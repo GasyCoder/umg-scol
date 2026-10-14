@@ -23,6 +23,7 @@ type Kpi = {
 };
 type Activity = {
     id: number;
+    uuid: string;
     at: string | null;
     actor: string;
     module_label: string;
@@ -51,6 +52,7 @@ type DashboardData = {
         with_anomalies: number;
         recent: {
             id: number;
+            uuid: string;
             filename: string;
             establishment: string;
             status: string;
@@ -369,7 +371,7 @@ export default function Dashboard({
                                             <tr key={item.id}>
                                                 <td className="max-w-56 truncate py-2 pr-3">
                                                     <Link
-                                                        href={`/imports/${item.id}`}
+                                                        href={`/imports/${item.uuid}`}
                                                         className="underline-offset-4 hover:underline"
                                                     >
                                                         {item.filename}
@@ -435,7 +437,7 @@ export default function Dashboard({
                                     >
                                         <span className="min-w-0">
                                             <Link
-                                                href={`/audits/${item.id}`}
+                                                href={`/audits/${item.uuid}`}
                                                 className="font-medium underline-offset-4 hover:underline"
                                             >
                                                 {item.event_label}
