@@ -73,7 +73,7 @@ export default function RecordFields({
                             }}
                             disabled={field.disabled}
                         >
-                            <SelectTrigger id={field.key}>
+                            <SelectTrigger id={field.key} className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
