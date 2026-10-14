@@ -1,12 +1,27 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, ChartColumn, LayoutGrid, ShieldCheck } from 'lucide-react';
+import {
+    BookMarked,
+    Building2,
+    CalendarDays,
+    CalendarRange,
+    ChartColumn,
+    FilePenLine,
+    FileUp,
+    FolderOpen,
+    Inbox,
+    LayoutGrid,
+    Layers,
+    Route,
+    ShieldCheck,
+    UserCheck,
+    Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
@@ -16,6 +31,14 @@ import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 import { definitions, baseUrl } from '@/components/references/definitions';
 import type { ReferenceKind } from '@/components/references/definitions';
+
+const referenceIcons: Record<ReferenceKind, LucideIcon> = {
+    establishments: Building2,
+    'academic-years': CalendarDays,
+    levels: Layers,
+    mentions: BookMarked,
+    programs: Route,
+};
 
 const mainNavItems: NavItem[] = [
     {
@@ -34,10 +57,10 @@ export function AppSidebar() {
         .map((kind) => ({
             title: definitions[kind].title,
             href: baseUrl(kind),
-            icon: BookOpen,
+            icon: referenceIcons[kind],
         }));
     const studentItems: NavItem[] = auth.canViewStudents
-        ? [{ title: 'Étudiants', href: '/students', icon: BookOpen }]
+        ? [{ title: 'Étudiants', href: '/students', icon: Users }]
         : [];
     const scholarshipItems: NavItem[] = [
         ...(auth.scholarships.campaigns
@@ -45,7 +68,7 @@ export function AppSidebar() {
                   {
                       title: 'Campagnes',
                       href: '/scholarships/campaigns',
-                      icon: BookOpen,
+                      icon: CalendarRange,
                   },
               ]
             : []),
@@ -54,7 +77,7 @@ export function AppSidebar() {
                   {
                       title: 'Réception des dossiers',
                       href: '/scholarships/reception',
-                      icon: BookOpen,
+                      icon: Inbox,
                   },
               ]
             : []),
@@ -63,7 +86,7 @@ export function AppSidebar() {
                   {
                       title: 'Dossiers',
                       href: '/scholarships/applications',
-                      icon: BookOpen,
+                      icon: FolderOpen,
                   },
               ]
             : []),
@@ -78,7 +101,7 @@ export function AppSidebar() {
     ];
     return (
         <Sidebar collapsible="icon" variant="sidebar">
-            <SidebarHeader>
+            <SidebarHeader className="h-16 justify-center border-b px-3">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
@@ -100,7 +123,7 @@ export function AppSidebar() {
                                   {
                                       title: 'Rattachements étudiants',
                                       href: '/student-links',
-                                      icon: BookOpen,
+                                      icon: UserCheck,
                                   },
                               ]
                             : []),
@@ -109,7 +132,7 @@ export function AppSidebar() {
                                   {
                                       title: 'Corrections',
                                       href: '/corrections',
-                                      icon: BookOpen,
+                                      icon: FilePenLine,
                                   },
                               ]
                             : []),
@@ -118,7 +141,7 @@ export function AppSidebar() {
                                   {
                                       title: 'Imports',
                                       href: '/imports',
-                                      icon: BookOpen,
+                                      icon: FileUp,
                                   },
                               ]
                             : []),
@@ -134,10 +157,6 @@ export function AppSidebar() {
                     <NavMain items={references} label="Référentiels" />
                 )}
             </SidebarContent>
-
-            <SidebarFooter>
-                <NavUser />
-            </SidebarFooter>
         </Sidebar>
     );
 }
