@@ -65,7 +65,7 @@ export default function ImportsIndex({
                                     <TableCell>
                                         <Link
                                             className="underline"
-                                            href={`/imports/${item.id}`}
+                                            href={`/imports/${item.uuid}`}
                                         >
                                             {item.original_filename}
                                         </Link>
