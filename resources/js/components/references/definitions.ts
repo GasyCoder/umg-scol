@@ -6,6 +6,7 @@ export type ReferenceKind =
     | 'programs';
 export type ReferenceRecord = {
     id: number;
+    uuid: string;
     name: string;
     is_active: boolean;
     code?: string | null;
