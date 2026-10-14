@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
+use App\Models\Activity;
 use App\Models\User;
 use App\Support\StudentPortalAccess;
-use Spatie\Activitylog\Models\Activity;
 
 /** Audit trail: global read for audits.view holders; no role is hidden from it, developer included. */
 class AuditPolicy
