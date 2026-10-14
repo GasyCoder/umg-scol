@@ -318,7 +318,7 @@ it('audits request, cancellation, approval and rejection with field and ids only
     $log = Activity::where('log_name', 'student_corrections')->orderBy('id')->get();
     expect($log->pluck('event')->all())->toBe(['correction_requested', 'correction_approved', 'correction_requested', 'correction_rejected', 'correction_requested', 'correction_cancelled', 'correction_requested', 'correction_approved', 'correction_requested', 'correction_approved']);
     $approval = $log->firstWhere('event', 'correction_approved');
-    expect($approval->causer_id)->toBe($this->staffA->id)->and($approval->properties->all())->toBe(['field' => 'phone', 'student_id' => $this->student->id, 'correction_id' => $approved->id]);
+    expect($approval->causer_id)->toBe($this->staffA->id)->and($approval->properties->all())->toEqual(['field' => 'phone', 'student_id' => $this->student->id, 'correction_id' => $approved->id]);
     expect($log->firstWhere('event', 'correction_cancelled')->causer_id)->toBe($this->studentUser->id);
     expect(Activity::where('log_name', 'students')->latest('id')->first()->properties->get('changed_fields'))->toBe(['email']);
     $json = Activity::all()->toJson();

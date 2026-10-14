@@ -44,11 +44,11 @@
 
 ## Phase 5 — Bourse
 
-- [ ] campagnes
-- [ ] réception dossier
-- [ ] numéro DDB
-- [ ] vérification
-- [ ] validation/correction/rejet
+- [x] campagnes
+- [x] réception dossier papier
+- [x] numéro DDB (saisie libre, doublon par campagne)
+- [x] vérification (checklist générique, à remplacer par la liste officielle)
+- [x] validation/correction/rejet, historique métier, export CSV
 
 ## Phase 6 — Audit/rapports
 

@@ -12,7 +12,6 @@ use App\Http\Requests\Students\StudentStatusRequest;
 use App\Http\Requests\Students\UpdateStudentRequest;
 use App\Models\Student;
 use App\Models\StudentRecord;
-use App\Support\StudentNormalization;
 use App\Support\StudentReferenceOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,16 +33,7 @@ class StudentController extends Controller
         }
         $search = trim($request->string('search')->toString());
         if ($search !== '') {
-            $query->whereHas('student', function ($q) use ($search): void {
-                $q->where(function ($q) use ($search): void {
-                    foreach (['student_number', 'last_name', 'first_names', 'cin', 'bac_registration_number', 'phone', 'email'] as $field) {
-                        $term = StudentNormalization::value($field, $search);
-                        $pattern = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
-                        $pattern = in_array($field, ['last_name', 'first_names']) ? '%'.$pattern.'%' : $pattern.'%';
-                        $q->orWhereRaw($field." LIKE ? ESCAPE '!'", [$pattern]);
-                    }
-                });
-            });
+            $query->whereHas('student', fn ($q) => $q->matching($search));
         }
 
         return Inertia::render('students/index', [

@@ -53,6 +53,35 @@ export function AppSidebar() {
     const studentItems: NavItem[] = auth.canViewStudents
         ? [{ title: 'Étudiants', href: '/students', icon: BookOpen }]
         : [];
+    const scholarshipItems: NavItem[] = [
+        ...(auth.scholarships.campaigns
+            ? [
+                  {
+                      title: 'Campagnes',
+                      href: '/scholarships/campaigns',
+                      icon: BookOpen,
+                  },
+              ]
+            : []),
+        ...(auth.scholarships.receive
+            ? [
+                  {
+                      title: 'Réception des dossiers',
+                      href: '/scholarships/reception',
+                      icon: BookOpen,
+                  },
+              ]
+            : []),
+        ...(auth.scholarships.applications
+            ? [
+                  {
+                      title: 'Dossiers',
+                      href: '/scholarships/applications',
+                      icon: BookOpen,
+                  },
+              ]
+            : []),
+    ];
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -101,6 +130,9 @@ export function AppSidebar() {
                             : []),
                     ]}
                 />
+                {scholarshipItems.length > 0 && (
+                    <NavMain items={scholarshipItems} label="Bourses" />
+                )}
                 {references.length > 0 && (
                     <NavMain items={references} label="Référentiels" />
                 )}

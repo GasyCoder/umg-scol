@@ -16,6 +16,11 @@ export type Auth = {
     canViewStudents: boolean;
     canViewImports: boolean;
     canViewCorrections: boolean;
+    scholarships: {
+        campaigns: boolean;
+        receive: boolean;
+        applications: boolean;
+    };
 };
 
 export type Passkey = {

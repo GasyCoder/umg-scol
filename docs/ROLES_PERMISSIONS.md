@@ -62,6 +62,15 @@ Matrice existante, sans nouvelle permission :
 
 Décider exige en plus le droit de modifier l'identité (`StudentPolicy::update`) : comme pour la saisie manuelle, un établissement ne peut pas approuver une correction sur une identité également déclarée par un autre établissement ; la demande reste visible en lecture et relève du superadmin. La Policy est revérifiée sous verrou dans l'Action.
 
+## Bourses
+
+Matrice existante, sans nouvelle permission :
+
+- `campaigns.manage` (superadmin, developer) : créer, modifier et changer le statut des campagnes. Le CDC confie les campagnes au superadmin ; la Scolarité Centrale ne reçoit pas cette permission.
+- Consultation des campagnes : `campaigns.manage` ou `scholarships.view`, en lecture seule pour la Scolarité Centrale.
+- `scholarships.view` : liste et détail des dossiers. Chaque action exige en plus sa permission : `scholarships.receive` (réception), `scholarships.review` (début de vérification, checklist), `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`.
+- `central_scholarship_office`, `superadmin` et `developer` ont ces permissions, avec un **accès global** : le traitement des dossiers papier est central. `establishment` et `student` n'ont aucune permission bourse et reçoivent 403 sur toutes ces routes. La Policy recontrôle la permission de la transition demandée, quelle que soit l'URL utilisée.
+
 ## Isolation
 
 Pour un rôle établissement, chaque Policy doit aussi comparer le `establishment_id`. Ne jamais faire ce contrôle uniquement dans React.

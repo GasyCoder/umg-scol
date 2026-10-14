@@ -28,7 +28,7 @@ Indexes conseillés : `(academic_year_id, establishment_id)`, `(student_id, acad
 
 ## scholarship_applications
 
-`application_number`, `scholarship_campaign_id`, `student_id`, `student_record_id`, `status`, dates/acteurs de réception, revue et décision, `reason`, `observation`.
+Implémentée : voir « Bourses implémentées » ci-dessous.
 
 ## imports/import_rows
 
@@ -154,3 +154,21 @@ Migration `2026_10_14_190000_create_student_correction_requests`, table `student
 - Index `(status, created_at)` pour la file de revue et `(user_id, created_at)` pour « Mes demandes ».
 
 Aucune suppression en cascade ; le rollback supprime uniquement cette table. Vérifications MySQL dédiées (contrainte unique, FK, attente de verrou entre deux connexions, rollback) : `php tests/MySql/StudentCorrectionChecks.php`, **uniquement sur une base jetable dont le nom contient `check`** (le script écrit des données réelles).
+
+## Bourses implémentées
+
+Migration `2026_10_14_200000_create_scholarship_tables`. Toutes les FK sont restrictives, sans cascade ; le rollback supprime uniquement ces quatre tables.
+
+- `scholarship_campaigns` : `academic_year_id`, `name` (unique par année), `starts_at`/`ends_at` indicatives, `status` (indexé), `notes`, `created_by`, `last_application_sequence` (compteur de numérotation, incrémenté sous verrou de la ligne campagne).
+- `scholarship_applications` : le dossier papier reçu. `application_number` unique ; `scholarship_campaign_id`, `sequence` (unique par campagne) ; `student_id` et `student_record_id` (déclaration annuelle retenue à la réception) ; `ddb_number` et `ddb_key` ; `status` ; `received_by`/`received_at` ; `review_started_by`/`review_started_at` (**dernier début de vérification**) ; `decided_by`/`decided_at` (**décision définitive uniquement** : validation ou rejet) ; `decision_reason` (motif de la demande de correction en cours ou du rejet) ; `internal_notes`. Aucune donnée personnelle du formulaire papier n'est recopiée : la comparaison se fait avec `students`/`student_records`.
+    - Unique `(campaign, student)` : un dossier par étudiant et campagne.
+    - Unique `(campaign, ddb_key)` : un numéro DDB fourni est unique dans sa campagne ; plusieurs dossiers sans DDB restent possibles (NULL).
+    - Index `(campaign, status, received_at)`, `(status, received_at)`, `received_at`, `ddb_key`, plus les index des FK `student_id` et `student_record_id`.
+- `scholarship_application_checks` : un contrôle par `(application, key)` unique ; `status` (`pending`, `ok`, `issue`, `not_applicable`), `note`, `checked_by`/`checked_at`. Les clés sont copiées depuis `config/scholarships.php` à la réception : modifier la liste ne change pas les dossiers déjà reçus.
+- `scholarship_application_status_histories` : historique métier `from_status` (NULL à la réception) → `to_status`, `actor_id`, `reason`, `created_at`. ActivityLog reste l'audit technique.
+
+**Numéro de dossier** : format technique `BRS{id campagne}-{séquence sur 6 chiffres}`, par exemple `BRS3-000042` (préfixe configurable). Ce n'est pas un format officiel. Il est attribué par le serveur, stable et unique (contrainte SQL). La séquence n'est consommée que si la réception est validée dans la même transaction.
+
+**Numéro DDB** : sa structure réglementaire n'est pas connue. Il est conservé tel que saisi, en chaîne, après suppression des espaces de début et de fin et regroupement des espaces internes. La clé de doublon `ddb_key` retire les espaces et passe en majuscules, sans toucher aux autres caractères. Il n'y a pas d'unicité globale, seulement par campagne.
+
+Vérifications MySQL : `php tests/MySql/ScholarshipChecks.php`, **uniquement sur une base jetable dont le nom contient `check`**.

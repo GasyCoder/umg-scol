@@ -72,6 +72,31 @@ class Student extends Model
         return $query->whereHas('studentRecords', fn ($record) => $record->currentActive()->where('establishment_id', $establishmentId));
     }
 
+    /**
+     * Server-side search shared by the student list and paper file reception:
+     * identifier/contact prefixes and name substrings.
+     *
+     * @param  Builder<Student>  $query
+     * @return Builder<Student>
+     */
+    public function scopeMatching(Builder $query, string $search): Builder
+    {
+        return $query->where(function ($q) use ($search): void {
+            foreach (['student_number', 'last_name', 'first_names', 'cin', 'bac_registration_number', 'phone', 'email'] as $field) {
+                $term = (string) StudentNormalization::value($field, $search);
+                $pattern = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
+                $pattern = in_array($field, ['last_name', 'first_names'], true) ? '%'.$pattern.'%' : $pattern.'%';
+                $q->orWhereRaw($field." LIKE ? ESCAPE '!'", [$pattern]);
+            }
+        });
+    }
+
+    /** @return HasMany<ScholarshipApplication, $this> */
+    public function scholarshipApplications(): HasMany
+    {
+        return $this->hasMany(ScholarshipApplication::class);
+    }
+
     /** @return HasOne<User,$this> */
     public function user(): HasOne
     {

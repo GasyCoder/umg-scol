@@ -50,9 +50,21 @@ Transitions : `pending → approved | rejected | cancelled` uniquement. Une dema
 
 Champs corrigibles : nom, prénoms, date et lieu de naissance, CIN (numéro, date et lieu de délivrance), téléphone, email de contact, adresse, numéro/série/année/mention du BAC. Exclus : le matricule (identifiant institutionnel attribué par l'établissement) et toute la déclaration annuelle (année, établissement, niveau, parcours, statut) : l'étudiant est invité à contacter son établissement.
 
-## Bourse
+## Bourse (implémentée)
 
-Dépôt papier → recherche étudiant → comparaison dossier/base → `validated` / `needs_correction` / `rejected`.
+**La demande de bourse reste papier.** Aucun dépôt numérique, aucun upload, aucun formulaire de demande dans le portail étudiant en V1. La plateforme enregistre la réception du dossier papier et son traitement par la Scolarité Centrale.
+
+1. **Campagne** (`/scholarships/campaigns`, `campaigns.manage`) : une campagne appartient à une année universitaire. Statuts `draft → scheduled | open`, `scheduled → open`, `open → closed`, `closed → archived`, sans retour. Ouverture refusée si l'année est inactive. Aucun changement automatique selon les dates en V1 : les dates sont indicatives, l'ouverture et la clôture sont manuelles. Pas de suppression.
+2. **Réception** (`/scholarships/reception`, `scholarships.receive`) : uniquement pour une campagne `open`. Le secrétariat choisit la campagne, recherche l'étudiant côté serveur (matricule, nom, prénom, CIN, numéro BAC, téléphone, email ; 2 caractères minimum, 20 résultats maximum), vérifie la fiche synthétique (matricule, nom, naissance, établissement, niveau, parcours, année) puis saisit le numéro DDB et des observations internes.
+3. Le serveur impose l'étudiant (actif), la **déclaration annuelle** (l'unique déclaration `active` de l'année de la campagne, avec établissement, niveau et parcours actifs et cohérents), l'acteur et la date. Aucune déclaration, déclaration inactive ou situation ambiguë : refus avec message, aucun dossier créé. **Un dossier par étudiant et par campagne.**
+4. **Vérification** (`scholarships.review`) : checklist de contrôles du dossier papier contre la fiche officielle (`conforme`, `anomalie`, `non applicable`, note facultative). Commencer la vérification ou enregistrer un premier contrôle fait passer le dossier `pending → in_review`.
+5. **Décision** : `validated` (`scholarships.validate`) exige que tous les contrôles soient conformes ou non applicables, et que la fiche et la déclaration soient toujours actives ; `needs_correction` (`scholarships.request_correction`) et `rejected` (`scholarships.reject`) exigent un motif (10 à 1000 caractères).
+
+Statuts du dossier : `pending` (reçu), `in_review`, `validated`, `needs_correction`, `rejected`. Transitions : `pending → in_review | validated | needs_correction | rejected` ; `in_review → validated | needs_correction | rejected` ; `needs_correction → in_review | validated | rejected`. `validated` et `rejected` sont définitifs en V1 (une réouverture serait une décision métier distincte). Un dossier d'une campagne archivée n'est plus modifiable ; une campagne clôturée bloque la réception, pas le traitement.
+
+`needs_correction` concerne le **dossier papier** (pièce manquante, incohérence à clarifier). Il ne modifie jamais `Student` et ne crée pas de `StudentCorrectionRequest` : si une donnée officielle est fausse, le workflow de correction existant s'applique séparément.
+
+Liste `/scholarships/applications` : pagination serveur (25), recherche (N° dossier, N° DDB, matricule, nom, prénom), filtres campagne, statut, établissement, niveau, période de réception. Export CSV (`scholarships.export`) des mêmes filtres. Historique métier visible sur chaque dossier.
 
 ## Historique
 

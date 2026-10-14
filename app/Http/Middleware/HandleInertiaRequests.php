@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ScholarshipApplication;
+use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
@@ -49,6 +51,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'permissions' => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
+                'scholarships' => [
+                    'campaigns' => $request->user() !== null && Gate::allows('viewAny', ScholarshipCampaign::class),
+                    'receive' => $request->user() !== null && Gate::allows('receive', ScholarshipApplication::class),
+                    'applications' => $request->user() !== null && Gate::allows('viewAny', ScholarshipApplication::class),
+                ],
                 'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
                 'canViewImports' => $request->user() !== null && Gate::allows('viewAny', StudentImport::class),
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
