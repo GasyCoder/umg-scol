@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -58,6 +59,12 @@ class Student extends Model
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         return $query->when($user->hasRole('establishment'), fn ($query) => $query->whereHas('studentRecords', fn ($record) => $record->where('establishment_id', $user->establishment_id)));
+    }
+
+    /** @return HasOne<User,$this> */
+    public function user(): HasOne
+    {
+        return $this->hasOne(User::class);
     }
 
     public function getActivitylogOptions(): LogOptions

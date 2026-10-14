@@ -22,6 +22,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @property int $id
  * @property string $name
+ * @property int|null $student_id
  * @property int|null $establishment_id
  * @property string $email
  * @property Carbon|null $email_verified_at
@@ -34,11 +35,19 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $updated_at
  */
 #[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'normalized_email', 'student_id'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, LogsActivity, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    protected string $guard_name = 'web';
+
+    /** @return BelongsTo<Student,$this> */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -73,6 +82,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'establishment_id' => 'integer',
+            'student_id' => 'integer',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

@@ -42,7 +42,7 @@ FK, transactions, historique, indexes, pas de duplication inutile, contraintes u
 
 Les migrations techniques sont complétées par `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions` (Spatie Permission) et `activity_log` (Spatie Activitylog). Les identifiants de modèles utilisent des relations polymorphes ; les pivots des rôles et permissions possèdent leurs contraintes et index fournis par le package.
 
-`activity_log` conserve sujet, acteur, événement, journal, changements d'attributs autorisés et métadonnées minimales. La fondation identité n'ajoutait aucun rattachement métier à `users`. La phase Référentiels ajoute désormais `establishment_id` nullable ; `student_id` reste absent. Les tables étudiantes sont désormais implémentées dans la phase suivante ; les tables de bourse restent proposées et non implémentées.
+`activity_log` conserve sujet, acteur, événement, journal, changements d'attributs autorisés et métadonnées minimales. La fondation identité n'ajoutait aucun rattachement métier à `users`. La phase Référentiels ajoute désormais `establishment_id` nullable ; le portail étudiant ajoute `student_id` (voir ci-dessous). Les tables étudiantes sont désormais implémentées dans la phase suivante ; les tables de bourse restent proposées et non implémentées.
 
 ## Référentiels institutionnels implémentés
 
@@ -128,3 +128,16 @@ Même déclaration annuelle et même niveau/parcours : duplicate sans modificati
 Confirmation : transaction unique avec verrou de l'import, verrous partagés des référentiels et verrous ciblés d'identité, puis nouvelle analyse de chaque ligne valid et verrouillage des candidats/déclarations. Les écritures Eloquent conservent l'audit. Reprise limitée des deadlocks ; échec critique rollback identité/déclaration/staging/audit, puis statut failed avec motif générique sans données personnelles. Un retry completed est un no-op sans second audit. La saisie manuelle conserve son verrou court de cache et acquiert les mêmes verrous DB avant les contrôles de doublons. Les écritures SQL directes ne bénéficient pas de ce protocole.
 
 SQLite conserve les tests automatisés rapides ; MySQL est vérifié séparément avec `php tests/MySql/StudentImportChecks.php` sur la connexion locale. Toutes les données de contrôle sont rollbackées. Les collations MySQL peuvent rapprocher casse/accents différemment de SQLite : le matching final et les clés utilisent un repli ASCII/minuscule, les conflits de valeurs restent stricts. Les dates SQLite peuvent être stockées avec minuit, les recherches incluent les deux formes date et date/minuit.
+
+## Portail étudiant implémenté
+
+Migration `2026_10_14_180000_create_student_portal_foundation` :
+
+- `users.student_id` : FK nullable vers `students`, `restrictOnDelete`, **unique** (une fiche = un compte au plus). Les comptes internes restent à `NULL`. Colonne cachée dans la sérialisation.
+- `users.normalized_email` : colonne générée virtuelle `LOWER(email)`, unique : deux comptes ne peuvent différer que par la casse de l'email.
+- `email_otp_challenges` : UUID, email, `email_key` HMAC unique (un défi actif par adresse), `code_hash` (bcrypt d'un HMAC du code), `session_hash` (lien au navigateur), `attempts`, `expires_at` indexé, `consumed_at`. Le code en clair n'est jamais stocké. Purge horaire par `students:purge-otp`.
+- `portal_email_locks` : clés HMAC servant de verrous de ligne (sérialisation des créations de compte par email / sujet Google).
+- `social_accounts` : `provider`, `provider_user_id`, `provider_email`, uniques `(provider, provider_user_id)` et `(user_id, provider)`. Aucun jeton OAuth stocké.
+- `student_link_requests` : `user_id`, `student_id`, `status` (`pending`, `approved`, `rejected`, `cancelled`), `requested_at`, `reviewed_at`, `reviewed_by`, `rejection_reason` (motif interne). Unique `(user_id, student_id)` et colonne virtuelle `pending_user_id` unique : une seule demande pending par compte. Les données saisies par l'étudiant (identifiant, naissance) ne sont pas persistées.
+
+Toutes les FK sont restrictives ; aucune suppression en cascade. Le rollback supprime les tables puis les colonnes de `users`, sans toucher aux autres données.

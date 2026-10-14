@@ -33,16 +33,17 @@ Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour
 - Bourses : `scholarships.view`, `scholarships.receive`, `scholarships.review`, `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`.
 - Administration : `establishments.manage`, `academic_years.manage`, `levels.manage`, `programs.manage`, `campaigns.manage`, `users.manage`, `roles.manage`, `permissions.manage`.
 - Audit : `audits.view`, `audits.export`.
+- Portail étudiant : `student_links.review` (revue des demandes de rattachement manuel).
 
 ## Matrice initiale
 
-| Rôle                         | Permissions attribuées                                                                                                             |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `superadmin`                 | Les 33 permissions du catalogue, explicitement attribuées                                                                          |
-| `developer`                  | Les mêmes 33 permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                         |
-| `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view` et les sept permissions bourses |
-| `establishment`              | Les six permissions étudiants, les trois déclarations annuelles, les quatre imports, `corrections.view`, `corrections.review`      |
-| `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                  |
+| Rôle                         | Permissions attribuées                                                                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `superadmin`                 | Les 34 permissions du catalogue, explicitement attribuées                                                                                                  |
+| `developer`                  | Les mêmes 34 permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                 |
+| `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view`, `student_links.review` et les sept permissions bourses |
+| `establishment`              | Les six permissions étudiants, les trois déclarations annuelles, les quatre imports, `corrections.view`, `corrections.review`, `student_links.review`      |
+| `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                                          |
 
 `students.viewAny` autorise une liste dans le périmètre du rôle : établissement propre pour `establishment`, global pour la Scolarité Centrale. Les permissions de consultation individuelle ne donnent jamais accès aux données d'autrui par elles-mêmes. Les Policies et filtres effectifs seront implémentés avec les modèles métier ; aucune isolation fictive n'est créée dans cette fondation.
 
@@ -54,11 +55,13 @@ Les attributions et retraits de rôles/permissions via les méthodes Spatie sont
 
 Pour un rôle établissement, chaque Policy doit aussi comparer le `establishment_id`. Ne jamais faire ce contrôle uniquement dans React.
 
-## Portails prévus
+## Portails
 
 - `scol.umg.test:8000` : `establishment`, `central_scholarship_office`, `superadmin`, `developer`.
 - `bourse.umg.test:8000` : `student` uniquement, via l'API Laravel `/api/student/*`.
 
 La séparation des domaines ne remplace pas les contrôles serveur. L'API étudiante doit limiter chaque requête à la fiche liée au compte authentifié. Une adresse email vérifiée ou un compte Google ne donne pas, à lui seul, accès à une fiche étudiante.
 
-Le rôle étudiant ne reçoit aucune permission de modification directe des données officielles. Il peut soumettre une demande de correction, traitée par l'établissement. Le mécanisme de rattachement et les contrôles de portail restent à implémenter lors d'une phase ultérieure.
+Le rôle étudiant ne reçoit aucune permission de modification directe des données officielles. Il peut soumettre une demande de correction, traitée par l'établissement. Le compte `student` n'utilise aucune permission Spatie sur `bourse` : l'accès est déterminé par le garde `student`, le rôle `student` seul, l'email vérifié, le marqueur de session du portail et `users.student_id`. Un compte portant un autre rôle (même en plus de `student`) est refusé sur l'API étudiante ; un compte `student` est refusé sur toutes les routes de `scol`, y compris Fortify et passkeys.
+
+Revue des rattachements (`/student-links`) : permission `student_links.review` + compte interne avec contexte valide. `establishment` ne voit et ne traite que les demandes dont l'étudiant a une déclaration `active` dans son établissement sur l'année courante active ; `central_scholarship_office`, `superadmin` et `developer` ont une revue globale. La Policy recontrôle ce périmètre sur l'ID de la demande et l'Action le revérifie sous verrou.

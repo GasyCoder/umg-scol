@@ -1,0 +1,23 @@
+<?php
+
+use App\Http\Controllers\StudentPortal\AuthenticationController;
+use App\Http\Controllers\StudentPortal\ProfileController;
+use App\Http\Middleware\EnsureStudentPortal;
+use Illuminate\Support\Facades\Route;
+
+Route::domain(config('portals.bourse_domain'))->group(function () {
+    Route::view('/', 'bourse')->name('student-portal');
+    Route::prefix('api/student')->name('student-api.')->group(function () {
+        Route::get('session', [AuthenticationController::class, 'session'])->name('session');
+        Route::post('auth/otp/request', [AuthenticationController::class, 'requestOtp'])->middleware('throttle:student-otp-request')->name('otp.request');
+        Route::post('auth/otp/verify', [AuthenticationController::class, 'verifyOtp'])->middleware('throttle:student-otp-verify')->name('otp.verify');
+        Route::get('auth/google/redirect', [AuthenticationController::class, 'googleRedirect'])->middleware('throttle:student-oauth')->name('google.redirect');
+        Route::get('auth/google/callback', [AuthenticationController::class, 'googleCallback'])->middleware('throttle:student-oauth')->name('google.callback');
+        Route::middleware(['auth:sanctum', EnsureStudentPortal::class])->group(function () {
+            Route::post('logout', [AuthenticationController::class, 'logout'])->name('logout');
+            Route::get('link/status', [ProfileController::class, 'status'])->name('link.status');
+            Route::post('link', [ProfileController::class, 'link'])->middleware('throttle:student-link')->name('link');
+            Route::get('me', [ProfileController::class, 'me'])->name('me');
+        });
+    });
+});

@@ -20,6 +20,17 @@ Permissions existantes imports.view/create/commit/export_errors, Policy serveur 
 
 Traitement synchrone V1, **10 Mo, 5 000 lignes physiques de données, 50 colonnes**, expansion XLSX limitée à 100 Mo. Taille/lignes configurables dans `config/student_imports.php`. Lecture et inserts staging par blocs de 200 ; analyse et confirmation par blocs ; aucun chargement intégral des lignes en mémoire. Les clés de doublons/verrouillage sont conservées en mémoire (volume borné), pas le fichier complet. La confirmation reste une transaction globale : les chunks ne sont pas des commits partiels. Test automatisé de 1 001 lignes ; vérifier les temps et limites PHP/proxy sur le matériel cible avant de relever les bornes. Pour des lots plus grands, passer les Actions en Jobs avec suivi d'état ; aucun worker n'est requis en local dans cette phase.
 
+## Portail étudiant : compte et rattachement
+
+Implémenté sur `bourse` (`/api/student/*`) :
+
+1. L'étudiant saisit son email → code à 6 chiffres envoyé → vérification → compte `student` créé ou retrouvé, email vérifié. Variante : Google OAuth (email vérifié). Le compte seul ne donne accès à aucune fiche et ne vaut pas inscription.
+2. L'étudiant saisit matricule ou numéro d'inscription au BAC + date de naissance.
+3. Rattachement automatique si identifiant exact, même naissance, fiche unique et active, non déjà liée, et email officiel de la fiche identique à l'email vérifié du compte.
+4. Sinon, si une fiche unique active non liée correspond, une demande `pending` est créée (une seule par compte) ; la réponse reste générique dans tous les cas d'échec.
+5. Le personnel autorisé traite la demande dans `/student-links` : approbation (revalidée sous verrou : compte toujours `student` vérifié non lié, fiche active non liée) ou rejet avec motif interne (10 à 500 caractères). Une double approbation est un no-op. Un rattachement automatique ultérieur annule la demande pending.
+6. Une fois rattaché, l'étudiant consulte sa fiche et ses déclarations annuelles en lecture seule.
+
 ## Vérification étudiant
 
 Identification → consultation → confirmer OU demander correction → établissement accepte/refuse/corrige.

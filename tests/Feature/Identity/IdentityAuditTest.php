@@ -9,7 +9,7 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 it('audits successful authentication and logout without credentials', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->internal()->create();
 
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
         ->assertRedirect(route('dashboard', absolute: false));

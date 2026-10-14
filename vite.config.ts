@@ -10,7 +10,11 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.tsx'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.tsx',
+                'resources/js/bourse/app.tsx',
+            ],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
@@ -29,6 +33,10 @@ export default defineConfig({
         }),
     ]),
     server: {
+        allowedHosts: [
+            process.env.SCOL_DOMAIN ?? 'scol.umg.test',
+            process.env.BOURSE_DOMAIN ?? 'bourse.umg.test',
+        ],
         watch: {
             ignored: [
                 '**/.agents/**',

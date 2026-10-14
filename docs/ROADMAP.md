@@ -37,7 +37,8 @@
 
 ## Phase 4 — Vérification étudiant
 
-- [ ] consultation
+- [x] portail `bourse` : compte OTP/Google et rattachement sécurisé
+- [x] consultation
 - [ ] confirmation
 - [ ] correction
 

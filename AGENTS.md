@@ -22,7 +22,7 @@ Packages privilégiés : `spatie/laravel-permission`, `spatie/laravel-activitylo
 
 ## Architecture
 
-- Un seul backend Laravel ; portail interne `scol.umg.test:8000` avec Inertia et portail étudiant `bourse.umg.test:8000` avec une future API `/api/student/*`. Aucun deuxième backend.
+- Un seul backend Laravel ; portail interne `scol.umg.test:8000` avec Inertia et portail étudiant `bourse.umg.test:8000` avec l'API `/api/student/*`. Aucun deuxième backend.
 - Contrôleurs minces, Form Requests, Policies/Gates, Actions/Services pour la logique métier.
 - Enums PHP pour les statuts.
 - Transactions DB pour imports et décisions sensibles.

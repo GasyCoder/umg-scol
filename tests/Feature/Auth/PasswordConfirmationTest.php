@@ -13,7 +13,7 @@ class PasswordConfirmationTest extends TestCase
 
     public function test_confirm_password_screen_can_be_rendered()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->internal()->create();
 
         $response = $this->actingAs($user)->get(route('password.confirm'));
 

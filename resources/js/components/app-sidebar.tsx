@@ -72,6 +72,15 @@ export function AppSidebar() {
                     items={[
                         ...mainNavItems,
                         ...studentItems,
+                        ...(auth.permissions.includes('student_links.review')
+                            ? [
+                                  {
+                                      title: 'Rattachements étudiants',
+                                      href: '/student-links',
+                                      icon: BookOpen,
+                                  },
+                              ]
+                            : []),
                         ...(auth.canViewImports
                             ? [
                                   {

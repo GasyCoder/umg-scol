@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Support\InternalUserProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Auth::provider('internal-eloquent', fn ($app, array $config) => new InternalUserProvider($app['hash'], $config['model']));
         $this->configureDefaults();
     }
 

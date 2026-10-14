@@ -7,7 +7,7 @@ $corrections = ['corrections.create', 'corrections.view', 'corrections.review'];
 $scholarships = ['scholarships.view', 'scholarships.receive', 'scholarships.review', 'scholarships.validate', 'scholarships.request_correction', 'scholarships.reject', 'scholarships.export'];
 $administration = ['establishments.manage', 'academic_years.manage', 'levels.manage', 'programs.manage', 'campaigns.manage', 'users.manage', 'roles.manage', 'permissions.manage'];
 $audits = ['audits.view', 'audits.export'];
-$permissions = [...$students, ...$records, ...$imports, ...$corrections, ...$scholarships, ...$administration, ...$audits];
+$permissions = [...$students, ...$records, ...$imports, ...$corrections, ...$scholarships, ...$administration, ...$audits, 'student_links.review'];
 
 return [
     'guard' => 'web',
@@ -17,9 +17,9 @@ return [
         'developer' => $permissions,
         'central_scholarship_office' => [
             'students.view', 'students.viewAny', 'students.export',
-            'student_records.view', 'corrections.view', ...$scholarships,
+            'student_records.view', 'corrections.view', 'student_links.review', ...$scholarships,
         ],
-        'establishment' => [...$students, ...$records, ...$imports, 'corrections.view', 'corrections.review'],
+        'establishment' => [...$students, ...$records, ...$imports, 'student_links.review', 'corrections.view', 'corrections.review'],
         'student' => ['students.view', 'student_records.view', 'corrections.create', 'corrections.view'],
     ],
 ];

@@ -38,9 +38,10 @@ return [
     */
 
     'guards' => [
+        'student' => ['driver' => 'session', 'provider' => 'users'],
         'web' => [
             'driver' => 'session',
-            'provider' => 'users',
+            'provider' => 'internal',
         ],
     ],
 
@@ -62,6 +63,7 @@ return [
     */
 
     'providers' => [
+        'internal' => ['driver' => 'internal-eloquent', 'model' => User::class],
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
@@ -94,7 +96,7 @@ return [
 
     'passwords' => [
         'users' => [
-            'provider' => 'users',
+            'provider' => 'internal',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

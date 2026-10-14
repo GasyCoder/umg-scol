@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureInternalPortal;
 use Laravel\Fortify\Features;
 
 return [
@@ -88,7 +89,7 @@ return [
 
     'prefix' => '',
 
-    'domain' => null,
+    'domain' => env('SCOL_DOMAIN', 'scol.umg.test'),
 
     /*
     |--------------------------------------------------------------------------
@@ -101,7 +102,7 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    'middleware' => ['web', EnsureInternalPortal::class],
 
     /*
     |--------------------------------------------------------------------------

@@ -38,6 +38,10 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        if ($request->getHost() === config('portals.bourse_domain')) {
+            return [];
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),

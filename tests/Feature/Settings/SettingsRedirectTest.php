@@ -11,13 +11,13 @@ it('requires authentication to access settings', function () {
 });
 
 it('redirects authenticated navigation to the profile', function (string $method) {
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->internal()->create())
         ->call($method, '/settings')
         ->assertRedirect(route('profile.edit'));
 })->with(['GET', 'HEAD']);
 
 it('rejects non-navigation methods on the settings redirect', function (string $method) {
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->internal()->create())
         ->call($method, '/settings')
         ->assertStatus(405);
 })->with(['POST', 'PUT', 'PATCH', 'DELETE', 'QUERY']);

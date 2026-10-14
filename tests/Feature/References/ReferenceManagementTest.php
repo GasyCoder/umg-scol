@@ -180,7 +180,7 @@ it('keeps other roles nullable and denies unusable establishment accounts', func
     $user = User::factory()->create()->assignRole($role);
     expect($user->establishment_id)->toBeNull();
     $response = $this->actingAs($user)->get('/dashboard');
-    if ($role === 'establishment') {
+    if (in_array($role, ['establishment', 'student'], true)) {
         $response->assertForbidden();
     } else {
         $response->assertOk();

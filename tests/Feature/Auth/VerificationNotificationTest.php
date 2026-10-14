@@ -24,7 +24,7 @@ class VerificationNotificationTest extends TestCase
     {
         Notification::fake();
 
-        $user = User::factory()->unverified()->create();
+        $user = User::factory()->internal()->unverified()->create();
 
         $this->actingAs($user)
             ->post(route('verification.send'))
@@ -37,7 +37,7 @@ class VerificationNotificationTest extends TestCase
     {
         Notification::fake();
 
-        $user = User::factory()->create();
+        $user = User::factory()->internal()->create();
 
         $this->actingAs($user)
             ->post(route('verification.send'))

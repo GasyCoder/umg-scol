@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
+use App\Support\StudentPortalAccess;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -13,6 +16,9 @@ use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\Passkeys;
+use Laravel\Sanctum\Sanctum;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -29,6 +35,13 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::query()->where('email', $request->input('email'))->first();
+
+            return $user !== null && StudentPortalAccess::internal($user) && Hash::check($request->input('password'), $user->password) ? $user : null;
+        });
+        Sanctum::getAccessTokenFromRequestUsing(fn () => '');
+        Passkeys::authorizeLoginUsing(fn (Request $request, PasskeyUser $user) => $user instanceof User && StudentPortalAccess::internal($user));
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();

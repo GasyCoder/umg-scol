@@ -18,7 +18,7 @@ beforeEach(function () {
 it('creates exactly the five documented roles and the complete permission catalogue', function () {
     expect(Role::query()->pluck('name')->sort()->values()->all())
         ->toBe(['central_scholarship_office', 'developer', 'establishment', 'student', 'superadmin']);
-    expect(Permission::query()->count())->toBe(33);
+    expect(Permission::query()->count())->toBe(34);
 
     foreach (config('access.permissions') as $permission) {
         expect(Permission::findByName($permission, 'web'))->not->toBeNull();
