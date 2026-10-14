@@ -19,7 +19,7 @@ class CorrectionListRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', Rule::in(['all', ...array_column(StudentCorrectionStatus::cases(), 'value')])], 'field' => ['nullable', Rule::enum(StudentCorrectionField::class)], 'establishment_id' => ['nullable', 'integer', Rule::exists('establishments', 'id')]];
+        return ['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', Rule::in(['all', ...array_column(StudentCorrectionStatus::cases(), 'value')])], 'field' => ['nullable', Rule::enum(StudentCorrectionField::class)], 'establishment_id' => ['nullable', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')]];
     }
 
     /** @return array<string,string> */

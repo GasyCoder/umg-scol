@@ -415,3 +415,9 @@ it('always interprets CSV numeric dates using calendar 1900', function () {
         Date::setExcelCalendar(1900);
     }
 });
+it('offers a French import template that the column mapping recognises', function () {
+    $csv = $this->actingAs($this->actor)->get('/imports/template')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
+    expect($csv)->toStartWith("\xEF\xBB\xBF")->toContain('Nom;Prénoms;Matricule');
+    $headers = str_getcsv(trim(substr($csv, 3)), ';');
+    expect(array_keys(StudentImportColumns::suggest($headers)))->toContain('last_name', 'level', 'program');
+});

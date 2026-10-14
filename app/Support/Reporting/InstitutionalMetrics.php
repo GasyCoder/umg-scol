@@ -43,7 +43,7 @@ final class InstitutionalMetrics
         if ($this->scope->year === null) {
             return ['declarations' => 0, 'active_declarations' => 0, 'active_students' => 0];
         }
-        $row = $this->records()->join('students', 'students.id', '=', 'student_records.student_id')
+        $row = $this->records()->join('students', 'students.id', '=', 'student_records.student_id')->whereNull('students.deleted_at')
             ->selectRaw("count(*) as declarations, sum(case when student_records.status = 'active' then 1 else 0 end) as active_declarations, count(distinct case when student_records.status = 'active' and students.is_active = ? then student_records.student_id end) as active_students", [true])
             ->toBase()->first();
 
@@ -53,7 +53,7 @@ final class InstitutionalMetrics
     /** @return array<int,array{id:int,label:string,value:int}> */
     public function studentsByLevel(): array
     {
-        return $this->grouped($this->activeRecords()->join('levels', 'levels.id', '=', 'student_records.level_id')
+        return $this->grouped($this->activeRecords()->join('levels', 'levels.id', '=', 'student_records.level_id')->whereNull('levels.deleted_at')
             ->groupBy('levels.id', 'levels.name', 'levels.sort_order')->orderBy('levels.sort_order')->orderBy('levels.name')
             ->selectRaw('levels.id as id, levels.name as label, count(*) as value'));
     }
@@ -61,7 +61,7 @@ final class InstitutionalMetrics
     /** @return array<int,array{id:int|null,label:string,value:int}> */
     public function studentsByProgram(): array
     {
-        return $this->grouped($this->activeRecords()->leftJoin('programs', 'programs.id', '=', 'student_records.program_id')
+        return $this->grouped($this->activeRecords()->leftJoin('programs', 'programs.id', '=', 'student_records.program_id')->whereNull('programs.deleted_at')
             ->groupBy('programs.id', 'programs.name')->orderByRaw('programs.id is null')->orderByDesc('value')->orderBy('programs.name')
             ->selectRaw('programs.id as id, programs.name as label, count(*) as value'), 'Sans parcours');
     }
@@ -69,7 +69,7 @@ final class InstitutionalMetrics
     /** @return array<int,array{id:int,label:string,value:int}> */
     public function studentsByEstablishment(): array
     {
-        return $this->grouped($this->activeRecords()->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')
+        return $this->grouped($this->activeRecords()->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')->whereNull('establishments.deleted_at')
             ->groupBy('establishments.id', 'establishments.name')->orderByDesc('value')->orderBy('establishments.name')
             ->selectRaw('establishments.id as id, establishments.name as label, count(*) as value'));
     }
@@ -176,7 +176,7 @@ final class InstitutionalMetrics
     /** @return Builder<ScholarshipApplication> */
     private function applications(): Builder
     {
-        return ScholarshipApplication::query()->join('scholarship_campaigns', 'scholarship_campaigns.id', '=', 'scholarship_applications.scholarship_campaign_id')
+        return ScholarshipApplication::query()->join('scholarship_campaigns', 'scholarship_campaigns.id', '=', 'scholarship_applications.scholarship_campaign_id')->whereNull('scholarship_campaigns.deleted_at')
             ->where('scholarship_campaigns.academic_year_id', $this->scope->year?->id);
     }
 
@@ -197,8 +197,8 @@ final class InstitutionalMetrics
     /** @return array<int,array{id:int,label:string,value:int}> */
     public function scholarshipsByEstablishment(): array
     {
-        return $this->grouped($this->applications()->join('student_records', 'student_records.id', '=', 'scholarship_applications.student_record_id')
-            ->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')
+        return $this->grouped($this->applications()->join('student_records', 'student_records.id', '=', 'scholarship_applications.student_record_id')->whereNull('student_records.deleted_at')
+            ->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')->whereNull('establishments.deleted_at')
             ->groupBy('establishments.id', 'establishments.name')->orderByDesc('value')->orderBy('establishments.name')
             ->selectRaw('establishments.id as id, establishments.name as label, count(*) as value'));
     }

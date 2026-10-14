@@ -23,7 +23,7 @@ class SaveCampaignRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')], 'name' => ['required', 'string', 'max:150'],
+            'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')->whereNull('deleted_at')], 'name' => ['required', 'string', 'max:150'],
             'starts_at' => ['nullable', 'date_format:Y-m-d'], 'ends_at' => ['nullable', 'date_format:Y-m-d'], 'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

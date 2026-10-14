@@ -54,6 +54,6 @@ class StudentCorrectionRequest extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return $query->when($user->hasRole('establishment'), fn ($q) => $q->whereHas('student', fn ($student) => $student->currentlyDeclaredBy($user->establishment_id)));
+        return $query->whereHas('student')->when($user->hasRole('establishment'), fn ($q) => $q->whereHas('student', fn ($student) => $student->currentlyDeclaredBy($user->establishment_id)));
     }
 }

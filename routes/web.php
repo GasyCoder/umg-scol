@@ -24,6 +24,8 @@ Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware
     require __DIR__.'/corrections.php';
     require __DIR__.'/scholarships.php';
     require __DIR__.'/reporting.php';
+    require __DIR__.'/permissions.php';
+    require __DIR__.'/trash.php';
     Route::get('student-links', [LinkReviewController::class, 'index'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.index');
     Route::post('student-links/{student_link_request}/review', [LinkReviewController::class, 'review'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.review');
 

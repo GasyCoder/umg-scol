@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 Schedule::command('students:purge-imports')->daily()->withoutOverlapping();
 
 Schedule::command('students:purge-otp')->hourly()->withoutOverlapping();
+
+Schedule::command('trash:cleanup-files')->hourly()->withoutOverlapping();

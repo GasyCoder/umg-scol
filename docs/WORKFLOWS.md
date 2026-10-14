@@ -20,6 +20,16 @@ Permissions existantes imports.view/create/commit/export_errors, Policy serveur 
 
 Traitement synchrone V1, **10 Mo, 5 000 lignes physiques de données, 50 colonnes**, expansion XLSX limitée à 100 Mo. Taille/lignes configurables dans `config/student_imports.php`. Lecture et inserts staging par blocs de 200 ; analyse et confirmation par blocs ; aucun chargement intégral des lignes en mémoire. Les clés de doublons/verrouillage sont conservées en mémoire (volume borné), pas le fichier complet. La confirmation reste une transaction globale : les chunks ne sont pas des commits partiels. Test automatisé de 1 001 lignes ; vérifier les temps et limites PHP/proxy sur le matériel cible avant de relever les bornes. Pour des lots plus grands, passer les Actions en Jobs avec suivi d'état ; aucun worker n'est requis en local dans cette phase.
 
+## Import/export des mentions et parcours
+
+Sur `/references/mentions` et `/references/programs`, un compte autorisé (`programs.manage`, établissement limité au sien) dispose de :
+
+- **Modèle** (`GET references/{kind}/template`) : XLSX avec une feuille « Mentions » ou « Parcours » (en-têtes seuls : `Code établissement`, `Code mention`, `Nom de la mention` ; pour les parcours `Code établissement`, `Code mention` facultatif, `Code parcours` facultatif, `Nom du parcours`) et une feuille « Codes » listant les établissements (et, pour les parcours, les mentions codées) du périmètre.
+- **Export** (`GET references/{kind}/export`) : la liste filtrée (recherche, établissement) dans le périmètre, mêmes colonnes que le modèle, donc réimportable telle quelle. Toutes les cellules sont écrites en texte.
+- **Import** : upload XLSX (première feuille) ou CSV `;`/`,` UTF-8 avec ou sans BOM, 2 Mo et 1 000 lignes au plus → analyse (codes mis en majuscules, mêmes règles que les formulaires) → prévisualisation `/references/{kind}/import/{token}` → confirmation explicite → transaction unique → retour à la liste avec « x créé(s), y mis à jour, z ignoré(s) ».
+  Statuts : `à créer`, `à mettre à jour` (même établissement et même code, nom ou mention différent), `inchangé`, `erreur` (établissement inconnu ou hors périmètre, nom manquant/trop long, code invalide, mention inconnue pour l'établissement, code en double dans le fichier, doublon probable). Une ligne sans code ne met jamais à jour : elle est créée seulement si aucun référentiel du même nom n'existe dans l'établissement (identique et sans code → `inchangé`). Une ligne codée dont le nom existe déjà sans code est refusée (ajouter le code par le formulaire). Une mention vide sur un parcours existant dont la mention n'a pas de code conserve cette mention.
+  Les lignes en erreur ou inchangées ne sont jamais importées ; la confirmation n'est possible que s'il reste au moins une création ou mise à jour. Pas de table : les lignes normalisées et l'analyse sont gardées 30 min en cache sous un jeton aléatoire lié au compte et au type. À la confirmation, l'analyse est refaite sous verrou des établissements concernés ; si le résultat a changé, rien n'est écrit et la prévisualisation est mise à jour.
+
 ## Navigation des étudiants (portail interne)
 
 `/students` se parcourt en cartes : établissement → niveau → mention → parcours → liste paginée. Chaque carte compte les déclarations actives (et inactives) de l'année choisie, l'année courante par défaut. Un compte établissement commence directement à ses niveaux et ne voit jamais un autre établissement. « Sans mention » regroupe les parcours non rattachés et les déclarations sans parcours ; « Sans parcours », les déclarations sans parcours. À chaque étape : fil d'Ariane cliquable, bouton « Voir toute la sélection en liste », recherche (matricule, nom, prénom, CIN, numéro BAC, téléphone, email) limitée à l'année affichée ; une recherche par URL sans année couvre toutes les années.
@@ -88,3 +98,9 @@ Liste `/scholarships/applications` : pagination serveur (25), recherche (N° dos
 ## Historique
 
 Ne jamais écraser un ancien `student_record` lors d'un changement d'année ; créer la déclaration de la nouvelle année.
+
+## Suppression réversible et permissions
+
+Personnel global autorisé → « Supprimer » → confirmation → contrôles des liens → corbeille. `/trash` liste par catégorie avec recherche/pagination ; restauration contrôlée avec audit ; purge définitive séparée et confirmée. Le déplacement conserve les données et les identifiants. Les référentiels utilisés restent désactivables, les campagnes restent archivables, les imports terminés peuvent être masqués en corbeille. Les dossiers déjà traités restent protégés de la purge. Les boutons sont proposés sur les listes des référentiels/imports/campagnes/dossiers et sur les listes/fiches étudiantes et leurs déclarations ; aucune suppression des rôles fixes ou de l'audit n'est exposée.
+
+`/permissions` : rechercher les droits, modifier la matrice par rôle, vérifier les droits accordés/retirés dans la confirmation, enregistrer. Les changements sont effectifs après invalidation du cache. Réexécuter le seeder conserve les réglages ; seules les permissions/rôles nouveaux reçoivent leurs defaults de déploiement.

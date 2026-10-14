@@ -317,3 +317,7 @@ it('shows the mention of each declaration and whether a portal account is linked
     $this->actingAs($this->actor)->get('/students/'.$record->student->uuid)->assertInertia(fn (Assert $page) => $page
         ->where('records.0.program.mention.name', 'Sciences de la vie')->where('portalLinked', true)->missing('student.password'));
 });
+it('rejects implausible dates such as a year typed on one digit', function () {
+    $this->actingAs($this->actor)->post('/students', [...$this->data, 'birth_date' => '0005-02-01', 'cin_issued_at' => '1899-12-31'])
+        ->assertSessionHasErrors(['birth_date' => 'La date est antérieure à 1900 : vérifiez l’année saisie.', 'cin_issued_at']);
+});

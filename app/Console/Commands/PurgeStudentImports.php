@@ -17,10 +17,10 @@ class PurgeStudentImports extends Command
     public function handle(): int
     {
         $count = 0;
-        StudentImport::query()->whereNull('purged_at')->where('created_at', '<', now()->subDays((int) config('student_imports.retention_days')))->whereNotIn('status', ['analyzing', 'committing'])->chunkById(100, function ($imports) use (&$count) {
+        StudentImport::withTrashed()->whereNull('purged_at')->where('created_at', '<', now()->subDays((int) config('student_imports.retention_days')))->whereNotIn('status', ['analyzing', 'committing'])->chunkById(100, function ($imports) use (&$count) {
             foreach ($imports as $item) {
                 DB::transaction(function () use ($item, &$count) {
-                    $import = StudentImport::query()->lockForUpdate()->findOrFail($item->id);
+                    $import = StudentImport::withTrashed()->lockForUpdate()->findOrFail($item->id);
                     if ($import->purged_at !== null || in_array($import->status, [StudentImportStatus::Analyzing, StudentImportStatus::Committing], true)) {
                         return;
                     }

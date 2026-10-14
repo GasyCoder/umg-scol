@@ -11,6 +11,7 @@ use App\Http\Requests\Imports\AnalyzeStudentImportRequest;
 use App\Http\Requests\Imports\UploadStudentImportRequest;
 use App\Models\Student;
 use App\Models\StudentImport;
+use App\Support\CsvExport;
 use App\Support\StudentImportColumns;
 use App\Support\StudentReferenceOptions;
 use Illuminate\Http\RedirectResponse;
@@ -34,7 +35,9 @@ class StudentImportController extends Controller
     {
         Gate::authorize('create', StudentImport::class);
 
-        return Inertia::render('imports/create', ['options' => app(StudentReferenceOptions::class)->forUser($request->user()), 'maxKilobytes' => config('student_imports.max_kilobytes'), 'maxRows' => config('student_imports.max_rows')]);
+        return Inertia::render('imports/create', ['options' => app(StudentReferenceOptions::class)->forUser($request->user()), 'maxKilobytes' => config('student_imports.max_kilobytes'), 'maxRows' => config('student_imports.max_rows'),
+            // Expected columns, shown before upload; names and level are required by the analysis.
+            'columns' => collect(StudentImportColumns::labels())->map(fn ($label, $key) => ['label' => $label, 'required' => in_array($key, ['last_name', 'level'], true)])->values()]);
     }
 
     public function store(UploadStudentImportRequest $request, UploadStudentImport $action): RedirectResponse
@@ -100,12 +103,7 @@ class StudentImportController extends Controller
     {
         Gate::authorize('create', StudentImport::class);
 
-        return response()->streamDownload(function () {
-            $stream = fopen('php://output', 'w');
-            if ($stream !== false) {
-                fputcsv($stream, array_keys(StudentImportColumns::labels()), ';', '"', '');
-                fclose($stream);
-            }
-        }, 'modele-etudiants.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        // French headers (recognised by the column mapping) with a BOM so that spreadsheet software reads accents.
+        return CsvExport::download('modele-import-etudiants.csv', array_values(StudentImportColumns::labels()), fn () => null);
     }
 }

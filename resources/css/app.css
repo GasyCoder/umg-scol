@@ -139,6 +139,11 @@
         @apply border-border;
     }
 
+    /* Keeps focused fields and anchored errors above the sticky form action bar. */
+    html {
+        scroll-padding-bottom: 5rem;
+    }
+
     body {
         @apply bg-background text-foreground;
     }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
+use App\Models\Concerns\Trashable;
 use Database\Factories\ProgramFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,7 @@ class Program extends Model
     protected $attributes = ['is_active' => true];
 
     /** @use HasFactory<ProgramFactory> */
-    use HasFactory, HasPublicUuid, InstitutionalReference;
+    use HasFactory, HasPublicUuid, InstitutionalReference, Trashable;
 
     protected function casts(): array
     {

@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Models\Activity;
+use App\Models\User;
 use App\Policies\AuditPolicy;
 use App\Policies\ReportPolicy;
 use App\Support\InternalUserProvider;
+use App\Support\StudentPortalAccess;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
@@ -33,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Activity::class, AuditPolicy::class);
         Gate::define('reports.view', [ReportPolicy::class, 'view']);
         Gate::define('reports.export', [ReportPolicy::class, 'export']);
+        Gate::define('permissions.manage-ui', fn (User $user) => StudentPortalAccess::internal($user) && $user->hasUsableEstablishment() && $user->can('permissions.manage'));
+        Gate::define('trash.manage-ui', fn (User $user) => StudentPortalAccess::internal($user) && $user->hasAnyRole(['superadmin', 'developer']) && ! $user->hasRole('establishment') && $user->hasUsableEstablishment() && $user->can('trash.manage'));
+        Gate::define('trash.purge-ui', fn (User $user) => Gate::forUser($user)->allows('trash.manage-ui') && $user->can('trash.purge'));
         $this->configureDefaults();
     }
 

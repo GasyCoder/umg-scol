@@ -75,13 +75,13 @@ final class StudentBrowser
         }
         $counts = "sum(case when student_records.status = 'active' then 1 else 0 end) as active, sum(case when student_records.status = 'active' then 0 else 1 end) as inactive";
         $query = match ($this->step()) {
-            'establishments' => $this->records()->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')
+            'establishments' => $this->records()->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')->whereNull('establishments.deleted_at')
                 ->groupBy('establishments.id', 'establishments.name', 'establishments.code')->orderBy('establishments.name')
                 ->selectRaw("establishments.id as id, establishments.name as label, establishments.code as code, {$counts}"),
-            'levels' => $this->records()->join('levels', 'levels.id', '=', 'student_records.level_id')
+            'levels' => $this->records()->join('levels', 'levels.id', '=', 'student_records.level_id')->whereNull('levels.deleted_at')
                 ->groupBy('levels.id', 'levels.name', 'levels.code', 'levels.sort_order')->orderBy('levels.sort_order')->orderBy('levels.name')
                 ->selectRaw("levels.id as id, levels.name as label, levels.code as code, {$counts}"),
-            'mentions' => $this->withPrograms()->leftJoin('mentions', 'mentions.id', '=', 'programs.mention_id')
+            'mentions' => $this->withPrograms()->leftJoin('mentions', 'mentions.id', '=', 'programs.mention_id')->whereNull('mentions.deleted_at')
                 ->groupBy('mentions.id', 'mentions.name', 'mentions.code')->orderByRaw('mentions.id is null')->orderBy('mentions.name')
                 ->selectRaw("mentions.id as id, mentions.name as label, mentions.code as code, {$counts}"),
             'programs' => $this->withPrograms()->tap(fn ($q) => $this->mention === self::NONE ? $q->whereNull('programs.mention_id') : $q->where('programs.mention_id', (int) $this->mention))
@@ -103,7 +103,7 @@ final class StudentBrowser
     /** @return Builder<StudentRecord> */
     private function withPrograms(): Builder
     {
-        return $this->records()->leftJoin('programs', 'programs.id', '=', 'student_records.program_id');
+        return $this->records()->leftJoin('programs', 'programs.id', '=', 'student_records.program_id')->whereNull('programs.deleted_at');
     }
 
     /**

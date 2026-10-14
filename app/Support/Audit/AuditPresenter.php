@@ -20,14 +20,14 @@ final class AuditPresenter
         'campaign_id', 'application_id', 'confirmation_id', 'correction_id', 'request_id', 'import_id', 'declared_by', 'ids',
         'status', 'from_status', 'is_active', 'is_current', 'field', 'check_key', 'check_status', 'changed_fields', 'filters', 'guard',
         'total_rows', 'valid_rows', 'warning_rows', 'rejected_rows', 'duplicate_rows', 'created_rows', 'updated_rows', 'declared_rows', 'skipped_rows',
-        'type', 'sort_order', 'report',
+        'type', 'sort_order', 'report', 'kind', 'role_name', 'granted_permissions', 'revoked_permissions', 'trash_batch',
     ];
 
     public const MODULES = [
         'authentication' => 'Connexions', 'identity' => 'Comptes internes', 'access' => 'Rôles et permissions', 'references' => 'Référentiels',
         'students' => 'Identités étudiantes', 'student_records' => 'Déclarations annuelles', 'student_imports' => 'Imports',
         'student_portal' => 'Portail étudiant', 'student_corrections' => 'Corrections', 'student_confirmations' => 'Confirmations étudiantes',
-        'scholarship_campaigns' => 'Campagnes de bourse', 'scholarships' => 'Dossiers de bourse', 'audits' => 'Audit', 'reports' => 'Rapports',
+        'scholarship_campaigns' => 'Campagnes de bourse', 'scholarships' => 'Dossiers de bourse', 'audits' => 'Audit', 'reports' => 'Rapports', 'trash' => 'Corbeille',
     ];
 
     public const EVENTS = [
@@ -39,6 +39,8 @@ final class AuditPresenter
         'application_received' => 'Dossier reçu', 'review_started' => 'Vérification commencée', 'check_updated' => 'Contrôle enregistré',
         'application_validated' => 'Dossier validé', 'application_needs_correction' => 'Correction de dossier demandée', 'application_rejected' => 'Dossier rejeté',
         'applications_exported' => 'Export des dossiers', 'audits_exported' => 'Export de l’audit', 'reports_exported' => 'Export de rapport',
+        'role_permissions_updated' => 'Permissions du rôle modifiées', 'trashed' => 'Déplacé dans la corbeille', 'restored' => 'Restauré', 'purged' => 'Purgé définitivement',
+        'references_imported' => 'Import de référentiels', 'references_exported' => 'Export de référentiels',
         'link_requested' => 'Rattachement demandé', 'link_approved' => 'Rattachement approuvé', 'link_rejected' => 'Rattachement rejeté', 'automatic_link' => 'Rattachement automatique',
         'account_created' => 'Compte étudiant créé', 'google_associated' => 'Compte Google associé',
         'roles.attached' => 'Rôle attribué', 'roles.detached' => 'Rôle retiré', 'permissions.attached' => 'Permission attribuée', 'permissions.detached' => 'Permission retirée',

@@ -26,6 +26,7 @@ export type Option = {
     is_active: boolean;
     establishment_id?: number;
     is_current?: boolean;
+    mention?: { id: number; name: string } | null;
 };
 export type Options = {
     establishments: Option[];

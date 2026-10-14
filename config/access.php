@@ -7,7 +7,9 @@ $corrections = ['corrections.create', 'corrections.view', 'corrections.review'];
 $scholarships = ['scholarships.view', 'scholarships.receive', 'scholarships.review', 'scholarships.validate', 'scholarships.request_correction', 'scholarships.reject', 'scholarships.export'];
 $administration = ['establishments.manage', 'academic_years.manage', 'levels.manage', 'programs.manage', 'campaigns.manage', 'users.manage', 'roles.manage', 'permissions.manage'];
 $audits = ['audits.view', 'audits.export'];
-$permissions = [...$students, ...$records, ...$imports, ...$corrections, ...$scholarships, ...$administration, ...$audits, 'student_links.review'];
+// Trash: move to the trash and restore (manage), permanent deletion (purge).
+$trash = ['trash.manage', 'trash.purge'];
+$permissions = [...$students, ...$records, ...$imports, ...$corrections, ...$scholarships, ...$administration, ...$audits, ...$trash, 'student_links.review'];
 
 return [
     'guard' => 'web',

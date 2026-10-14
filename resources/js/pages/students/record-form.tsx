@@ -1,7 +1,7 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { ErrorSummary, FormActions } from '@/components/forms/form-kit';
 import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
 import RecordFields from '@/components/students/record-fields';
 import type {
     AnnualRecord,
@@ -37,7 +37,7 @@ export default function AnnualRecordForm({
         else form.post(`/students/${student.uuid}/records`);
     };
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 pb-0 md:p-6 md:pb-0">
             <Head title="Déclaration annuelle" />
             <Heading
                 title={
@@ -45,9 +45,18 @@ export default function AnnualRecordForm({
                         ? 'Modifier la déclaration annuelle'
                         : 'Ajouter une déclaration annuelle'
                 }
-                description={`${student.last_name} ${student.first_names ?? ''}`}
+                description={`${student.last_name} ${student.first_names ?? ''} — ${record ? 'l’établissement et l’année ne changent pas ; niveau et parcours peuvent être corrigés.' : 'nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
             />
-            <form onSubmit={submit} className="space-y-5">
+            <form onSubmit={submit} className="space-y-6" noValidate>
+                <ErrorSummary
+                    errors={form.errors as Record<string, string | undefined>}
+                    labels={{
+                        establishment_id: 'Établissement',
+                        academic_year_id: 'Année universitaire',
+                        level_id: 'Niveau',
+                        program_id: 'Parcours',
+                    }}
+                />
                 <RecordFields
                     options={options}
                     data={form.data}
@@ -55,12 +64,15 @@ export default function AnnualRecordForm({
                     setData={(key, value) => form.setData(key, value)}
                     immutable={record !== null}
                 />
-                <div className="flex gap-3">
-                    <Button disabled={form.processing}>Enregistrer</Button>
-                    <Button variant="outline" asChild>
-                        <Link href={`/students/${student.uuid}`}>Annuler</Link>
-                    </Button>
-                </div>
+                <FormActions
+                    processing={form.processing}
+                    submitLabel={
+                        record
+                            ? 'Enregistrer la déclaration'
+                            : 'Ajouter la déclaration'
+                    }
+                    cancelHref={`/students/${student.uuid}`}
+                />
             </form>
         </div>
     );

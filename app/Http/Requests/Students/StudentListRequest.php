@@ -17,7 +17,7 @@ class StudentListRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:100'], 'academic_year_id' => ['nullable', 'integer', Rule::exists('academic_years', 'id')], 'establishment_id' => ['nullable', 'integer', Rule::exists('establishments', 'id')], 'level_id' => ['nullable', 'integer', Rule::exists('levels', 'id')], 'mention_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'], 'program_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'], 'status' => ['nullable', Rule::in(['active', 'inactive'])], 'view' => ['nullable', Rule::in(['list'])]];
+        return ['search' => ['nullable', 'string', 'max:100'], 'academic_year_id' => ['nullable', 'integer', Rule::exists('academic_years', 'id')->whereNull('deleted_at')], 'establishment_id' => ['nullable', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')], 'level_id' => ['nullable', 'integer', Rule::exists('levels', 'id')->whereNull('deleted_at')], 'mention_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'], 'program_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'], 'status' => ['nullable', Rule::in(['active', 'inactive'])], 'view' => ['nullable', Rule::in(['list'])]];
     }
 
     /** @return array<string,string> */

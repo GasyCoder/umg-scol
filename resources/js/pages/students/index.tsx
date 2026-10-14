@@ -10,6 +10,7 @@ import {
     Users,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
+import { TrashButton } from '@/components/trash/trash-button';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -496,6 +497,18 @@ export default function StudentsIndex({
                                                         Consulter
                                                     </Link>
                                                 </Button>
+                                                {record.student && (
+                                                    <TrashButton
+                                                        kind="students"
+                                                        uuid={
+                                                            record.student.uuid
+                                                        }
+                                                        label={
+                                                            record.student
+                                                                .last_name
+                                                        }
+                                                    />
+                                                )}
                                             </td>
                                         </tr>
                                     ))

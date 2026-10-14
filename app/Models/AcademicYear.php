@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
+use App\Models\Concerns\Trashable;
 use Carbon\CarbonInterface;
 use Database\Factories\AcademicYearFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -23,7 +24,7 @@ class AcademicYear extends Model
     protected $attributes = ['is_current' => false, 'is_active' => true];
 
     /** @use HasFactory<AcademicYearFactory> */
-    use HasFactory, HasPublicUuid, InstitutionalReference;
+    use HasFactory, HasPublicUuid, InstitutionalReference, Trashable;
 
     protected function casts(): array
     {

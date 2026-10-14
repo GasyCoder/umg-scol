@@ -7,6 +7,7 @@ use App\Actions\Corrections\RequestStudentCorrection;
 use App\Enums\StudentCorrectionField;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StudentPortal\StoreCorrectionRequest;
+use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class CorrectionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_if($user->student_id === null, 403);
+        abort_if($user->student_id === null || ! Student::query()->whereKey($user->student_id)->exists(), 403);
         $corrections = StudentCorrectionRequest::query()->where('user_id', $user->id)->where('student_id', $user->student_id)->latest('id')->limit(100)->get();
 
         return response()->json(['corrections' => $corrections->map(fn (StudentCorrectionRequest $correction) => $this->present($correction))->values()]);
@@ -32,7 +33,7 @@ class CorrectionController extends Controller
     public function cancel(Request $request, string $correction, CancelStudentCorrection $action): JsonResponse
     {
         $user = $request->user();
-        abort_if($user->student_id === null, 403);
+        abort_if($user->student_id === null || ! Student::query()->whereKey($user->student_id)->exists(), 403);
         // Scoped lookup: another student's request is indistinguishable from a missing one.
         $target = StudentCorrectionRequest::query()->where('user_id', $user->id)->where('student_id', $user->student_id)->where('uuid', $correction)->firstOrFail();
 

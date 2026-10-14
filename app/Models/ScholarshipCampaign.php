@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ScholarshipCampaignStatus;
 use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\Trashable;
 use Carbon\CarbonInterface;
 use Database\Factories\ScholarshipCampaignFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ScholarshipCampaign extends Model
 {
     /** @use HasFactory<ScholarshipCampaignFactory> */
-    use HasFactory, HasPublicUuid;
+    use HasFactory, HasPublicUuid, Trashable;
 
     protected $attributes = ['status' => 'draft', 'last_application_sequence' => 0];
 

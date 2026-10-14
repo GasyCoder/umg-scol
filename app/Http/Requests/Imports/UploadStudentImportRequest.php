@@ -32,7 +32,7 @@ class UploadStudentImportRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['file' => ['required', 'file', 'extensions:xlsx,csv', 'mimes:xlsx,csv,txt', 'max:'.config('student_imports.max_kilobytes')], 'establishment_id' => ['required', 'integer', Rule::exists('establishments', 'id')->where('is_active', true)], 'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')->where('is_active', true)]];
+        return ['file' => ['required', 'file', 'extensions:xlsx,csv', 'mimes:xlsx,csv,txt', 'max:'.config('student_imports.max_kilobytes')], 'establishment_id' => ['required', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')->where('is_active', true)], 'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')->whereNull('deleted_at')->where('is_active', true)]];
     }
 
     public function messages(): array

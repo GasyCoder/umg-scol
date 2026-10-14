@@ -30,6 +30,9 @@ class ApplicationController extends Controller
     {
         $filters = $request->safe()->only(ScholarshipApplicationFilters::KEYS);
         $query = ScholarshipApplicationFilters::apply(ScholarshipApplication::query()->with(self::LIST_RELATIONS), $filters);
+        // Tab counters: same filters except the status itself, in one grouped query.
+        $counts = ScholarshipApplicationFilters::apply(ScholarshipApplication::query(), array_diff_key($filters, ['status' => true]))
+            ->toBase()->select('status')->selectRaw('COUNT(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status');
 
         return Inertia::render('scholarships/applications/index', [
             'applications' => $query->orderByDesc('received_at')->orderByDesc('id')->paginate(25)->withQueryString()->through(fn (ScholarshipApplication $a) => [
@@ -38,6 +41,7 @@ class ApplicationController extends Controller
                 'level' => $a->studentRecord->level->name, 'status' => $a->status->value, 'status_label' => $a->status->label(), 'received_at' => $a->received_at->toIso8601String(),
             ]),
             'filters' => $filters,
+            'statusCounts' => collect(ScholarshipApplicationStatus::cases())->mapWithKeys(fn ($s) => [$s->value => (int) ($counts[$s->value] ?? 0)]),
             'options' => [
                 'campaigns' => ScholarshipCampaign::query()->orderByDesc('id')->get(['id', 'name']),
                 'statuses' => array_map(fn ($s) => ['value' => $s->value, 'label' => $s->label()], ScholarshipApplicationStatus::cases()),

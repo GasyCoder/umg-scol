@@ -1,6 +1,15 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import {
+    CalendarRange,
+    FolderOpen,
+    Megaphone,
+    Pencil,
+    Plus,
+} from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { ErrorSummary, FormField } from '@/components/forms/form-kit';
+import { TrashButton } from '@/components/trash/trash-button';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import {
@@ -19,7 +28,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -41,6 +49,14 @@ type Campaign = {
     status_label: string;
     applications_count: number;
     targets: Option[];
+};
+
+/** Status changes worded as the action the manager performs. */
+const actionLabels: Record<string, string> = {
+    scheduled: 'Programmer',
+    open: 'Ouvrir la réception',
+    closed: 'Clôturer',
+    archived: 'Archiver',
 };
 
 export default function Campaigns({
@@ -104,61 +120,139 @@ export default function Campaigns({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <Heading
                     title="Campagnes de bourse"
-                    description="Une campagne par année universitaire encadre la réception des dossiers papier. La réception n’est possible que lorsque la campagne est ouverte."
+                    description="Une campagne par année universitaire encadre la réception des dossiers papier : la réception n’est possible que pendant une campagne ouverte."
                 />
                 {canManage && (
                     <Button onClick={() => open('new')}>
+                        <Plus aria-hidden="true" />
                         Nouvelle campagne
                     </Button>
                 )}
             </div>
+            <p className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
+                Cycle d’une campagne :{' '}
+                <strong className="text-foreground">Brouillon</strong> →
+                Programmée →{' '}
+                <strong className="text-foreground">Ouverte</strong> (réception
+                des dossiers) → Clôturée → Archivée. Chaque étape est
+                définitive.
+            </p>
             <InputError message={pageErrors.status} />
             {campaigns.data.length === 0 ? (
-                <p>Aucune campagne.</p>
+                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed bg-card p-10 text-center">
+                    <Megaphone
+                        className="size-8 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <p className="font-medium">
+                        Aucune campagne pour le moment.
+                    </p>
+                    {canManage && (
+                        <Button onClick={() => open('new')}>
+                            Créer la première campagne
+                        </Button>
+                    )}
+                </div>
             ) : (
-                <div className="divide-y rounded-md border">
+                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                     {campaigns.data.map((campaign) => (
                         <article
                             key={campaign.id}
-                            className="flex flex-wrap items-center justify-between gap-3 p-4"
+                            className="flex flex-col rounded-lg border bg-card"
                         >
-                            <div className="space-y-1">
-                                <p className="font-medium">{campaign.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {campaign.academic_year} · du{' '}
-                                    {formatDate(campaign.starts_at)} au{' '}
-                                    {formatDate(campaign.ends_at)} ·{' '}
-                                    {campaign.applications_count} dossier(s)
-                                </p>
+                            <div className="flex items-start gap-3 p-5">
+                                <span
+                                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-primary"
+                                    aria-hidden="true"
+                                >
+                                    <Megaphone className="size-5" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h2 className="truncate text-base font-bold text-foreground">
+                                            {campaign.name}
+                                        </h2>
+                                        <StatusBadge
+                                            status={campaign.status}
+                                            label={campaign.status_label}
+                                        />
+                                    </div>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Année {campaign.academic_year}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <StatusBadge
-                                    status={campaign.status}
-                                    label={campaign.status_label}
+                            <dl className="grid grid-cols-2 gap-4 border-y px-5 py-4 text-sm">
+                                <div>
+                                    <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <CalendarRange
+                                            className="size-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        Période indicative
+                                    </dt>
+                                    <dd className="mt-1 font-medium text-foreground">
+                                        {campaign.starts_at || campaign.ends_at
+                                            ? `${formatDate(campaign.starts_at)} → ${formatDate(campaign.ends_at)}`
+                                            : 'Non définie'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <FolderOpen
+                                            className="size-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        Dossiers reçus
+                                    </dt>
+                                    <dd className="mt-1 font-heading text-lg leading-none font-bold text-foreground tabular-nums">
+                                        {campaign.applications_count}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div className="px-5 pb-4">
+                                <TrashButton
+                                    kind="campaigns"
+                                    uuid={campaign.uuid}
+                                    label={campaign.name}
                                 />
-                                {canManage &&
-                                    campaign.status !== 'archived' && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => open(campaign)}
-                                        >
-                                            Modifier
-                                        </Button>
-                                    )}
-                                {campaign.targets.map((target) => (
-                                    <Button
-                                        key={target.value}
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() =>
-                                            setTransition({ campaign, target })
-                                        }
-                                    >
-                                        → {target.label}
-                                    </Button>
-                                ))}
                             </div>
+                            {(canManage || campaign.targets.length > 0) && (
+                                <div className="mt-auto flex flex-wrap items-center gap-2 p-4">
+                                    {campaign.targets.map((target) => (
+                                        <Button
+                                            key={target.value}
+                                            size="sm"
+                                            variant={
+                                                target.value === 'open'
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            onClick={() =>
+                                                setTransition({
+                                                    campaign,
+                                                    target,
+                                                })
+                                            }
+                                        >
+                                            {actionLabels[target.value] ??
+                                                target.label}
+                                        </Button>
+                                    ))}
+                                    {canManage &&
+                                        campaign.status !== 'archived' && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="ml-auto"
+                                                onClick={() => open(campaign)}
+                                            >
+                                                <Pencil aria-hidden="true" />
+                                                Modifier
+                                            </Button>
+                                        )}
+                                </div>
+                            )}
                         </article>
                     ))}
                 </div>
@@ -170,8 +264,8 @@ export default function Campaigns({
                     if (!value && !form.processing) setEditing(null);
                 }}
             >
-                <DialogContent>
-                    <form onSubmit={submit} className="space-y-4">
+                <DialogContent className="sm:max-w-xl">
+                    <form onSubmit={submit} className="space-y-5" noValidate>
                         <DialogHeader>
                             <DialogTitle>
                                 {editing === 'new'
@@ -179,19 +273,29 @@ export default function Campaigns({
                                     : 'Modifier la campagne'}
                             </DialogTitle>
                             <DialogDescription>
-                                Une nouvelle campagne est créée en brouillon.
+                                {editing === 'new'
+                                    ? 'La campagne est créée en brouillon ; vous l’ouvrirez ensuite pour commencer la réception.'
+                                    : 'Les dates restent indicatives : l’ouverture et la clôture se font depuis la liste.'}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-2">
-                            <Label>Année universitaire</Label>
+                        <ErrorSummary errors={{ campaign: errors.campaign }} />
+                        <FormField
+                            id="academic_year_id"
+                            label="Année universitaire"
+                            required
+                            error={errors.academic_year_id}
+                        >
                             <Select
                                 value={form.data.academic_year_id}
                                 onValueChange={(value) =>
                                     form.setData('academic_year_id', value)
                                 }
                             >
-                                <SelectTrigger aria-label="Année universitaire">
-                                    <SelectValue placeholder="Choisir" />
+                                <SelectTrigger
+                                    id="academic_year_id"
+                                    className="w-full"
+                                >
+                                    <SelectValue placeholder="Choisir une année" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {academicYears.map((year) => (
@@ -204,24 +308,31 @@ export default function Campaigns({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <InputError message={errors.academic_year_id} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Nom</Label>
+                        </FormField>
+                        <FormField
+                            id="name"
+                            label="Nom de la campagne"
+                            required
+                            error={errors.name}
+                            hint="Unique pour l’année universitaire."
+                        >
                             <Input
                                 id="name"
                                 maxLength={150}
                                 required
+                                placeholder="Bourse nationale 2026-2027"
                                 value={form.data.name}
                                 onChange={(e) =>
                                     form.setData('name', e.target.value)
                                 }
                             />
-                            <InputError message={errors.name} />
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="starts_at">Début</Label>
+                        </FormField>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <FormField
+                                id="starts_at"
+                                label="Début"
+                                error={errors.starts_at}
+                            >
                                 <Input
                                     id="starts_at"
                                     type="date"
@@ -233,33 +344,39 @@ export default function Campaigns({
                                         )
                                     }
                                 />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="ends_at">Fin</Label>
+                            </FormField>
+                            <FormField
+                                id="ends_at"
+                                label="Fin"
+                                error={errors.ends_at}
+                            >
                                 <Input
                                     id="ends_at"
                                     type="date"
+                                    min={form.data.starts_at || undefined}
                                     value={form.data.ends_at}
                                     onChange={(e) =>
                                         form.setData('ends_at', e.target.value)
                                     }
                                 />
-                                <InputError message={errors.ends_at} />
-                            </div>
+                            </FormField>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">Notes internes</Label>
+                        <FormField
+                            id="notes"
+                            label="Notes internes"
+                            error={errors.notes}
+                            hint={`${form.data.notes.length}/1000 caractères — visibles uniquement par le personnel.`}
+                        >
                             <textarea
                                 id="notes"
-                                className="min-h-20 w-full rounded-md border bg-transparent p-2 text-sm"
+                                className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 maxLength={1000}
                                 value={form.data.notes}
                                 onChange={(e) =>
                                     form.setData('notes', e.target.value)
                                 }
                             />
-                        </div>
-                        <InputError message={errors.campaign} />
+                        </FormField>
                         <DialogFooter>
                             <Button
                                 type="button"
@@ -272,7 +389,9 @@ export default function Campaigns({
                             <Button disabled={form.processing}>
                                 {form.processing
                                     ? 'Enregistrement…'
-                                    : 'Enregistrer'}
+                                    : editing === 'new'
+                                      ? 'Créer la campagne'
+                                      : 'Enregistrer'}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -286,7 +405,11 @@ export default function Campaigns({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Changer le statut</DialogTitle>
+                        <DialogTitle>
+                            {transition
+                                ? `${actionLabels[transition.target.value] ?? 'Changer le statut'} ?`
+                                : 'Changer le statut'}
+                        </DialogTitle>
                         <DialogDescription>
                             {transition &&
                                 `« ${transition.campaign.name} » passera de ${transition.campaign.status_label} à ${transition.target.label}. Ce changement ne peut pas être annulé.`}

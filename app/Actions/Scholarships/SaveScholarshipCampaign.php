@@ -3,6 +3,7 @@
 namespace App\Actions\Scholarships;
 
 use App\Enums\ScholarshipCampaignStatus;
+use App\Models\AcademicYear;
 use App\Models\ScholarshipCampaign;
 use App\Models\User;
 use App\Support\ScholarshipAudit;
@@ -24,8 +25,11 @@ class SaveScholarshipCampaign
                 if ($target->status === ScholarshipCampaignStatus::Archived) {
                     throw ValidationException::withMessages(['campaign' => 'Une campagne archivée ne peut plus être modifiée.']);
                 }
-                if ($target->exists && $target->academic_year_id !== (int) $data['academic_year_id'] && ($target->status !== ScholarshipCampaignStatus::Draft || $target->applications()->exists())) {
+                if ($target->exists && $target->academic_year_id !== (int) $data['academic_year_id'] && ($target->status !== ScholarshipCampaignStatus::Draft || $target->applications()->withTrashed()->exists())) {
                     throw ValidationException::withMessages(['academic_year_id' => 'L’année universitaire ne peut changer que pour une campagne en brouillon sans dossier.']);
+                }
+                if (AcademicYear::query()->whereKey($data['academic_year_id'])->sharedLock()->first() === null) {
+                    throw ValidationException::withMessages(['academic_year_id' => 'Cette année universitaire n’est plus disponible.']);
                 }
                 $target->fill($data);
                 if ($target->starts_at !== null && $target->ends_at !== null && $target->starts_at->greaterThan($target->ends_at)) {

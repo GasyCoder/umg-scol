@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\StudentRecordStatus;
 use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\Trashable;
 use Database\Factories\StudentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -11,30 +12,22 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use LogicException;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /** @property StudentRecordStatus $status */
 #[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'status', 'declared_by', 'declared_at'])]
-#[Hidden(['active_academic_year_id'])]
+#[Hidden(['active_academic_year_id', 'live_marker'])]
 class StudentRecord extends Model
 {
     /** @use HasFactory<StudentRecordFactory> */
-    use HasFactory, HasPublicUuid, LogsActivity;
+    use HasFactory, HasPublicUuid, LogsActivity, Trashable;
 
     protected $attributes = ['status' => 'active'];
 
     protected function casts(): array
     {
         return ['status' => StudentRecordStatus::class, 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
-    }
-
-    protected static function booted(): void
-    {
-        static::deleting(function (): never {
-            throw new LogicException('Une déclaration annuelle doit être désactivée, pas supprimée.');
-        });
     }
 
     /** @return BelongsTo<Student, $this> */

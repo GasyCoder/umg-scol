@@ -11,6 +11,8 @@ import {
     Inbox,
     LayoutGrid,
     Layers,
+    KeyRound,
+    Trash2,
     Route,
     ShieldCheck,
     UserCheck,
@@ -152,6 +154,31 @@ export function AppSidebar() {
                 )}
                 {steeringItems.length > 0 && (
                     <NavMain items={steeringItems} label="Pilotage" />
+                )}
+                {(auth.canManagePermissions || auth.canManageTrash) && (
+                    <NavMain
+                        label="Administration"
+                        items={[
+                            ...(auth.canManagePermissions
+                                ? [
+                                      {
+                                          title: 'Permissions',
+                                          href: '/permissions',
+                                          icon: KeyRound,
+                                      },
+                                  ]
+                                : []),
+                            ...(auth.canManageTrash
+                                ? [
+                                      {
+                                          title: 'Corbeille',
+                                          href: '/trash',
+                                          icon: Trash2,
+                                      },
+                                  ]
+                                : []),
+                        ]}
+                    />
                 )}
                 {references.length > 0 && (
                     <NavMain items={references} label="Référentiels" />

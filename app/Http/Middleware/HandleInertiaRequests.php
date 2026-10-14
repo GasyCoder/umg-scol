@@ -61,6 +61,8 @@ class HandleInertiaRequests extends Middleware
                 'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
                 'canViewImports' => $request->user() !== null && Gate::allows('viewAny', StudentImport::class),
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
+                'canManagePermissions' => $request->user() !== null && Gate::allows('permissions.manage-ui'),
+                'canManageTrash' => $request->user() !== null && Gate::allows('trash.manage-ui'),
                 'canViewReports' => $request->user() !== null && Gate::allows('reports.view'),
                 'canViewAudits' => $request->user() !== null && Gate::allows('viewAny', Activity::class),
                 'roleLabel' => $request->user() === null ? null : AuditPresenter::role($request->user()),

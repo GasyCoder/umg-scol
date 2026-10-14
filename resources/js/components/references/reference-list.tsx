@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { TrashButton } from '@/components/trash/trash-button';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { article, baseUrl, definitions } from './definitions';
+import { ReferenceTransferToolbar } from './reference-transfer';
 import type {
     EstablishmentOption,
     ReferenceKind,
@@ -118,11 +120,19 @@ export default function ReferenceList({
                     description="Administration des référentiels institutionnels."
                 />
                 {canCreate && (
-                    <Button asChild>
-                        <Link href={`${baseUrl(kind)}/create`}>
-                            Créer {articleText} {definition.singular}
-                        </Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {(kind === 'mentions' || kind === 'programs') && (
+                            <ReferenceTransferToolbar
+                                kind={kind}
+                                filters={filters}
+                            />
+                        )}
+                        <Button asChild>
+                            <Link href={`${baseUrl(kind)}/create`}>
+                                Créer {articleText} {definition.singular}
+                            </Link>
+                        </Button>
+                    </div>
                 )}
             </div>
             <form
@@ -252,6 +262,11 @@ export default function ReferenceList({
                                                     ? 'Désactiver'
                                                     : 'Activer'}
                                             </Button>
+                                            <TrashButton
+                                                kind={kind}
+                                                uuid={row.uuid}
+                                                label={row.name}
+                                            />
                                             {kind === 'academic-years' &&
                                                 !row.is_current &&
                                                 row.is_active && (

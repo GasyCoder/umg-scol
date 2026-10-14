@@ -435,6 +435,21 @@ it('lists, filters and searches files with server pagination', function () {
         ->and($count('?received_from='.now()->addDay()->format('Y-m-d')))->toBe(0);
     $this->get('/scholarships/applications?received_from=2026-02-01&received_to=2026-01-01')->assertSessionHasErrors('received_to');
 });
+it('counts files per status for the current filters, ignoring the status filter itself', function () {
+    receiveFile($this);
+    $other = Establishment::factory()->create(['name' => 'École Normale']);
+    $foreignStudent = Student::factory()->create(['last_name' => 'ZAFY']);
+    StudentRecord::factory()->create(['student_id' => $foreignStudent->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $other->id, 'level_id' => $this->level->id, 'program_id' => null, 'status' => 'active']);
+    app(TransitionScholarshipApplication::class)->handle($this->central, receiveFile($this, $foreignStudent), ScholarshipApplicationStatus::Rejected, 'Dossier hors délai.');
+    app(TransitionScholarshipApplication::class)->handle($this->central, receiveFile($this, declaredStudent($this)), ScholarshipApplicationStatus::InReview, null);
+    $this->actingAs($this->central);
+    $empty = ['pending' => 0, 'in_review' => 0, 'needs_correction' => 0, 'validated' => 0, 'rejected' => 0];
+    $this->get('/scholarships/applications?status=rejected')->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)
+        ->where('statusCounts', [...$empty, 'pending' => 1, 'in_review' => 1, 'rejected' => 1]));
+    $this->get('/scholarships/applications?status=pending&establishment_id='.$this->establishment->id)->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)
+        ->where('statusCounts', [...$empty, 'pending' => 1, 'in_review' => 1]));
+    $this->get('/scholarships/applications?search=zaf')->assertInertia(fn (Assert $page) => $page->where('statusCounts', [...$empty, 'rejected' => 1]));
+});
 it('paginates the file list by 25', function () {
     foreach (range(1, 27) as $i) {
         receiveFile($this, declaredStudent($this));

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
+import { TrashButton } from '@/components/trash/trash-button';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -184,6 +185,12 @@ export default function StudentShow({
                     </ul>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <TrashButton
+                        kind="students"
+                        uuid={student.uuid}
+                        label={`${student.last_name} ${student.first_names ?? ''}`}
+                        redirect="/students"
+                    />
                     {canUpdate && (
                         <Button variant="outline" asChild>
                             <Link href={`/students/${student.uuid}/edit`}>
@@ -436,6 +443,11 @@ export default function StudentShow({
                                                         </Badge>
                                                     </td>
                                                     <td className="px-4 py-3">
+                                                        <TrashButton
+                                                            kind="student-records"
+                                                            uuid={record.uuid}
+                                                            label="Déclaration annuelle"
+                                                        />
                                                         {record.canUpdate && (
                                                             <div className="flex justify-end gap-1">
                                                                 <Button

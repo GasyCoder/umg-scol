@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasPublicUuid;
+use App\Models\Concerns\Trashable;
 use App\Support\StudentNormalization;
 use Carbon\CarbonInterface;
 use Database\Factories\StudentFactory;
@@ -12,7 +13,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use LogicException;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -24,7 +24,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
-    use HasFactory, HasPublicUuid, LogsActivity;
+    use HasFactory, HasPublicUuid, LogsActivity, Trashable;
 
     protected $attributes = ['is_active' => true];
 
@@ -38,13 +38,6 @@ class Student extends Model
         parent::setAttribute($key, StudentNormalization::value($key, $value));
 
         return $this;
-    }
-
-    protected static function booted(): void
-    {
-        static::deleting(function (): never {
-            throw new LogicException('Une identité étudiante doit être désactivée, pas supprimée.');
-        });
     }
 
     /** @return HasMany<StudentRecord, $this> */

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\References;
 
+use App\Actions\References\SaveInstitutionalChild;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\References\ReferenceListRequest;
 use App\Http\Requests\References\ReferenceStatusRequest;
@@ -9,6 +10,7 @@ use App\Http\Requests\References\SaveProgramRequest;
 use App\Models\Establishment;
 use App\Models\Mention;
 use App\Models\Program;
+use App\Support\References\ReferenceTransfer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -20,22 +22,10 @@ class ProgramController extends Controller
     public function index(ReferenceListRequest $request): Response
     {
         Gate::authorize('viewAny', Program::class);
-        $search = $request->string('search')->trim()->toString();
-        $query = Program::query()->with(['establishment:id,code,name', 'mention:id,name']);
-        if ($request->user()->hasRole('establishment')) {
-            $query->where('establishment_id', $request->user()->establishment_id);
-        }
-        if ($request->filled('establishment_id')) {
-            $query->where('establishment_id', $request->integer('establishment_id'));
-        }
-        if ($search !== '') {
-            $query->where(function ($query) use ($search): void {
-                $query->where('name', 'like', '%'.$search.'%')->orWhere('code', 'like', '%'.$search.'%');
-            });
-        }
+        $query = ReferenceTransfer::listQuery('programs', $request->user(), $request->only(['search', 'establishment_id']));
 
         return Inertia::render('references/programs/index', [
-            'records' => $query->orderBy('name')->orderBy('id')->paginate(15)->withQueryString(),
+            'records' => $query->paginate(15)->withQueryString(),
             'filters' => $request->only(['search', 'establishment_id']),
             'canCreate' => Gate::allows('create', Program::class), 'establishments' => $this->establishments($request),
         ]);
@@ -50,7 +40,7 @@ class ProgramController extends Controller
 
     public function store(SaveProgramRequest $request): RedirectResponse
     {
-        Program::create($request->validated());
+        app(SaveInstitutionalChild::class)->handle($request->user(), new Program, $request->validated());
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Référentiel créé.']);
 
         return to_route('references.programs.index');
@@ -65,7 +55,7 @@ class ProgramController extends Controller
 
     public function update(SaveProgramRequest $request, Program $program): RedirectResponse
     {
-        $program->update($request->validated());
+        app(SaveInstitutionalChild::class)->handle($request->user(), $program, $request->validated());
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Référentiel modifié.']);
 
         return to_route('references.programs.index');
@@ -73,7 +63,7 @@ class ProgramController extends Controller
 
     public function status(ReferenceStatusRequest $request, Program $program): RedirectResponse
     {
-        $program->update($request->validated());
+        app(SaveInstitutionalChild::class)->handle($request->user(), $program, $request->validated());
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Statut mis à jour.']);
 
         return to_route('references.programs.index');

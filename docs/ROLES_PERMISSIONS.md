@@ -39,15 +39,15 @@ Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour
 
 | Rôle                         | Permissions attribuées                                                                                                                                     |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `superadmin`                 | Les 34 permissions du catalogue, explicitement attribuées                                                                                                  |
-| `developer`                  | Les mêmes 34 permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                 |
+| `superadmin`                 | Les 36 permissions du catalogue, explicitement attribuées                                                                                                  |
+| `developer`                  | Les mêmes 36 permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                 |
 | `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view`, `student_links.review` et les sept permissions bourses |
 | `establishment`              | Les six permissions étudiants, les trois déclarations annuelles, les quatre imports, `corrections.view`, `corrections.review`, `student_links.review`      |
 | `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                                          |
 
 `students.viewAny` autorise une liste dans le périmètre du rôle : établissement propre pour `establishment`, global pour la Scolarité Centrale. Les permissions de consultation individuelle ne donnent jamais accès aux données d'autrui par elles-mêmes. Les Policies et filtres effectifs seront implémentés avec les modèles métier ; aucune isolation fictive n'est créée dans cette fondation.
 
-`RolesAndPermissionsSeeder` est transactionnel et idempotent. Il remet les attributions des cinq rôles en conformité avec cette matrice et invalide le cache Spatie. Aucun `Gate::before` ne donne implicitement des permissions futures. Une nouvelle permission doit être intégrée explicitement à la matrice.
+`RolesAndPermissionsSeeder` est transactionnel et idempotent. Il crée uniquement les rôles et permissions manquants et initialise un nouveau rôle selon la matrice. Une nouvelle permission est attribuée aux rôles prévus dans la config lors de sa création. Les attributions et retraits déjà réglés à l’écran ne sont jamais réécrits ; le cache Spatie est invalidé. Aucun `Gate::before` ne donne implicitement des permissions futures. Une nouvelle permission doit être intégrée explicitement à la matrice.
 
 Les attributions et retraits de rôles/permissions via les méthodes Spatie sont audités avec sujet, acteur authentifié et identifiants concernés. Les écritures directes dans les tables pivots contournent ces événements : les futures opérations d'administration devront passer par les méthodes Spatie dans une transaction et être testées.
 
@@ -106,3 +106,11 @@ Exports de rapports : `students.export` (étudiants), `imports.export_errors` (i
 ## Mentions
 
 Les mentions font partie du référentiel des parcours : même permission `programs.manage` et même périmètre (superadmin et developer globaux ; un établissement, s'il reçoit un jour cette permission, limité à ses mentions). Aucune nouvelle permission.
+
+## Gestion des permissions et corbeille
+
+`/permissions` exige `permissions.manage`, un compte interne et un contexte utilisable. Les cinq rôles et le catalogue restent définis dans le code ; seule la matrice d'attribution est modifiable à l'écran, qui fait foi pour les permissions déjà installées. `roles.manage` n'est pas exigée en plus : aucune création, renommage ni suppression de rôle n'est exposée. Enregistrement par rôle, confirmation du différentiel, transaction, cache invalidé et version optimiste empêchant l'écrasement d'une matrice périmée. Les permissions hors catalogue ne sont pas créables par cette interface. Les éventuelles attributions hors catalogue réalisées en CLI restent conservées et ne sont pas administrées ici.
+
+Garde-fous serveur : superadmin conserve `permissions.manage`, `roles.manage`, `users.manage` ; student ne peut recevoir que `students.view`, `student_records.view`, `corrections.create`, `corrections.view`. Les Policies, domaines et périmètres restent applicables après toute attribution. L'API étudiante conserve ses contrôles de compte/rattachement : modifier la matrice ne donne pas accès au portail interne. Un gestionnaire qui retire son propre droit de gestion est renvoyé au tableau de bord.
+
+Corbeille : nouvelles permissions `trash.manage` (déplacer/restaurer/lister) et `trash.purge` (purger), attribuées initialement au superadmin et au developer. Pour ces opérations globales et destructives, le compte doit en plus porter superadmin ou developer, sans rôle establishment (même dans un compte à rôles mixtes) ; attribuer cette permission à un rôle opérationnel ne contourne pas son périmètre. Aucun bypass global. Audit des différences sous `access`, événement `role_permissions_updated`, avec rôle, noms de droits accordés/retirés et acteur ; les événements Spatie attach/detach sont conservés.
