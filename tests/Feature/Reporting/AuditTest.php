@@ -2,11 +2,11 @@
 
 use App\Actions\Scholarships\SaveScholarshipCampaign;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
-use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -47,7 +47,7 @@ it('requires audits.view: other internal roles and students get 403', function (
     $line = auditLine($this->admin, 'scholarships', 'application_received');
     foreach ([$this->central, $this->staff, User::factory()->create()->assignRole('student')] as $user) {
         $this->actingAs($user)->get('/audits')->assertForbidden();
-        $this->actingAs($user)->get('/audits/'.$line->id)->assertForbidden();
+        $this->actingAs($user)->get('/audits/'.$line->uuid)->assertForbidden();
         $this->actingAs($user)->get('/audits/export')->assertForbidden();
     }
     auditRows($this, $this->admin);
@@ -81,7 +81,7 @@ it('shows an authorised detail with whitelisted metadata only', function () {
         'password' => 'secret-pass', 'code' => '123456', 'proposed_value' => 'Nouvelle valeur', 'access_token' => 'ya29.token', 'reason' => 'motif libre',
         'attributes' => ['status' => 'validated', 'email' => 'nouveau@example.test', 'last_name' => 'RAKOTO'], 'old' => ['status' => 'pending', 'email' => 'ancien@example.test'],
     ]);
-    $response = $this->actingAs($this->admin)->get('/audits/'.$line->id)->assertOk();
+    $response = $this->actingAs($this->admin)->get('/audits/'.$line->uuid)->assertOk();
     $response->assertInertia(fn (Assert $page) => $page->component('audits/show')->where('activity.event_label', 'Dossier validé')
         ->where('activity.metadata', [['key' => 'student_id', 'value' => '44'], ['key' => 'campaign_id', 'value' => '3'], ['key' => 'application_id', 'value' => '12'], ['key' => 'status', 'value' => 'validated'], ['key' => 'changed_fields', 'value' => 'phone, address']]));
     $props = json_encode($response->viewData('page')['props']);
@@ -92,7 +92,7 @@ it('shows an authorised detail with whitelisted metadata only', function () {
 });
 it('renders an empty administrative list explicitly', function () {
     $line = auditLine($this->admin, 'scholarships', 'applications_exported', ['filters' => []]);
-    $this->actingAs($this->admin)->get('/audits/'.$line->id)->assertInertia(fn (Assert $page) => $page->where('activity.metadata', [['key' => 'filters', 'value' => 'aucun']]));
+    $this->actingAs($this->admin)->get('/audits/'.$line->uuid)->assertInertia(fn (Assert $page) => $page->where('activity.metadata', [['key' => 'filters', 'value' => 'aucun']]));
 });
 it('never hides the developer: actions appear and filter like any other actor', function () {
     $year = AcademicYear::factory()->create(['is_current' => true]);
