@@ -1,9 +1,9 @@
 <?php
 
+use App\Models\Activity;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
