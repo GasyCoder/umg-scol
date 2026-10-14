@@ -20,6 +20,7 @@ import {
 
 type Row = {
     id: number;
+    uuid: string;
     application_number: string;
     ddb_number: string | null;
     campaign: string;
@@ -243,7 +244,7 @@ export default function ApplicationsIndex({
                                             asChild
                                         >
                                             <Link
-                                                href={`/scholarships/applications/${item.id}`}
+                                                href={`/scholarships/applications/${item.uuid}`}
                                             >
                                                 Ouvrir
                                             </Link>
