@@ -19,7 +19,7 @@ import { ConfirmationSection } from './confirmation';
 import type { ConfirmationState } from './confirmation';
 import type { Session } from './api';
 type Correction = {
-    id: number;
+    uuid: string;
     field: string;
     field_label: string;
     proposed_value: string;
@@ -208,10 +208,10 @@ function Portal() {
             )
             .finally(() => setBusy(false));
     };
-    const cancelCorrection = (id: number) =>
+    const cancelCorrection = (uuid: string) =>
         void perform(async () => {
             const result = await api<{ message: string }>(
-                `corrections/${id}/cancel`,
+                `corrections/${uuid}/cancel`,
                 {},
             );
             setMessage(result.message);
@@ -643,7 +643,7 @@ function Portal() {
                             ) : (
                                 corrections.map((item) => (
                                     <article
-                                        key={item.id}
+                                        key={item.uuid}
                                         className="space-y-2 rounded-lg border p-4"
                                     >
                                         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -681,7 +681,7 @@ function Portal() {
                                                 size="sm"
                                                 disabled={busy}
                                                 onClick={() =>
-                                                    cancelCorrection(item.id)
+                                                    cancelCorrection(item.uuid)
                                                 }
                                             >
                                                 Annuler la demande
