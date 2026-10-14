@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StudentLinkStatus;
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['user_id', 'student_id', 'status', 'requested_at', 'reviewed_at', 'reviewed_by', 'rejection_reason'])]
 class StudentLinkRequest extends Model
 {
+    use HasPublicUuid;
+
     protected function casts(): array
     {
         return ['status' => StudentLinkStatus::class, 'requested_at' => 'datetime', 'reviewed_at' => 'datetime'];
