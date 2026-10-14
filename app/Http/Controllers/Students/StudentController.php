@@ -12,6 +12,7 @@ use App\Http\Requests\Students\StudentStatusRequest;
 use App\Http\Requests\Students\UpdateStudentRequest;
 use App\Models\Student;
 use App\Models\StudentRecord;
+use App\Support\StudentConfirmationContext;
 use App\Support\StudentReferenceOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class StudentController extends Controller
         $records = $student->studentRecords()->visibleTo($request->user())->with(['academicYear:id,name', 'establishment:id,code,name', 'level:id,code,name', 'program:id,code,name', 'declaredBy:id,name'])->orderByDesc('academic_year_id')->orderByDesc('id')->get();
 
         return Inertia::render('students/show', ['student' => $student, 'records' => $records->map(fn ($record) => [...$record->toArray(), 'canUpdate' => Gate::allows('update', $record)]),
+            'confirmation' => StudentConfirmationContext::load($student)->forStaff(),
             'canUpdate' => Gate::allows('update', $student), 'canDeactivate' => Gate::allows('deactivate', $student), 'canCreateRecord' => Gate::allows('create', [StudentRecord::class, $student])]);
     }
 

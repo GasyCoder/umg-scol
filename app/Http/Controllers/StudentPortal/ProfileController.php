@@ -6,6 +6,7 @@ use App\Actions\StudentPortal\LinkStudent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StudentPortal\LinkStudentRequest;
 use App\Models\Student;
+use App\Support\StudentConfirmationContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,11 +28,12 @@ class ProfileController extends Controller
     {
         $student = Student::query()->whereKey($request->user()->student_id)->where('is_active', true)->first();
         abort_if($student === null, 403, 'Le compte ne permet pas actuellement de consulter une fiche.');
-        $student->load(['studentRecords.academicYear:id,name', 'studentRecords.establishment:id,name', 'studentRecords.level:id,code,name', 'studentRecords.program:id,name']);
+        // Same loaded records for the display and the confirmation state: the version token matches what is shown.
+        $student->load(['studentRecords' => fn ($query) => $query->with(StudentConfirmationContext::recordRelations())]);
         $data = $student->only(['student_number', 'last_name', 'first_names', 'birth_place', 'phone', 'email', 'address', 'bac_registration_number', 'bac_series', 'bac_year', 'bac_mention']);
         $data['birth_date'] = $student->birth_date?->format('Y-m-d');
         $data['records'] = $student->studentRecords->map(fn ($record) => ['academic_year' => $record->academicYear->name, 'establishment' => $record->establishment->name, 'level' => $record->level->name, 'program' => $record->program?->name, 'status' => $record->status->value])->values();
 
-        return response()->json(['student' => $data]);
+        return response()->json(['student' => $data, 'confirmation' => StudentConfirmationContext::load($student)->forStudent()]);
     }
 }

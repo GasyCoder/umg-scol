@@ -12,6 +12,7 @@
 - `scholarship_campaigns`
 - `scholarship_applications`
 - `student_correction_requests`
+- `student_information_confirmations`
 - `imports`
 - `import_rows`
 - `activity_log`
@@ -42,7 +43,7 @@ FK, transactions, historique, indexes, pas de duplication inutile, contraintes u
 
 Les migrations techniques sont complétées par `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions` (Spatie Permission) et `activity_log` (Spatie Activitylog). Les identifiants de modèles utilisent des relations polymorphes ; les pivots des rôles et permissions possèdent leurs contraintes et index fournis par le package.
 
-`activity_log` conserve sujet, acteur, événement, journal, changements d'attributs autorisés et métadonnées minimales. La fondation identité n'ajoutait aucun rattachement métier à `users`. La phase Référentiels ajoute désormais `establishment_id` nullable ; le portail étudiant ajoute `student_id` (voir ci-dessous). Les tables étudiantes sont désormais implémentées dans la phase suivante ; les tables de bourse restent proposées et non implémentées.
+`activity_log` conserve sujet, acteur, événement, journal, changements d'attributs autorisés et métadonnées minimales. La fondation identité n'ajoutait aucun rattachement métier à `users`. La phase Référentiels ajoute désormais `establishment_id` nullable ; le portail étudiant ajoute `student_id` (voir ci-dessous). Les tables étudiantes, du portail, des corrections, de confirmation et de bourse sont implémentées (sections ci-dessous).
 
 ## Référentiels institutionnels implémentés
 
@@ -154,6 +155,23 @@ Migration `2026_10_14_190000_create_student_correction_requests`, table `student
 - Index `(status, created_at)` pour la file de revue et `(user_id, created_at)` pour « Mes demandes ».
 
 Aucune suppression en cascade ; le rollback supprime uniquement cette table. Vérifications MySQL dédiées (contrainte unique, FK, attente de verrou entre deux connexions, rollback) : `php tests/MySql/StudentCorrectionChecks.php`, **uniquement sur une base jetable dont le nom contient `check`** (le script écrit des données réelles).
+
+## Confirmations étudiantes implémentées
+
+Migration `2026_10_14_210000_create_student_information_confirmations`, table `student_information_confirmations` : historique des déclarations « mes informations affichées sont correctes ».
+
+- `student_id`, `user_id` (compte qui confirme), `student_record_id` et `academic_year_id` (déclaration courante confirmée), tous dérivés côté serveur ; FK restrictives, aucune cascade.
+- `sequence` : rang dans l'historique de l'étudiant, unique `(student_id, sequence)`. Deux confirmations concurrentes ne peuvent pas occuper le même rang.
+- `information_fingerprint` : HMAC-SHA256 (clé `APP_KEY`) de la version confirmée, **jamais une copie des valeurs**. Aucun nom, contact, naissance, BAC ni CIN dans cette table. Masqué à la sérialisation.
+- `confirmed_at`, timestamps. Aucune colonne d'état : « confirmée », « obsolète » ou « jamais confirmée » est **déduit** à chaque lecture en comparant la dernière confirmation (rang le plus élevé) à l'empreinte de la situation actuelle. Aucune Action Student ne touche cette table.
+
+Contenu canonique de l'empreinte (`StudentInformationFingerprint`, version `v1`) : ordre de clés fixe, valeurs préfixées par leur longueur, NULL distinct de la chaîne vide, dates `Y-m-d` ; jamais de JSON.
+
+- Student : `student_number`, `last_name`, `first_names`, `birth_date`, `birth_place`, `phone`, `email`, `address`, `bac_registration_number`, `bac_series`, `bac_year`, `bac_mention` (exactement les champs affichés sur `bourse`). Les données CIN, jamais affichées à l'étudiant, sont exclues.
+- Déclaration courante : `id`, `status` ; année, établissement, niveau, parcours : **identifiant et nom affiché**. Renommer un parcours ou un niveau rend donc la confirmation obsolète : l'étudiant n'a pas vu ce libellé.
+- Les déclarations des autres années, affichées pour l'historique, ne font pas partie de la version confirmée.
+
+Rotation d'`APP_KEY` : toutes les empreintes deviennent non comparables, donc toutes les confirmations apparaissent obsolètes (échec sûr, même convention que les corrections) ; l'étudiant confirme à nouveau. Vérifications MySQL : `php tests/MySql/StudentConfirmationChecks.php`, **uniquement sur une base jetable dont le nom contient `check`**.
 
 ## Bourses implémentées
 

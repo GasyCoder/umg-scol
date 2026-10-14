@@ -22,6 +22,7 @@ class StudentPortalServiceProvider extends ServiceProvider
         RateLimiter::for('student-otp-verify', fn (Request $r) => [Limit::perMinute(20)->by('verify-ip:'.$r->ip()), Limit::perMinute(5)->by('verify-challenge:'.PortalEmailLock::key(is_string($r->input('challenge_id')) ? $r->input('challenge_id') : ''))]);
         RateLimiter::for('student-link', fn (Request $r) => [Limit::perMinute(10)->by('link-ip:'.$r->ip()), Limit::perMinute(3)->by('link-user:'.$r->user()->id), Limit::perDay(20)->by('link-day:'.$r->user()->id)]);
         RateLimiter::for('student-correction', fn (Request $r) => [Limit::perMinute(10)->by('correction-user:'.$r->user()->id), Limit::perDay(30)->by('correction-day:'.$r->user()->id)]);
+        RateLimiter::for('student-confirmation', fn (Request $r) => [Limit::perMinute(10)->by('confirmation-user:'.$r->user()->id), Limit::perDay(50)->by('confirmation-day:'.$r->user()->id)]);
         RateLimiter::for('student-oauth', fn (Request $r) => Limit::perMinute(10)->by('oauth:'.$r->ip()));
     }
 }

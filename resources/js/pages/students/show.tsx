@@ -14,15 +14,27 @@ import {
 } from '@/components/ui/dialog';
 import { identitySections } from '@/components/students/types';
 import type { AnnualRecord, Student } from '@/components/students/types';
+type StudentConfirmation = {
+    status: 'never_confirmed' | 'confirmed' | 'stale';
+    confirmed_at: string | null;
+    academic_year: string | null;
+};
+const confirmationLabels: Record<StudentConfirmation['status'], string> = {
+    never_confirmed: 'À confirmer',
+    confirmed: 'Confirmée',
+    stale: 'Confirmation devenue obsolète',
+};
 export default function StudentShow({
     student,
     records,
+    confirmation: studentConfirmation,
     canUpdate,
     canDeactivate,
     canCreateRecord,
 }: {
     student: Student;
     records: AnnualRecord[];
+    confirmation: StudentConfirmation;
     canUpdate: boolean;
     canDeactivate: boolean;
     canCreateRecord: boolean;
@@ -89,6 +101,33 @@ export default function StudentShow({
                     )}
                 </div>
             </div>
+            <p className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">
+                    Vérification étudiant :
+                </span>
+                <Badge
+                    variant={
+                        studentConfirmation.status === 'confirmed'
+                            ? 'secondary'
+                            : 'outline'
+                    }
+                >
+                    {confirmationLabels[studentConfirmation.status]}
+                </Badge>
+                {studentConfirmation.confirmed_at && (
+                    <span>
+                        {studentConfirmation.status === 'confirmed'
+                            ? 'Confirmée'
+                            : 'Dernière confirmation'}{' '}
+                        le{' '}
+                        {new Date(
+                            studentConfirmation.confirmed_at,
+                        ).toLocaleDateString('fr-FR')}
+                        {studentConfirmation.academic_year &&
+                            ` (année ${studentConfirmation.academic_year})`}
+                    </span>
+                )}
+            </p>
             <div className="grid gap-5 lg:grid-cols-2">
                 {identitySections.map((section) => (
                     <section

@@ -33,7 +33,22 @@ Implémenté sur `bourse` (`/api/student/*`) :
 
 ## Vérification étudiant
 
-Identification → consultation → confirmer OU demander correction → établissement accepte/refuse/corrige. La confirmation explicite reste à faire ; la demande de correction est implémentée.
+Identification → consultation → confirmer OU demander correction → établissement accepte/refuse/corrige. Les deux branches sont implémentées.
+
+## Confirmation des informations (implémentée)
+
+La confirmation signifie uniquement : « j'ai vérifié les informations actuellement affichées et je les considère correctes ». Ce n'est ni une inscription, ni une validation par l'établissement, ni une validation de bourse, ni une preuve d'identité, et elle ne modifie ni `Student` ni `StudentRecord`.
+
+1. Page « Mes informations » sur `bourse`, section « Vérification de mes informations » : état `never_confirmed` (jamais confirmé), `confirmed` (« Informations confirmées le … », badge « Confirmées ») ou `stale` (« Vos informations ont changé depuis votre dernière confirmation », badge « À confirmer de nouveau »).
+2. Action volontaire : bouton « Je confirme que mes informations sont correctes », puis dialogue « Je confirme avoir vérifié les informations affichées » et bouton « Confirmer mes informations ». Rien n'est confirmé à l'affichage ; pas de case précochée.
+3. `POST /api/student/confirmation` n'envoie que le jeton opaque de la version affichée. Le serveur dérive le compte, la fiche, l'année courante et la déclaration, recalcule l'empreinte sous verrou et refuse si la version a changé depuis l'affichage (« Vos informations ont changé depuis leur affichage »). L'étudiant ne confirme donc jamais une version qu'il n'a pas vue.
+4. Situation confirmée : année universitaire courante active, puis l'unique déclaration `active` de l'étudiant pour cette année. Aucune année courante, aucune déclaration, déclaration inactive, situation ambiguë ou fiche inactive : refus avec message, rien n'est enregistré.
+5. Une demande de correction `pending` bloque la confirmation (« Une ou plusieurs corrections sont encore en attente ») avec un lien « Voir mes demandes ». Après approbation, rejet ou annulation, l'étudiant confirme l'état officiel du moment.
+6. Historique conservé : une nouvelle version confirmée ajoute une ligne. Un double clic ou un nouvel essai sur la même version ne crée rien (idempotent, sans second audit).
+7. Obsolescence déduite : toute modification d'un champ affiché, de la déclaration courante (niveau, parcours, établissement, statut) ou du libellé affiché d'un référentiel rend la confirmation obsolète. Une nouvelle année courante exige une nouvelle confirmation de la nouvelle situation ; l'historique précédent reste. Les données CIN, non affichées, et l'email de connexion (`User.email`, distinct de l'email de contact `Student.email`) ne sont pas concernés.
+8. **La confirmation n'est jamais une condition** de réception, de vérification ou de validation d'un dossier papier de bourse : un étudiant sans compte ou sans confirmation est traité normalement.
+
+Le personnel voit sur la fiche interne « Vérification étudiant » : « À confirmer », « Confirmée le … (année …) » ou « Confirmation devenue obsolète », selon les Policies Student existantes.
 
 ## Demande de correction (implémentée)
 

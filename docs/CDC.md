@@ -35,7 +35,7 @@ Consulter ses informations, confirmer leur exactitude, signaler une correction. 
 
 Portail prévu : `bourse.umg.test:8000`, réservé aux étudiants, utilisant l'API `/api/student/*` du backend Laravel commun. Création du compte d'accès par email + OTP ou Google OAuth, puis rattachement sécurisé à une fiche `Student` préexistante déclarée par un établissement. La création du compte ne constitue jamais une inscription universitaire ; la vérification de l'email seule ne prouve pas le rattachement à la fiche.
 
-Le portail interne `scol.umg.test:8000` utilise Inertia + React + TypeScript et accueille les établissements, la Scolarité Centrale, le superadmin et le developer. Les deux portails, l'authentification étudiante et le rattachement sont implémentés ; confirmation et demande de correction restent à faire.
+Le portail interne `scol.umg.test:8000` utilise Inertia + React + TypeScript et accueille les établissements, la Scolarité Centrale, le superadmin et le developer. Les deux portails, l'authentification étudiante, le rattachement, la demande de correction et la confirmation explicite des informations sont implémentés. La confirmation n'est jamais une condition du traitement papier des bourses.
 
 ## Scolarité Centrale
 

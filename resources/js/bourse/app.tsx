@@ -14,6 +14,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { api } from './api';
+import { ConfirmationSection } from './confirmation';
+import type { ConfirmationState } from './confirmation';
 import type { Session } from './api';
 type Correction = {
     id: number;
@@ -67,6 +69,9 @@ type Student = {
 function Portal() {
     const [session, setSession] = useState<Session | null>(null);
     const [student, setStudent] = useState<Student | null>(null);
+    const [confirmation, setConfirmation] = useState<ConfirmationState | null>(
+        null,
+    );
     const [error, setError] = useState(
         new URLSearchParams(window.location.search).has('auth_error')
             ? 'Connexion Google impossible. Utilisez email + code ; vous pourrez ensuite associer Google depuis votre session.'
@@ -89,14 +94,19 @@ function Portal() {
         const next = await api<Session>('session');
         setSession(next);
         if (next.linked) {
-            const result = await api<{ student: Student }>('me');
+            const result = await api<{
+                student: Student;
+                confirmation: ConfirmationState;
+            }>('me');
             setStudent(result.student);
+            setConfirmation(result.confirmation);
             const list = await api<{ corrections: Correction[] }>(
                 'corrections',
             );
             setCorrections(list.corrections);
         } else {
             setStudent(null);
+            setConfirmation(null);
             setCorrections([]);
         }
     }
@@ -602,7 +612,16 @@ function Portal() {
                             Pour une erreur concernant votre niveau, parcours ou
                             établissement, contactez votre établissement.
                         </p>
-                        <section className="space-y-4">
+                        {confirmation && (
+                            <ConfirmationSection
+                                state={confirmation}
+                                onDone={async (result) => {
+                                    setMessage(result);
+                                    await refresh();
+                                }}
+                            />
+                        )}
+                        <section id="mes-demandes" className="space-y-4">
                             <h2 className="text-lg font-semibold">
                                 Mes demandes de correction
                             </h2>

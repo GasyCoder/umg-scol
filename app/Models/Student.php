@@ -91,6 +91,12 @@ class Student extends Model
         });
     }
 
+    /** @return HasMany<StudentInformationConfirmation, $this> */
+    public function informationConfirmations(): HasMany
+    {
+        return $this->hasMany(StudentInformationConfirmation::class);
+    }
+
     /** @return HasMany<ScholarshipApplication, $this> */
     public function scholarshipApplications(): HasMany
     {

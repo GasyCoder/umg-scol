@@ -4,7 +4,7 @@
 
 - [x] Spatie Permission
 - [x] Spatie Activitylog
-- [ ] Laravel Excel
+- [x] Laravel Excel
 - [x] Pest installé et tests de fondation identité/permissions/audit
 - [x] mécanisme de seed superadmin sécurisé et idempotent
 
@@ -39,7 +39,7 @@
 
 - [x] portail `bourse` : compte OTP/Google et rattachement sécurisé
 - [x] consultation
-- [ ] confirmation
+- [x] confirmation explicite des informations (empreinte HMAC, obsolescence déduite)
 - [x] demande de correction (étudiant) et revue (personnel)
 
 ## Phase 5 — Bourse
