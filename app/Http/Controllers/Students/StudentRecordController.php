@@ -21,7 +21,7 @@ class StudentRecordController extends Controller
     {
         Gate::authorize('create', [StudentRecord::class, $student]);
 
-        return Inertia::render('students/record-form', ['student' => $student->only(['id', 'last_name', 'first_names']), 'record' => null, 'options' => app(StudentReferenceOptions::class)->forUser($request->user())]);
+        return Inertia::render('students/record-form', ['student' => $student->only(['id', 'uuid', 'last_name', 'first_names']), 'record' => null, 'options' => app(StudentReferenceOptions::class)->forUser($request->user())]);
     }
 
     public function store(SaveStudentRecordRequest $request, Student $student): RedirectResponse
@@ -35,20 +35,20 @@ class StudentRecordController extends Controller
     {
         Gate::authorize('update', $student_record);
 
-        return Inertia::render('students/record-form', ['student' => $student_record->student->only(['id', 'last_name', 'first_names']), 'record' => $student_record, 'options' => app(StudentReferenceOptions::class)->forUser($request->user())]);
+        return Inertia::render('students/record-form', ['student' => $student_record->student->only(['id', 'uuid', 'last_name', 'first_names']), 'record' => $student_record, 'options' => app(StudentReferenceOptions::class)->forUser($request->user())]);
     }
 
     public function update(SaveStudentRecordRequest $request, StudentRecord $student_record): RedirectResponse
     {
         app(SaveStudentRecord::class)->handle($request->user(), $student_record->student, $student_record, $request->validated());
 
-        return to_route('students.show', $student_record->student_id);
+        return to_route('students.show', $student_record->student);
     }
 
     public function status(StudentStatusRequest $request, StudentRecord $student_record): RedirectResponse
     {
         app(SaveStudentRecord::class)->handle($request->user(), $student_record->student, $student_record, $request->validated());
 
-        return to_route('students.show', $student_record->student_id);
+        return to_route('students.show', $student_record->student);
     }
 }

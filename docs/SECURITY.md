@@ -110,3 +110,5 @@ Verrou d'import + verrous DB ciblés partagés avec la saisie manuelle, nouvelle
 - Les comptes étudiants apparaissent dans l'audit sous la forme « Compte étudiant n° {id} », sans nom ni email. Le developer n'a aucun traitement particulier : ses actions apparaissent et se filtrent comme celles des autres acteurs, et ses exports d'audit sont eux-mêmes audités.
 - CSV : séparateur `;`, BOM UTF-8, `Cache-Control: private, no-store`, cellules commençant par `=`, `+`, `-`, `@`, tabulation ou retour chariot préfixées d'une apostrophe (`CsvExport`). Limites de débit propres : 10 exports par minute pour les rapports et pour l'audit.
 - Indicateurs techniques du developer : compteurs uniquement (jobs en échec, imports en échec, volume d'audit) ; aucun contenu de job, de configuration, de session ni secret.
+
+- Fiches étudiantes adressées par UUID dans les URL : pas d'identifiant séquentiel devinable ni d'indication du volume de fiches. Ce n'est pas un contrôle d'accès : les Policies restent seules à décider de la visibilité.

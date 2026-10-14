@@ -21,7 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { baseUrl, definitions } from './definitions';
+import { article, baseUrl, definitions } from './definitions';
 import type {
     EstablishmentOption,
     ReferenceKind,
@@ -47,7 +47,7 @@ export default function ReferenceList({
     establishments = [],
 }: ReferenceListProps & { kind: ReferenceKind }) {
     const definition = definitions[kind];
-    const article = kind === 'academic-years' ? 'une' : 'un';
+    const articleText = article(kind);
     const search = useForm({
         search: filters.search ?? '',
         establishment_id: filters.establishment_id
@@ -82,7 +82,9 @@ export default function ReferenceList({
               ? ['Nom', 'Dates', 'Année courante']
               : kind === 'levels'
                 ? ['Code', 'Nom', 'Ordre']
-                : ['Établissement', 'Code', 'Nom'];
+                : kind === 'programs'
+                  ? ['Établissement', 'Mention', 'Code', 'Nom']
+                  : ['Établissement', 'Code', 'Nom'];
     const cells = (row: ReferenceRecord) =>
         kind === 'establishments'
             ? [
@@ -99,7 +101,14 @@ export default function ReferenceList({
                 ]
               : kind === 'levels'
                 ? [row.code, row.name, String(row.sort_order)]
-                : [row.establishment?.name ?? '—', row.code ?? '—', row.name];
+                : kind === 'programs'
+                  ? [
+                        row.establishment?.name ?? '—',
+                        row.mention?.name ?? 'Sans mention',
+                        row.code ?? '—',
+                        row.name,
+                    ]
+                  : [row.establishment?.name ?? '—', row.code ?? '—', row.name];
     return (
         <div className="space-y-6 p-4 md:p-6">
             <Head title={definition.title} />
@@ -111,7 +120,7 @@ export default function ReferenceList({
                 {canCreate && (
                     <Button asChild>
                         <Link href={`${baseUrl(kind)}/create`}>
-                            Créer {article} {definition.singular}
+                            Créer {articleText} {definition.singular}
                         </Link>
                     </Button>
                 )}
@@ -130,7 +139,7 @@ export default function ReferenceList({
                     }
                     maxLength={100}
                 />
-                {kind === 'programs' && (
+                {(kind === 'programs' || kind === 'mentions') && (
                     <Select
                         value={search.data.establishment_id || 'all'}
                         onValueChange={(value) =>

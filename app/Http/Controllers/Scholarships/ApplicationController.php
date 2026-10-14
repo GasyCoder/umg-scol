@@ -53,7 +53,7 @@ class ApplicationController extends Controller
     {
         Gate::authorize('view', $application);
         $application->load([
-            'campaign.academicYear:id,name', 'student:id,student_number,last_name,first_names,birth_date,birth_place,is_active',
+            'campaign.academicYear:id,name', 'student:id,uuid,student_number,last_name,first_names,birth_date,birth_place,is_active',
             'studentRecord.establishment:id,name', 'studentRecord.level:id,name', 'studentRecord.program:id,name', 'studentRecord.academicYear:id,name',
             'checks' => fn ($q) => $q->orderBy('id')->with('checker:id,name'), 'history' => fn ($q) => $q->orderBy('id')->with('actor:id,name'), 'receiver:id,name', 'reviewStarter:id,name', 'decider:id,name',
         ]);
@@ -69,7 +69,7 @@ class ApplicationController extends Controller
                 'review_started' => $application->review_started_at ? ['at' => $application->review_started_at->toIso8601String(), 'by' => $application->reviewStarter?->name] : null,
                 'decided' => $application->decided_at ? ['at' => $application->decided_at->toIso8601String(), 'by' => $application->decider?->name] : null,
                 'student' => [
-                    ...$application->student->only(['id', 'student_number', 'last_name', 'first_names', 'birth_place', 'is_active']), 'birth_date' => $application->student->birth_date?->format('Y-m-d'),
+                    ...$application->student->only(['uuid', 'student_number', 'last_name', 'first_names', 'birth_place', 'is_active']), 'birth_date' => $application->student->birth_date?->format('Y-m-d'),
                     'academic_year' => $record->academicYear->name, 'establishment' => $record->establishment->name, 'level' => $record->level->name, 'program' => $record->program?->name, 'record_status' => $record->status->value,
                 ],
                 'checks' => $application->checks->map(fn ($check) => [

@@ -5,6 +5,7 @@ use App\Enums\StudentRecordStatus;
 use App\Models\AcademicYear;
 use App\Models\Establishment;
 use App\Models\Level;
+use App\Models\Mention;
 use App\Models\Program;
 use App\Models\Student;
 use App\Models\StudentRecord;
@@ -64,15 +65,15 @@ it('normalizes without damaging official names and Malagasy telephone formats', 
 it('allows authorized identity edits and status changes without deleting history', function () {
     $this->actingAs($this->actor)->post('/students', $this->data)->assertRedirect();
     $student = Student::sole();
-    $this->get('/students/'.$student->id.'/edit')->assertOk();
-    $this->put('/students/'.$student->id, [...$this->data, 'last_name' => 'Nom corrigé', 'is_active' => false, 'establishment_id' => $this->b->id])->assertSessionHasNoErrors()->assertRedirect();
+    $this->get('/students/'.$student->uuid.'/edit')->assertOk();
+    $this->put('/students/'.$student->uuid, [...$this->data, 'last_name' => 'Nom corrigé', 'is_active' => false, 'establishment_id' => $this->b->id])->assertSessionHasNoErrors()->assertRedirect();
     expect($student->fresh()->last_name)->toBe('Nom corrigé')->and($student->fresh()->is_active)->toBeTrue()
         ->and(StudentRecord::sole()->establishment_id)->toBe($this->a->id);
-    $this->patch('/students/'.$student->id.'/status', ['is_active' => false])->assertRedirect();
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => false])->assertRedirect();
     expect($student->fresh()->is_active)->toBeFalse()->and(StudentRecord::count())->toBe(1);
-    $this->patch('/students/'.$student->id.'/status', ['is_active' => true])->assertRedirect();
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => true])->assertRedirect();
     expect($student->fresh()->is_active)->toBeTrue();
-    $this->delete('/students/'.$student->id)->assertStatus(405);
+    $this->delete('/students/'.$student->uuid)->assertStatus(405);
 });
 
 it('rejects invalid identity input', function (string $field, mixed $value) {
@@ -128,10 +129,10 @@ it('creates later years without overwriting previous years or attribution', func
     $old = StudentRecord::sole();
     $next = AcademicYear::factory()->create();
     $payload = ['academic_year_id' => $next->id, 'level_id' => $this->level->id, 'program_id' => null];
-    $this->get('/students/'.$student->id.'/records/create')->assertOk();
-    $this->post('/students/'.$student->id.'/records', $payload)->assertSessionHasNoErrors()->assertRedirect();
+    $this->get('/students/'.$student->uuid.'/records/create')->assertOk();
+    $this->post('/students/'.$student->uuid.'/records', $payload)->assertSessionHasNoErrors()->assertRedirect();
     expect($student->studentRecords()->count())->toBe(2)->and($old->fresh()->academic_year_id)->toBe($this->year->id);
-    $this->post('/students/'.$student->id.'/records', $payload)->assertSessionHasErrors('academic_year_id');
+    $this->post('/students/'.$student->uuid.'/records', $payload)->assertSessionHasErrors('academic_year_id');
     $new = StudentRecord::where('academic_year_id', $next->id)->sole();
     $this->put('/student-records/'.$new->id, [...$payload, 'declared_by' => $this->admin->id])->assertRedirect();
     expect($new->fresh()->declared_by)->toBe($this->actor->id);
@@ -168,13 +169,13 @@ it('enforces program establishment and all foreign keys in the database', functi
 it('strictly isolates student lists detail and foreign record urls', function () {
     $own = StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $foreign = StudentRecord::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->actor)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->where('records.data.0.student_id', $own->student_id));
-    $this->get('/students/'.$own->student_id)->assertOk();
-    foreach (['/students/'.$foreign->student_id, '/students/'.$foreign->student_id.'/edit', '/student-records/'.$foreign->id.'/edit', '/students/'.$foreign->student_id.'/records/create'] as $url) {
+    $this->actingAs($this->actor)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->where('records.data.0.student_id', $own->student_id));
+    $this->get('/students/'.$own->student->uuid)->assertOk();
+    foreach (['/students/'.$foreign->student->uuid, '/students/'.$foreign->student->uuid.'/edit', '/student-records/'.$foreign->id.'/edit', '/students/'.$foreign->student->uuid.'/records/create'] as $url) {
         $this->get($url)->assertForbidden();
     }
-    $this->put('/students/'.$foreign->student_id, ['last_name' => 'Hack'])->assertForbidden();
-    $this->patch('/students/'.$foreign->student_id.'/status', ['is_active' => false])->assertForbidden();
+    $this->put('/students/'.$foreign->student->uuid, ['last_name' => 'Hack'])->assertForbidden();
+    $this->patch('/students/'.$foreign->student->uuid.'/status', ['is_active' => false])->assertForbidden();
     $this->patch('/student-records/'.$foreign->id.'/status', ['status' => 'inactive'])->assertForbidden();
     $this->put('/student-records/'.$foreign->id, [])->assertForbidden();
     $this->get('/students?establishment_id='.$this->b->id)->assertForbidden();
@@ -183,19 +184,19 @@ it('strictly isolates student lists detail and foreign record urls', function ()
 it('does not reveal other annual records on a shared student detail', function () {
     $own = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'status' => 'inactive']);
     StudentRecord::factory()->create(['student_id' => $own->student_id, 'establishment_id' => $this->b->id]);
-    $this->actingAs($this->actor)->get('/students/'.$own->student_id)->assertInertia(fn (Assert $page) => $page->has('records', 1)->where('records.0.establishment_id', $this->a->id)->where('canUpdate', false)->where('canDeactivate', false));
-    $this->put('/students/'.$own->student_id, ['last_name' => 'Changed'])->assertForbidden();
+    $this->actingAs($this->actor)->get('/students/'.$own->student->uuid)->assertInertia(fn (Assert $page) => $page->has('records', 1)->where('records.0.establishment_id', $this->a->id)->where('canUpdate', false)->where('canDeactivate', false));
+    $this->put('/students/'.$own->student->uuid, ['last_name' => 'Changed'])->assertForbidden();
 });
 
 it('keeps central office read only while allowing global filters and detail', function () {
     $a = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id]);
     StudentRecord::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', false));
-    $this->get('/students/'.$a->student_id)->assertInertia(fn (Assert $page) => $page->where('canUpdate', false)->where('canCreateRecord', false));
+    $this->actingAs($this->central)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', false));
+    $this->get('/students/'.$a->student->uuid)->assertInertia(fn (Assert $page) => $page->where('canUpdate', false)->where('canCreateRecord', false));
     $query = http_build_query(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'status' => 'active']);
     $this->get('/students?'.$query)->assertInertia(fn (Assert $page) => $page->has('records.data', 1));
     $this->post('/students', $this->data)->assertForbidden();
-    $this->put('/students/'.$a->student_id, ['last_name' => 'Hack'])->assertForbidden();
+    $this->put('/students/'.$a->student->uuid, ['last_name' => 'Hack'])->assertForbidden();
     $this->patch('/student-records/'.$a->id.'/status', ['status' => 'inactive'])->assertForbidden();
 });
 
@@ -212,7 +213,7 @@ it('denies student accounts and accounts without permission including direct url
     }
     $record = StudentRecord::factory()->create();
     $this->actingAs($user)->get('/students')->assertForbidden();
-    $this->get('/students/'.$record->student_id)->assertForbidden();
+    $this->get('/students/'.$record->student->uuid)->assertForbidden();
     $this->get('/students/create')->assertForbidden();
     $this->post('/students', $this->data)->assertForbidden();
 })->with(['student', 'none']);
@@ -221,9 +222,9 @@ it('audits changes without personal values in attributes or metadata', function 
     $this->actingAs($this->actor)->post('/students', $this->data)->assertRedirect();
     $student = Student::sole();
     $record = StudentRecord::sole();
-    $this->put('/students/'.$student->id, [...$this->data, 'last_name' => 'Correction sensible', 'email' => 'new-private@example.test'])->assertRedirect();
+    $this->put('/students/'.$student->uuid, [...$this->data, 'last_name' => 'Correction sensible', 'email' => 'new-private@example.test'])->assertRedirect();
     $this->patch('/student-records/'.$record->id.'/status', ['status' => 'inactive'])->assertRedirect();
-    $this->patch('/students/'.$student->id.'/status', ['is_active' => false])->assertRedirect();
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => false])->assertRedirect();
     $logs = Activity::whereIn('log_name', ['students', 'student_records'])->get();
     expect($logs->count())->toBe(5);
     foreach ($logs as $log) {
@@ -246,7 +247,7 @@ it('paginates on the server and bounds relation queries independently of row cou
     StudentRecord::factory()->count(25)->create(['establishment_id' => $this->a->id]);
     DB::enableQueryLog();
     DB::flushQueryLog();
-    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 20)->where('records.total', 25));
+    $this->actingAs($this->central)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 20)->where('records.total', 25));
     $related = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'from "students"'));
     expect($related->count())->toBeLessThanOrEqual(2);
     DB::disableQueryLog();
@@ -277,7 +278,7 @@ it('rejects student-record alteration to a foreign program or establishment', fu
 it('does not create a declaration for inactive identities', function () {
     $record = StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $record->student->update(['is_active' => false]);
-    $this->actingAs($this->actor)->post('/students/'.$record->student_id.'/records', ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id])->assertSessionHasErrors('status');
+    $this->actingAs($this->actor)->post('/students/'.$record->student->uuid.'/records', ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id])->assertSessionHasErrors('status');
 });
 
 it('escapes search wildcards consistently across database engines', function () {
@@ -292,4 +293,27 @@ it('rejects malformed manual establishment and status payloads', function () {
     $record = StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $this->patch('/student-records/'.$record->id.'/status', ['status' => 'registered'])->assertSessionHasErrors('status');
     expect($record->fresh()->status)->toBe(StudentRecordStatus::Active);
+});
+
+// Public uuid in URLs
+it('identifies students by an uuid in every URL and never by the sequential id', function () {
+    $this->actingAs($this->actor)->post('/students', $this->data)->assertSessionHasNoErrors();
+    $student = Student::query()->latest('id')->first();
+    expect($student->uuid)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/')
+        ->and(route('students.show', $student))->toEndWith('/students/'.$student->uuid);
+    $this->get('/students/'.$student->uuid)->assertOk()->assertInertia(fn (Assert $page) => $page->where('student.uuid', $student->uuid)->where('portalLinked', false));
+    $this->get('/students/'.$student->id)->assertNotFound();
+    $this->get('/students/not-a-uuid')->assertNotFound();
+    $this->patch('/students/'.$student->id.'/status', ['is_active' => false])->assertNotFound();
+    expect($student->fresh()->is_active)->toBeTrue();
+    $record = $student->studentRecords()->first();
+    $this->patch('/student-records/'.$record->id.'/status', ['status' => 'inactive'])->assertRedirect('/students/'.$student->uuid);
+});
+it('shows the mention of each declaration and whether a portal account is linked', function () {
+    $mention = Mention::factory()->create(['establishment_id' => $this->a->id, 'name' => 'Sciences de la vie']);
+    $this->program->update(['mention_id' => $mention->id]);
+    $record = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'program_id' => $this->program->id]);
+    User::factory()->create()->assignRole('student')->forceFill(['student_id' => $record->student_id])->save();
+    $this->actingAs($this->actor)->get('/students/'.$record->student->uuid)->assertInertia(fn (Assert $page) => $page
+        ->where('records.0.program.mention.name', 'Sciences de la vie')->where('portalLinked', true)->missing('student.password'));
 });

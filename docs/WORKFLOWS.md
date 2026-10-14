@@ -20,6 +20,10 @@ Permissions existantes imports.view/create/commit/export_errors, Policy serveur 
 
 Traitement synchrone V1, **10 Mo, 5 000 lignes physiques de données, 50 colonnes**, expansion XLSX limitée à 100 Mo. Taille/lignes configurables dans `config/student_imports.php`. Lecture et inserts staging par blocs de 200 ; analyse et confirmation par blocs ; aucun chargement intégral des lignes en mémoire. Les clés de doublons/verrouillage sont conservées en mémoire (volume borné), pas le fichier complet. La confirmation reste une transaction globale : les chunks ne sont pas des commits partiels. Test automatisé de 1 001 lignes ; vérifier les temps et limites PHP/proxy sur le matériel cible avant de relever les bornes. Pour des lots plus grands, passer les Actions en Jobs avec suivi d'état ; aucun worker n'est requis en local dans cette phase.
 
+## Navigation des étudiants (portail interne)
+
+`/students` se parcourt en cartes : établissement → niveau → mention → parcours → liste paginée. Chaque carte compte les déclarations actives (et inactives) de l'année choisie, l'année courante par défaut. Un compte établissement commence directement à ses niveaux et ne voit jamais un autre établissement. « Sans mention » regroupe les parcours non rattachés et les déclarations sans parcours ; « Sans parcours », les déclarations sans parcours. À chaque étape : fil d'Ariane cliquable, bouton « Voir toute la sélection en liste », recherche (matricule, nom, prénom, CIN, numéro BAC, téléphone, email) limitée à l'année affichée ; une recherche par URL sans année couvre toutes les années.
+
 ## Portail étudiant : compte et rattachement
 
 Implémenté sur `bourse` (`/api/student/*`) :

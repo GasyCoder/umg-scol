@@ -37,7 +37,7 @@ type Application = {
     review_started: Stamp;
     decided: Stamp;
     student: {
-        id: number;
+        uuid: string;
         student_number: string | null;
         last_name: string;
         first_names: string | null;
@@ -200,7 +200,7 @@ export default function ApplicationShow({
                 />
                 {canViewStudent && (
                     <Button variant="outline" size="sm" asChild>
-                        <Link href={`/students/${student.id}`}>
+                        <Link href={`/students/${student.uuid}`}>
                             Comparer avec la fiche officielle complète
                         </Link>
                     </Button>

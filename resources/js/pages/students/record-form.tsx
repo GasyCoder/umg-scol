@@ -13,7 +13,7 @@ export default function AnnualRecordForm({
     record,
     options,
 }: {
-    student: Pick<Student, 'id' | 'last_name' | 'first_names'>;
+    student: Pick<Student, 'id' | 'uuid' | 'last_name' | 'first_names'>;
     record: AnnualRecord | null;
     options: Options;
 }) {
@@ -34,7 +34,7 @@ export default function AnnualRecordForm({
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (record) form.put(`/student-records/${record.id}`);
-        else form.post(`/students/${student.id}/records`);
+        else form.post(`/students/${student.uuid}/records`);
     };
     return (
         <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
@@ -58,7 +58,7 @@ export default function AnnualRecordForm({
                 <div className="flex gap-3">
                     <Button disabled={form.processing}>Enregistrer</Button>
                     <Button variant="outline" asChild>
-                        <Link href={`/students/${student.id}`}>Annuler</Link>
+                        <Link href={`/students/${student.uuid}`}>Annuler</Link>
                     </Button>
                 </div>
             </form>

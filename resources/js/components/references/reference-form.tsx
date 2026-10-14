@@ -13,9 +13,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { baseUrl, definitions } from './definitions';
+import { article, baseUrl, definitions } from './definitions';
 import type {
     EstablishmentOption,
+    MentionOption,
     ReferenceKind,
     ReferenceRecord,
 } from './definitions';
@@ -23,14 +24,16 @@ import type {
 export type ReferenceFormProps = {
     record: ReferenceRecord | null;
     establishments?: EstablishmentOption[];
+    mentions?: MentionOption[];
 };
 export default function ReferenceForm({
     kind,
     record,
     establishments = [],
+    mentions = [],
 }: ReferenceFormProps & { kind: ReferenceKind }) {
     const definition = definitions[kind];
-    const article = kind === 'academic-years' ? 'une' : 'un';
+    const articleText = article(kind);
     const initial: Record<string, string | boolean> = {
         is_active: record?.is_active ?? true,
     };
@@ -55,7 +58,7 @@ export default function ReferenceForm({
         <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
             <Head title={definition.title} />
             <Heading
-                title={`${record ? 'Modifier' : 'Créer'} ${article} ${definition.singular}`}
+                title={`${record ? 'Modifier' : 'Créer'} ${articleText} ${definition.singular}`}
                 description="Référentiel institutionnel de l’Université de Mahajanga."
             />
             <form
@@ -68,11 +71,58 @@ export default function ReferenceForm({
                             {field.label}
                             {field.required ? ' *' : ''}
                         </Label>
-                        {field.type === 'establishment' ? (
+                        {field.type === 'mention' ? (
+                            <Select
+                                value={String(form.data[field.key]) || 'none'}
+                                onValueChange={(value) =>
+                                    form.setData(
+                                        field.key,
+                                        value === 'none' ? '' : value,
+                                    )
+                                }
+                            >
+                                <SelectTrigger id={field.key}>
+                                    <SelectValue placeholder="Sans mention" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">
+                                        Sans mention
+                                    </SelectItem>
+                                    {mentions
+                                        .filter(
+                                            (option) =>
+                                                String(
+                                                    option.establishment_id,
+                                                ) ===
+                                                String(
+                                                    form.data.establishment_id,
+                                                ),
+                                        )
+                                        .map((option) => (
+                                            <SelectItem
+                                                key={option.id}
+                                                value={String(option.id)}
+                                            >
+                                                {option.name}
+                                                {!option.is_active
+                                                    ? ' (inactive)'
+                                                    : ''}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                        ) : field.type === 'establishment' ? (
                             <Select
                                 value={String(form.data[field.key])}
                                 onValueChange={(value) =>
-                                    form.setData(field.key, value)
+                                    form.setData((data) => ({
+                                        ...data,
+                                        [field.key]: value,
+                                        ...('mention_id' in data &&
+                                        value !== data[field.key]
+                                            ? { mention_id: '' }
+                                            : {}),
+                                    }))
                                 }
                                 required
                             >

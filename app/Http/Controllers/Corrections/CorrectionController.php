@@ -67,7 +67,7 @@ class CorrectionController extends Controller
             'current_value' => $correction->field->valueOf($student), 'proposed_value' => $correction->proposed_value, 'student_message' => $correction->student_message,
             'rejection_reason' => $correction->rejection_reason, 'created_at' => $correction->created_at->toIso8601String(), 'reviewed_at' => $correction->reviewed_at?->toIso8601String(),
             'reviewer' => $correction->reviewer?->name, 'conflict' => $correction->status === StudentCorrectionStatus::Pending && ! hash_equals($correction->current_fingerprint, $correction->field->fingerprint($student)),
-            'student' => [...$student->only(['last_name', 'first_names', 'student_number', 'is_active']), 'id' => $student->id, 'establishments' => $student->studentRecords->pluck('establishment.name')->unique()->values()],
+            'student' => [...$student->only(['last_name', 'first_names', 'student_number', 'is_active']), 'uuid' => $student->uuid, 'establishments' => $student->studentRecords->pluck('establishment.name')->unique()->values()],
         ], 'canReview' => $correction->status === StudentCorrectionStatus::Pending && Gate::allows('review', $correction), 'canViewStudent' => Gate::allows('view', $student)]);
     }
 

@@ -27,6 +27,12 @@ class Establishment extends Model
         return ['code', 'name', 'type', 'is_active'];
     }
 
+    /** @return HasMany<Mention, $this> */
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(Mention::class);
+    }
+
     /** @return HasMany<Program, $this> */
     public function programs(): HasMany
     {

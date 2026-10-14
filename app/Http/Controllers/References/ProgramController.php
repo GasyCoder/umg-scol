@@ -7,6 +7,7 @@ use App\Http\Requests\References\ReferenceListRequest;
 use App\Http\Requests\References\ReferenceStatusRequest;
 use App\Http\Requests\References\SaveProgramRequest;
 use App\Models\Establishment;
+use App\Models\Mention;
 use App\Models\Program;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class ProgramController extends Controller
     {
         Gate::authorize('viewAny', Program::class);
         $search = $request->string('search')->trim()->toString();
-        $query = Program::query()->with('establishment:id,code,name');
+        $query = Program::query()->with(['establishment:id,code,name', 'mention:id,name']);
         if ($request->user()->hasRole('establishment')) {
             $query->where('establishment_id', $request->user()->establishment_id);
         }
@@ -44,7 +45,7 @@ class ProgramController extends Controller
     {
         Gate::authorize('create', Program::class);
 
-        return Inertia::render('references/programs/form', ['record' => null, 'establishments' => $this->establishments($request)]);
+        return Inertia::render('references/programs/form', ['record' => null, 'establishments' => $this->establishments($request), 'mentions' => $this->mentions($request)]);
     }
 
     public function store(SaveProgramRequest $request): RedirectResponse
@@ -59,7 +60,7 @@ class ProgramController extends Controller
     {
         Gate::authorize('update', $program);
 
-        return Inertia::render('references/programs/form', ['record' => $program, 'establishments' => $this->establishments($request)]);
+        return Inertia::render('references/programs/form', ['record' => $program, 'establishments' => $this->establishments($request), 'mentions' => $this->mentions($request)]);
     }
 
     public function update(SaveProgramRequest $request, Program $program): RedirectResponse
@@ -76,6 +77,13 @@ class ProgramController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Statut mis à jour.']);
 
         return to_route('references.programs.index');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function mentions(Request $request): array
+    {
+        return Mention::query()->when($request->user()->hasRole('establishment'), fn ($query) => $query->where('establishment_id', $request->user()->establishment_id))
+            ->orderBy('name')->get(['id', 'establishment_id', 'code', 'name', 'is_active'])->toArray();
     }
 
     /** @return array<int, array<string, mixed>> */

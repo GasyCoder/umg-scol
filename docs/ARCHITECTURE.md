@@ -44,6 +44,8 @@ Pilotage : `app/Support/Reporting` (`ReportScope` pour le périmètre et l'anné
 
 `resources/js/components`, `components/ui`, `layouts`, `pages`, `hooks`, `lib`, `types`.
 
+Thème : tokens shadcn/ui définis dans `resources/css/app.css` d'après la palette DashWind (bleu `#6576ff`, ardoise `#364a63`/`#526484`, fond `#f5f6fa`, bordures `#e5e9f2`, mode sombre dérivé), polices Roboto (texte) et Nunito (titres) servies par Bunny Fonts via `laravel-vite-plugin`. Le dossier `template-model/` (DashWind, sous licence, dépôt git propre) sert de référence visuelle locale et n'est jamais versionné.
+
 ## Règles
 
 - routes nommées cohérentes ;

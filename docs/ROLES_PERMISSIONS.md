@@ -102,3 +102,7 @@ Aucune nouvelle permission. Le tableau de bord et les rapports réutilisent les 
 | Indicateurs techniques                      | rôle `developer`               | compteurs seulement                                        |
 
 Exports de rapports : `students.export` (étudiants), `imports.export_errors` (imports), `scholarships.export` (bourses). Export d'audit : `audits.export`. Le rôle `student` n'a accès à aucune de ces routes. Le filtre d'année est réservé aux acteurs globaux sur le tableau de bord ; dans les rapports, un établissement peut changer d'année mais reste dans son établissement.
+
+## Mentions
+
+Les mentions font partie du référentiel des parcours : même permission `programs.manage` et même périmètre (superadmin et developer globaux ; un établissement, s'il reçoit un jour cette permission, limité à ses mentions). Aucune nouvelle permission.

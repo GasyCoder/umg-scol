@@ -6,6 +6,7 @@
 - `establishments`
 - `academic_years`
 - `levels`
+- `mentions`
 - `programs`
 - `students`
 - `student_records`
@@ -190,3 +191,15 @@ Migration `2026_10_14_200000_create_scholarship_tables`. Toutes les FK sont rest
 **Numéro DDB** : sa structure réglementaire n'est pas connue. Il est conservé tel que saisi, en chaîne, après suppression des espaces de début et de fin et regroupement des espaces internes. La clé de doublon `ddb_key` retire les espaces et passe en majuscules, sans toucher aux autres caractères. Il n'y a pas d'unicité globale, seulement par campagne.
 
 Vérifications MySQL : `php tests/MySql/ScholarshipChecks.php`, **uniquement sur une base jetable dont le nom contient `check`**.
+
+## Mentions implémentées
+
+Migration `2026_10_15_100000_create_mentions`. Organisation LMD : établissement → mention → parcours ; le niveau reste porté par la déclaration annuelle.
+
+- `mentions` : `establishment_id` (FK restrictive), `code` facultatif unique par établissement, `name`, `is_active`, timestamps. Unique `(id, establishment_id)` pour la FK composite.
+- `programs.mention_id` : facultatif (les parcours existants restent « Sans mention » jusqu'à leur rattachement), FK composite `(mention_id, establishment_id) → mentions(id, establishment_id)` : un parcours et sa mention appartiennent toujours au même établissement, garanti en base. Aucune cascade ; le rollback retire la colonne puis la table.
+- La mention d'un étudiant est déduite de son parcours (`student_records.program_id → programs.mention_id`) : aucune colonne mention dans les déclarations ni dans l'import.
+
+## Identifiant public des étudiants
+
+Migration `2026_10_15_110000_add_uuid_to_students` : colonne `students.uuid` (UUID v7, unique, non nulle), générée par le modèle à la création (saisie manuelle et import passent par Eloquent) et remplie pour les fiches existantes par la migration. Elle sert de clé de route (`/students/{uuid}`, modification, statut, nouvelle déclaration) ; l'`id` entier reste la clé primaire et la cible de toutes les FK. Une URL avec l'identifiant numérique ou un UUID invalide répond 404.

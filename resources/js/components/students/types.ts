@@ -1,5 +1,7 @@
 export type Student = {
     id: number;
+    /** Public identifier used in every URL. */
+    uuid: string;
     student_number: string | null;
     last_name: string;
     first_names: string | null;
@@ -43,7 +45,12 @@ export type AnnualRecord = {
     declared_at: string;
     student?: Pick<
         Student,
-        'id' | 'student_number' | 'last_name' | 'first_names' | 'is_active'
+        | 'id'
+        | 'uuid'
+        | 'student_number'
+        | 'last_name'
+        | 'first_names'
+        | 'is_active'
     >;
     establishment?: Option;
     academic_year?: Option;

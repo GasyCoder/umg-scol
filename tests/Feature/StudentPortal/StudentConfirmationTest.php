@@ -318,22 +318,22 @@ it('allows students only, never staff, to confirm', function () {
 // Internal page
 it('shows the confirmation state to an establishment for its own student', function () {
     $scol = 'http://'.config('portals.scol_domain');
-    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->id)->assertOk()
+    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->uuid)->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('confirmation.status', 'never_confirmed')->where('confirmation.confirmed_at', null));
     confirmInformation($this)->assertOk();
-    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->id)->assertOk()
+    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->uuid)->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('confirmation.status', 'confirmed')->where('confirmation.academic_year', '2026-2027')->missing('confirmation.information_fingerprint')->missing('confirmation.version'));
     $this->student->update(['phone' => '0329998877']);
-    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->id)->assertInertia(fn (Assert $page) => $page->where('confirmation.status', 'stale'));
+    $this->actingAs($this->staffA)->get($scol.'/students/'.$this->student->uuid)->assertInertia(fn (Assert $page) => $page->where('confirmation.status', 'stale'));
 });
 it('hides the state of students outside the establishment scope', function () {
     confirmInformation($this)->assertOk();
-    $this->actingAs($this->staffB)->get('http://'.config('portals.scol_domain').'/students/'.$this->student->id)->assertForbidden();
+    $this->actingAs($this->staffB)->get('http://'.config('portals.scol_domain').'/students/'.$this->student->uuid)->assertForbidden();
 });
 it('shows the state globally to the central office', function () {
     [$other, $otherUser] = linkedConfirmationStudent($this, $this->b);
     confirmInformation($this, $otherUser)->assertOk();
-    $this->actingAs($this->central)->get('http://'.config('portals.scol_domain').'/students/'.$other->id)->assertOk()
+    $this->actingAs($this->central)->get('http://'.config('portals.scol_domain').'/students/'.$other->uuid)->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('confirmation.status', 'confirmed'));
 });
 

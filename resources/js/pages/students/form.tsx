@@ -38,7 +38,7 @@ export default function StudentForm({
     const form = useForm(initial);
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (student) form.put(`/students/${student.id}`);
+        if (student) form.put(`/students/${student.uuid}`);
         else form.post('/students');
     };
     return (
@@ -116,7 +116,7 @@ export default function StudentForm({
                         <Link
                             href={
                                 student
-                                    ? `/students/${student.id}`
+                                    ? `/students/${student.uuid}`
                                     : '/students'
                             }
                         >

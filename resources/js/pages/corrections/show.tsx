@@ -28,7 +28,7 @@ type Correction = {
     reviewer: string | null;
     conflict: boolean;
     student: {
-        id: number;
+        uuid: string;
         last_name: string;
         first_names: string | null;
         student_number: string | null;
@@ -141,7 +141,7 @@ export default function CorrectionShow({
                 )}
                 {canViewStudent && (
                     <Button variant="ghost" asChild>
-                        <Link href={`/students/${correction.student.id}`}>
+                        <Link href={`/students/${correction.student.uuid}`}>
                             Voir la fiche
                         </Link>
                     </Button>

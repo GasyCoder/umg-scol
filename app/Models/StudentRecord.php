@@ -87,7 +87,8 @@ class StudentRecord extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return $query->when($user->hasRole('establishment'), fn ($query) => $query->where('establishment_id', $user->establishment_id));
+        // Qualified: callers join other tables that also carry an establishment_id (programs, mentions).
+        return $query->when($user->hasRole('establishment'), fn ($query) => $query->where($query->qualifyColumn('establishment_id'), $user->establishment_id));
     }
 
     public function getActivitylogOptions(): LogOptions

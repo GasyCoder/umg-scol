@@ -2,6 +2,7 @@ export type ReferenceKind =
     | 'establishments'
     | 'academic-years'
     | 'levels'
+    | 'mentions'
     | 'programs';
 export type ReferenceRecord = {
     id: number;
@@ -18,6 +19,15 @@ export type ReferenceRecord = {
     sort_order?: number;
     establishment_id?: number;
     establishment?: { id: number; code: string; name: string };
+    mention_id?: number | null;
+    mention?: { id: number; name: string } | null;
+};
+export type MentionOption = {
+    id: number;
+    establishment_id: number;
+    name: string;
+    code: string | null;
+    is_active: boolean;
 };
 export type EstablishmentOption = {
     id: number;
@@ -28,7 +38,7 @@ export type EstablishmentOption = {
 export type Field = {
     key: string;
     label: string;
-    type?: 'text' | 'email' | 'date' | 'number' | 'establishment';
+    type?: 'text' | 'email' | 'date' | 'number' | 'establishment' | 'mention';
     required?: boolean;
     maxLength?: number;
 };
@@ -79,9 +89,9 @@ export const definitions: Record<
             },
         ],
     },
-    programs: {
-        title: 'Parcours',
-        singular: 'parcours',
+    mentions: {
+        title: 'Mentions',
+        singular: 'mention',
         permission: 'programs.manage',
         fields: [
             {
@@ -94,5 +104,24 @@ export const definitions: Record<
             { key: 'name', label: 'Nom', required: true, maxLength: 255 },
         ],
     },
+    programs: {
+        title: 'Parcours',
+        singular: 'parcours',
+        permission: 'programs.manage',
+        fields: [
+            {
+                key: 'establishment_id',
+                label: 'Établissement',
+                type: 'establishment',
+                required: true,
+            },
+            { key: 'mention_id', label: 'Mention', type: 'mention' },
+            { key: 'code', label: 'Code', maxLength: 30 },
+            { key: 'name', label: 'Nom', required: true, maxLength: 255 },
+        ],
+    },
 };
+/** Feminine nouns take "une" in the create/edit titles. */
+export const article = (kind: ReferenceKind) =>
+    kind === 'academic-years' || kind === 'mentions' ? 'une' : 'un';
 export const baseUrl = (kind: ReferenceKind) => `/references/${kind}`;

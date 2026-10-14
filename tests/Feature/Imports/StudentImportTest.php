@@ -235,7 +235,7 @@ it('does not expose foreign identities or automatically transfer them', function
     expect($import->warning_rows)->toBe(1)->and($import->rows()->sole()->matched_student_id)->toBeNull();
     $this->actingAs($this->admin);
     app(AnalyzeStudentImport::class)->handle($this->admin, $import, $import->mapping);
-    expect($import->rows()->sole()->warnings)->toContain(['field' => 'record', 'code' => 'foreign_active_record', 'message' => 'Une déclaration active existe dans un autre établissement. Aucun transfert automatique.']);
+    expect($import->rows()->sole()->warnings)->toContainEqual(['field' => 'record', 'code' => 'foreign_active_record', 'message' => 'Une déclaration active existe dans un autre établissement. Aucun transfert automatique.']);
 });
 it('commits only valid rows and ignores warnings rejected rows and duplicates', function () {
     existingImportStudent($this, ['student_number' => 'OLD']);
