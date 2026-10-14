@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 
 type Detail = {
     id: number;
+    uuid: string;
     at: string | null;
     actor: string;
     role: string | null;
@@ -38,10 +39,10 @@ export default function AuditShow({ activity }: { activity: Detail }) {
     ];
     return (
         <div className="space-y-6 p-4 md:p-6">
-            <Head title={`Audit n° ${activity.id}`} />
+            <Head title={`Audit — ${activity.event_label}`} />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <Heading
-                    title={`Entrée d’audit n° ${activity.id}`}
+                    title={`Audit / ${activity.event_label}`}
                     description="Seules les métadonnées administratives autorisées sont affichées."
                 />
                 <Button variant="outline" asChild>
