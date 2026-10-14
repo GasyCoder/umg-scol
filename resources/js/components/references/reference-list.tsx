@@ -71,7 +71,7 @@ export default function ReferenceList({
     const confirm = () => {
         if (!confirmation) return;
         action.patch(
-            `${baseUrl(kind)}/${confirmation.record.id}/${confirmation.current ? 'current' : 'status'}`,
+            `${baseUrl(kind)}/${confirmation.record.uuid}/${confirmation.current ? 'current' : 'status'}`,
             { preserveScroll: true, onSuccess: () => setConfirmation(null) },
         );
     };
@@ -238,7 +238,7 @@ export default function ReferenceList({
                                                 asChild
                                             >
                                                 <Link
-                                                    href={`${baseUrl(kind)}/${row.id}/edit`}
+                                                    href={`${baseUrl(kind)}/${row.uuid}/edit`}
                                                 >
                                                     Modifier
                                                 </Link>
