@@ -45,7 +45,7 @@ class CorrectionController extends Controller
 
         return Inertia::render('corrections/index', [
             'corrections' => $query->orderBy('created_at')->orderBy('id')->paginate(20)->withQueryString()->through(fn (StudentCorrectionRequest $c) => [
-                'id' => $c->id, 'field_label' => $c->field->label(), 'status' => $c->status->value, 'status_label' => $c->status->label(), 'created_at' => $c->created_at->toIso8601String(),
+                'id' => $c->id, 'uuid' => $c->uuid, 'field_label' => $c->field->label(), 'status' => $c->status->value, 'status_label' => $c->status->label(), 'created_at' => $c->created_at->toIso8601String(),
                 'student' => $c->student->only(['last_name', 'first_names', 'student_number']), 'establishments' => $c->student->studentRecords->pluck('establishment.name')->unique()->values(),
             ]),
             'filters' => ['status' => $status, ...$request->only(['search', 'field', 'establishment_id'])],
@@ -63,7 +63,7 @@ class CorrectionController extends Controller
         $student = $correction->student()->with(['studentRecords' => fn ($r) => $r->currentActive()->with('establishment:id,name')])->firstOrFail();
 
         return Inertia::render('corrections/show', ['correction' => [
-            'id' => $correction->id, 'field_label' => $correction->field->label(), 'status' => $correction->status->value, 'status_label' => $correction->status->label(),
+            'id' => $correction->id, 'uuid' => $correction->uuid, 'field_label' => $correction->field->label(), 'status' => $correction->status->value, 'status_label' => $correction->status->label(),
             'current_value' => $correction->field->valueOf($student), 'proposed_value' => $correction->proposed_value, 'student_message' => $correction->student_message,
             'rejection_reason' => $correction->rejection_reason, 'created_at' => $correction->created_at->toIso8601String(), 'reviewed_at' => $correction->reviewed_at?->toIso8601String(),
             'reviewer' => $correction->reviewer?->name, 'conflict' => $correction->status === StudentCorrectionStatus::Pending && ! hash_equals($correction->current_fingerprint, $correction->field->fingerprint($student)),
