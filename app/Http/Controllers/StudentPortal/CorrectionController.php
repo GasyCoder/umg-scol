@@ -34,7 +34,7 @@ class CorrectionController extends Controller
         $user = $request->user();
         abort_if($user->student_id === null, 403);
         // Scoped lookup: another student's request is indistinguishable from a missing one.
-        $target = StudentCorrectionRequest::query()->where('user_id', $user->id)->where('student_id', $user->student_id)->findOrFail((int) $correction);
+        $target = StudentCorrectionRequest::query()->where('user_id', $user->id)->where('student_id', $user->student_id)->where('uuid', $correction)->firstOrFail();
 
         return response()->json(['correction' => $this->present($action->handle($user, $target)), 'message' => 'Demande annulée.']);
     }
@@ -45,7 +45,7 @@ class CorrectionController extends Controller
         $value = $correction->proposed_value;
 
         return [
-            'id' => $correction->id, 'field' => $correction->field->value, 'field_label' => $correction->field->label(),
+            'uuid' => $correction->uuid, 'field' => $correction->field->value, 'field_label' => $correction->field->label(),
             'proposed_value' => $correction->field === StudentCorrectionField::Cin ? str_repeat('•', max(0, mb_strlen($value) - 3)).mb_substr($value, -3) : $value,
             'status' => $correction->status->value, 'status_label' => $correction->status->label(), 'student_message' => $correction->student_message,
             'decision_reason' => $correction->rejection_reason, 'created_at' => $correction->created_at->toIso8601String(), 'reviewed_at' => $correction->reviewed_at?->toIso8601String(),
