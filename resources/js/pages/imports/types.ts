@@ -13,6 +13,7 @@ export type ImportStatus =
     | 'cancelled';
 export type ImportItem = {
     id: number;
+    uuid: string;
     original_filename: string;
     status: ImportStatus;
     total_rows: number;
