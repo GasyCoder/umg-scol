@@ -58,13 +58,13 @@ export default function ImportShow({
         item.status === 'uploaded' || (item.status === 'ready' && editMapping);
     const analyze = (event: FormEvent) => {
         event.preventDefault();
-        mapping.post(`/imports/${item.id}/analyze`, {
+        mapping.post(`/imports/${item.uuid}/analyze`, {
             onSuccess: () => setEditMapping(false),
         });
     };
     return (
         <div className="space-y-6 p-4 md:p-6">
-            <Head title={`Import ${item.id}`} />
+            <Head title={`Import — ${item.original_filename}`} />
             <Heading
                 title={
                     analyzing
@@ -184,7 +184,7 @@ export default function ImportShow({
                             value={filter || 'all'}
                             onValueChange={(value) =>
                                 router.get(
-                                    `/imports/${item.id}`,
+                                    `/imports/${item.uuid}`,
                                     value === 'all' ? {} : { status: value },
                                     { preserveState: true },
                                 )
@@ -216,7 +216,7 @@ export default function ImportShow({
                         </Select>
                         {canExport && (
                             <Button variant="outline" asChild>
-                                <a href={`/imports/${item.id}/errors`}>
+                                <a href={`/imports/${item.uuid}/errors`}>
                                     Télécharger les erreurs
                                 </a>
                             </Button>
@@ -396,7 +396,7 @@ export default function ImportShow({
                         <Button
                             disabled={commit.processing}
                             onClick={() =>
-                                commit.post(`/imports/${item.id}/commit`, {
+                                commit.post(`/imports/${item.uuid}/commit`, {
                                     onSuccess: () => setConfirm(false),
                                 })
                             }
