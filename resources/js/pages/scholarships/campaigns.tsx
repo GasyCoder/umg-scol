@@ -30,6 +30,7 @@ import {
 
 type Campaign = {
     id: number;
+    uuid: string;
     name: string;
     academic_year_id: number;
     academic_year: string;
@@ -95,7 +96,7 @@ export default function Campaigns({
         const options = { onSuccess: () => setEditing(null) };
         if (editing === 'new') form.post('/scholarships/campaigns', options);
         else if (editing)
-            form.put(`/scholarships/campaigns/${editing.id}`, options);
+            form.put(`/scholarships/campaigns/${editing.uuid}`, options);
     };
     return (
         <div className="space-y-6 p-4 md:p-6">
@@ -304,7 +305,7 @@ export default function Campaigns({
                             onClick={() => {
                                 if (!transition) return;
                                 router.post(
-                                    `/scholarships/campaigns/${transition.campaign.id}/status`,
+                                    `/scholarships/campaigns/${transition.campaign.uuid}/status`,
                                     { status: transition.target.value },
                                     {
                                         onStart: () => setBusy(true),
