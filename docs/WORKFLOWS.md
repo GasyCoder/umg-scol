@@ -33,7 +33,22 @@ Implémenté sur `bourse` (`/api/student/*`) :
 
 ## Vérification étudiant
 
-Identification → consultation → confirmer OU demander correction → établissement accepte/refuse/corrige.
+Identification → consultation → confirmer OU demander correction → établissement accepte/refuse/corrige. La confirmation explicite reste à faire ; la demande de correction est implémentée.
+
+## Demande de correction (implémentée)
+
+L'étudiant ne modifie jamais directement ses données officielles :
+
+1. Sur `bourse`, page « Mes informations », bouton « Signaler une erreur » sur chaque information corrigible → nouvelle valeur + message facultatif (500 caractères). `POST /api/student/corrections`.
+2. **Une demande = un champ.** Trois erreurs = trois demandes, décidées séparément. Au plus une demande `pending` par étudiant et par champ (garanti en base).
+3. Refus immédiat : champ hors liste, valeur invalide selon les règles de saisie administrative, valeur identique après normalisation, compte non rattaché ou fiche inactive.
+4. L'étudiant suit ses demandes (« Mes demandes de correction ») et peut annuler une demande `pending` ; il peut ensuite en créer une nouvelle. Pas d'édition d'une demande.
+5. Le personnel autorisé ouvre `/corrections` (scol), examine valeur officielle actuelle / valeur proposée / message, puis **approuve** (la fiche est modifiée pour ce seul champ, dans la même transaction) ou **refuse** avec un motif obligatoire (10 à 500 caractères) visible par l'étudiant.
+6. Si la valeur officielle a changé depuis la demande, l'approbation est bloquée (conflit) : le personnel réexamine et refuse si nécessaire.
+
+Transitions : `pending → approved | rejected | cancelled` uniquement. Une demande décidée ou annulée n'est jamais retraitée ; une double approbation est un no-op.
+
+Champs corrigibles : nom, prénoms, date et lieu de naissance, CIN (numéro, date et lieu de délivrance), téléphone, email de contact, adresse, numéro/série/année/mention du BAC. Exclus : le matricule (identifiant institutionnel attribué par l'établissement) et toute la déclaration annuelle (année, établissement, niveau, parcours, statut) : l'étudiant est invité à contacter son établissement.
 
 ## Bourse
 

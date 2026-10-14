@@ -76,6 +76,15 @@ class StudentRecord extends Model
      * @param  Builder<StudentRecord>  $query
      * @return Builder<StudentRecord>
      */
+    public function scopeCurrentActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active')->whereHas('academicYear', fn ($year) => $year->where('is_current', true)->where('is_active', true));
+    }
+
+    /**
+     * @param  Builder<StudentRecord>  $query
+     * @return Builder<StudentRecord>
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         return $query->when($user->hasRole('establishment'), fn ($query) => $query->where('establishment_id', $user->establishment_id));

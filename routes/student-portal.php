@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\StudentPortal\AuthenticationController;
+use App\Http\Controllers\StudentPortal\CorrectionController;
 use App\Http\Controllers\StudentPortal\ProfileController;
 use App\Http\Middleware\EnsureStudentPortal;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,9 @@ Route::domain(config('portals.bourse_domain'))->group(function () {
             Route::get('link/status', [ProfileController::class, 'status'])->name('link.status');
             Route::post('link', [ProfileController::class, 'link'])->middleware('throttle:student-link')->name('link');
             Route::get('me', [ProfileController::class, 'me'])->name('me');
+            Route::get('corrections', [CorrectionController::class, 'index'])->name('corrections.index');
+            Route::post('corrections', [CorrectionController::class, 'store'])->middleware('throttle:student-correction')->name('corrections.store');
+            Route::post('corrections/{correction}/cancel', [CorrectionController::class, 'cancel'])->whereNumber('correction')->name('corrections.cancel');
         });
     });
 });

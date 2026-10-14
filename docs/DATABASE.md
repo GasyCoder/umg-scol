@@ -141,3 +141,16 @@ Migration `2026_10_14_180000_create_student_portal_foundation` :
 - `student_link_requests` : `user_id`, `student_id`, `status` (`pending`, `approved`, `rejected`, `cancelled`), `requested_at`, `reviewed_at`, `reviewed_by`, `rejection_reason` (motif interne). Unique `(user_id, student_id)` et colonne virtuelle `pending_user_id` unique : une seule demande pending par compte. Les données saisies par l'étudiant (identifiant, naissance) ne sont pas persistées.
 
 Toutes les FK sont restrictives ; aucune suppression en cascade. Le rollback supprime les tables puis les colonnes de `users`, sans toucher aux autres données.
+
+## Demandes de correction implémentées
+
+Migration `2026_10_14_190000_create_student_correction_requests`, table `student_correction_requests` :
+
+- `student_id` (FK restrictive, toujours issu de `users.student_id` du demandeur), `user_id` (FK, compte demandeur), `field` (enum `StudentCorrectionField`, liste blanche), `status` (`pending`, `approved`, `rejected`, `cancelled`).
+- `proposed_value` : texte **chiffré** (cast `encrypted`, clé `APP_KEY`), normalisé comme la saisie administrative. Nécessaire pour appliquer la décision ; jamais journalisé.
+- `current_fingerprint` : HMAC-SHA256 (clé `APP_KEY`) de la valeur officielle observée lors de la demande. **La valeur actuelle n'est pas copiée** : la revue l'affiche depuis la fiche, et l'empreinte sert au contrôle de cohérence optimiste. Une rotation d'`APP_KEY` rend les demandes pending en conflit (échec sûr) et le chiffrement exige la conservation des anciennes clés (`APP_PREVIOUS_KEYS`).
+- `student_message` (500), `rejection_reason` (500, visible par l'étudiant), `reviewed_by` (FK), `reviewed_at`, timestamps.
+- `pending_marker` : colonne virtuelle (1 si pending, sinon NULL) et unique `student_corrections_pending_field_unique (student_id, field, pending_marker)` : une seule demande pending par étudiant et champ, les demandes décidées restant illimitées.
+- Index `(status, created_at)` pour la file de revue et `(user_id, created_at)` pour « Mes demandes ».
+
+Aucune suppression en cascade ; le rollback supprime uniquement cette table. Vérifications MySQL dédiées (contrainte unique, FK, attente de verrou entre deux connexions, rollback) : `php tests/MySql/StudentCorrectionChecks.php`, **uniquement sur une base jetable dont le nom contient `check`** (le script écrit des données réelles).

@@ -24,11 +24,13 @@ L'authentification étudiante se fait par email + OTP (code à 6 chiffres haché
 
 Une fiche ne peut être rattachée qu'à un seul compte (contrainte unique en SQL). Les réponses du portail ne renvoient jamais l'identifiant interne ni la CIN.
 
+Une fois rattaché, l'étudiant peut signaler une erreur (`GET/POST /api/student/corrections`, `POST /api/student/corrections/{id}/cancel`) ; le personnel traite les demandes dans `/corrections` sur `scol`. Voir `WORKFLOWS.md` et `SECURITY.md`.
+
 La création du compte donne accès au portail ; elle ne constitue jamais une inscription universitaire. L'établissement déclare un étudiant déjà régulièrement inscrit hors plateforme. L'étudiant consulte ses données et soumet une demande de correction, sans modifier directement les informations administratives.
 
 ```text
 Portail interne -> Routes web Laravel -> Inertia -> React/TypeScript/shadcn
-Portail étudiant -> /api/student/* Laravel (prévu)
+Portail étudiant -> /api/student/* Laravel
                          \-> Controllers -> Requests/Policies -> Actions/Services -> Eloquent -> MySQL
 ```
 

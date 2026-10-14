@@ -41,6 +41,6 @@ class StudentLinkRequest extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return $query->when($user->hasRole('establishment'), fn ($q) => $q->whereHas('student.studentRecords', fn ($r) => $r->where('establishment_id', $user->establishment_id)->where('status', 'active')->whereHas('academicYear', fn ($year) => $year->where('is_current', true)->where('is_active', true))));
+        return $query->when($user->hasRole('establishment'), fn ($q) => $q->whereHas('student', fn ($student) => $student->currentlyDeclaredBy($user->establishment_id)));
     }
 }

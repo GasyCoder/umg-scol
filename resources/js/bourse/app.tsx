@@ -5,8 +5,44 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { api } from './api';
 import type { Session } from './api';
+type Correction = {
+    id: number;
+    field: string;
+    field_label: string;
+    proposed_value: string;
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+    status_label: string;
+    student_message: string | null;
+    decision_reason: string | null;
+    created_at: string;
+    reviewed_at: string | null;
+};
+type FieldRow = {
+    label: string;
+    value: string | number | null;
+    field?: string;
+    hidden?: boolean;
+    input?: 'date' | 'number' | 'email' | 'tel';
+};
+const statusVariant: Record<
+    Correction['status'],
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+    pending: 'default',
+    approved: 'secondary',
+    rejected: 'destructive',
+    cancelled: 'outline',
+};
 type Student = {
     student_number: string | null;
     last_name: string;
@@ -44,13 +80,25 @@ function Portal() {
     const [type, setType] = useState('student_number');
     const [identifier, setIdentifier] = useState('');
     const [birth, setBirth] = useState('');
+    const [corrections, setCorrections] = useState<Correction[]>([]);
+    const [reporting, setReporting] = useState<FieldRow | null>(null);
+    const [proposed, setProposed] = useState('');
+    const [note, setNote] = useState('');
+    const [dialogError, setDialogError] = useState('');
     async function refresh() {
         const next = await api<Session>('session');
         setSession(next);
         if (next.linked) {
             const result = await api<{ student: Student }>('me');
             setStudent(result.student);
-        } else setStudent(null);
+            const list = await api<{ corrections: Correction[] }>(
+                'corrections',
+            );
+            setCorrections(list.corrections);
+        } else {
+            setStudent(null);
+            setCorrections([]);
+        }
     }
     useEffect(() => {
         void refresh().catch((reason: unknown) =>
@@ -114,6 +162,50 @@ function Portal() {
             await refresh();
         });
     };
+    const pendingFields = new Set(
+        corrections
+            .filter((item) => item.status === 'pending')
+            .map((item) => item.field),
+    );
+    const openReport = (row: FieldRow) => {
+        setReporting(row);
+        setProposed('');
+        setNote('');
+        setDialogError('');
+    };
+    const submitCorrection = (event: FormEvent) => {
+        event.preventDefault();
+        if (!reporting?.field) return;
+        setBusy(true);
+        setDialogError('');
+        api<{ message: string }>('corrections', {
+            field: reporting.field,
+            value: proposed,
+            message: note,
+        })
+            .then(async (result) => {
+                setReporting(null);
+                setMessage(result.message);
+                await refresh();
+            })
+            .catch((reason: unknown) =>
+                setDialogError(
+                    reason instanceof Error
+                        ? reason.message
+                        : 'La demande n’a pas pu être envoyée.',
+                ),
+            )
+            .finally(() => setBusy(false));
+    };
+    const cancelCorrection = (id: number) =>
+        void perform(async () => {
+            const result = await api<{ message: string }>(
+                `corrections/${id}/cancel`,
+                {},
+            );
+            setMessage(result.message);
+            await refresh();
+        });
     return (
         <div className="min-h-screen">
             <header className="border-b">
@@ -306,41 +398,117 @@ function Portal() {
                 {student && (
                     <>
                         <div className="grid gap-5 md:grid-cols-2">
-                            {[
-                                {
-                                    title: 'Identité',
-                                    fields: [
-                                        ['Matricule', student.student_number],
-                                        ['Nom', student.last_name],
-                                        ['Prénoms', student.first_names],
-                                        ['Naissance', student.birth_date],
-                                        [
-                                            'Lieu de naissance',
-                                            student.birth_place,
+                            {(
+                                [
+                                    {
+                                        title: 'Identité',
+                                        fields: [
+                                            {
+                                                label: 'Matricule',
+                                                value: student.student_number,
+                                            },
+                                            {
+                                                label: 'Nom',
+                                                value: student.last_name,
+                                                field: 'last_name',
+                                            },
+                                            {
+                                                label: 'Prénoms',
+                                                value: student.first_names,
+                                                field: 'first_names',
+                                            },
+                                            {
+                                                label: 'Date de naissance',
+                                                value: student.birth_date,
+                                                field: 'birth_date',
+                                                input: 'date',
+                                            },
+                                            {
+                                                label: 'Lieu de naissance',
+                                                value: student.birth_place,
+                                                field: 'birth_place',
+                                            },
                                         ],
-                                    ],
-                                },
-                                {
-                                    title: 'Contact',
-                                    fields: [
-                                        ['Téléphone', student.phone],
-                                        ['Email', student.email],
-                                        ['Adresse', student.address],
-                                    ],
-                                },
-                                {
-                                    title: 'Baccalauréat',
-                                    fields: [
-                                        [
-                                            'Numéro BAC',
-                                            student.bac_registration_number,
+                                    },
+                                    {
+                                        title: 'Carte d’identité (CIN)',
+                                        note: 'Pour votre sécurité, les données CIN ne sont pas affichées. Vous pouvez signaler une valeur à corriger.',
+                                        fields: [
+                                            {
+                                                label: 'Numéro CIN',
+                                                value: null,
+                                                field: 'cin',
+                                                hidden: true,
+                                            },
+                                            {
+                                                label: 'Date de délivrance',
+                                                value: null,
+                                                field: 'cin_issued_at',
+                                                hidden: true,
+                                                input: 'date',
+                                            },
+                                            {
+                                                label: 'Lieu de délivrance',
+                                                value: null,
+                                                field: 'cin_issued_place',
+                                                hidden: true,
+                                            },
                                         ],
-                                        ['Série', student.bac_series],
-                                        ['Année', student.bac_year],
-                                        ['Mention', student.bac_mention],
-                                    ],
-                                },
-                            ].map((section) => (
+                                    },
+                                    {
+                                        title: 'Contact',
+                                        fields: [
+                                            {
+                                                label: 'Téléphone',
+                                                value: student.phone,
+                                                field: 'phone',
+                                                input: 'tel',
+                                            },
+                                            {
+                                                label: 'Email de contact',
+                                                value: student.email,
+                                                field: 'email',
+                                                input: 'email',
+                                            },
+                                            {
+                                                label: 'Adresse',
+                                                value: student.address,
+                                                field: 'address',
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        title: 'Baccalauréat',
+                                        fields: [
+                                            {
+                                                label: 'Numéro BAC',
+                                                value: student.bac_registration_number,
+                                                field: 'bac_registration_number',
+                                            },
+                                            {
+                                                label: 'Série',
+                                                value: student.bac_series,
+                                                field: 'bac_series',
+                                            },
+                                            {
+                                                label: 'Année',
+                                                value: student.bac_year,
+                                                field: 'bac_year',
+                                                input: 'number',
+                                            },
+                                            {
+                                                label: 'Mention',
+                                                value: student.bac_mention,
+                                                field: 'bac_mention',
+                                            },
+                                        ],
+                                    },
+                                ] as {
+                                    title: string;
+                                    note?: string;
+                                    fields: FieldRow[];
+                                }[]
+                            ).map((section) => (
                                 <section
                                     key={section.title}
                                     className="space-y-3 rounded-lg border p-5"
@@ -348,23 +516,52 @@ function Portal() {
                                     <h2 className="font-semibold">
                                         {section.title}
                                     </h2>
-                                    <dl className="space-y-2">
-                                        {section.fields.map(
-                                            ([label, value]) => (
-                                                <div
-                                                    key={label}
-                                                    className="grid grid-cols-2 gap-3"
-                                                >
-                                                    <dt className="text-muted-foreground">
-                                                        {label}
-                                                    </dt>
-                                                    <dd className="break-words">
-                                                        {value ??
-                                                            'Non renseigné'}
-                                                    </dd>
-                                                </div>
-                                            ),
-                                        )}
+                                    {section.note && (
+                                        <p className="text-sm text-muted-foreground">
+                                            {section.note}
+                                        </p>
+                                    )}
+                                    <dl className="space-y-3">
+                                        {section.fields.map((row) => (
+                                            <div
+                                                key={row.label}
+                                                className="grid grid-cols-2 items-start gap-3"
+                                            >
+                                                <dt className="text-muted-foreground">
+                                                    {row.label}
+                                                </dt>
+                                                <dd className="space-y-1 break-words">
+                                                    <span className="block">
+                                                        {row.hidden
+                                                            ? 'Non affiché'
+                                                            : (row.value ??
+                                                              'Non renseigné')}
+                                                    </span>
+                                                    {row.field &&
+                                                        (pendingFields.has(
+                                                            row.field,
+                                                        ) ? (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Demande en
+                                                                attente
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="text-xs underline underline-offset-4"
+                                                                onClick={() =>
+                                                                    openReport(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Signaler une
+                                                                erreur
+                                                            </button>
+                                                        ))}
+                                                </dd>
+                                            </div>
+                                        ))}
                                     </dl>
                                 </section>
                             ))}
@@ -402,9 +599,154 @@ function Portal() {
                             )}
                         </section>
                         <p className="text-sm text-muted-foreground">
-                            Les informations officielles sont consultables en
-                            lecture seule.
+                            Pour une erreur concernant votre niveau, parcours ou
+                            établissement, contactez votre établissement.
                         </p>
+                        <section className="space-y-4">
+                            <h2 className="text-lg font-semibold">
+                                Mes demandes de correction
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
+                                Vos informations officielles ne changent
+                                qu’après validation par le personnel autorisé.
+                            </p>
+                            {corrections.length === 0 ? (
+                                <p>Aucune demande pour le moment.</p>
+                            ) : (
+                                corrections.map((item) => (
+                                    <article
+                                        key={item.id}
+                                        className="space-y-2 rounded-lg border p-4"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <p className="font-medium">
+                                                {item.field_label}
+                                            </p>
+                                            <Badge
+                                                variant={
+                                                    statusVariant[item.status]
+                                                }
+                                            >
+                                                {item.status_label}
+                                            </Badge>
+                                        </div>
+                                        <p className="break-words">
+                                            Valeur proposée :{' '}
+                                            {item.proposed_value}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Envoyée le{' '}
+                                            {new Date(
+                                                item.created_at,
+                                            ).toLocaleDateString('fr-FR')}
+                                            {item.reviewed_at &&
+                                                ` · décision le ${new Date(item.reviewed_at).toLocaleDateString('fr-FR')}`}
+                                        </p>
+                                        {item.decision_reason && (
+                                            <p className="text-sm">
+                                                Motif : {item.decision_reason}
+                                            </p>
+                                        )}
+                                        {item.status === 'pending' && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={busy}
+                                                onClick={() =>
+                                                    cancelCorrection(item.id)
+                                                }
+                                            >
+                                                Annuler la demande
+                                            </Button>
+                                        )}
+                                    </article>
+                                ))
+                            )}
+                        </section>
+                        <Dialog
+                            open={reporting !== null}
+                            onOpenChange={(open) => {
+                                if (!open && !busy) setReporting(null);
+                            }}
+                        >
+                            <DialogContent>
+                                <form
+                                    onSubmit={submitCorrection}
+                                    className="space-y-4"
+                                >
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Signaler une erreur :{' '}
+                                            {reporting?.label}
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Votre demande sera examinée par le
+                                            personnel. La fiche officielle ne
+                                            change qu’après approbation.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    {reporting && !reporting.hidden && (
+                                        <p className="text-sm">
+                                            Valeur actuelle :{' '}
+                                            {reporting.value ??
+                                                'Non renseignée'}
+                                        </p>
+                                    )}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="proposed">
+                                            Valeur correcte
+                                        </Label>
+                                        <Input
+                                            id="proposed"
+                                            type={reporting?.input ?? 'text'}
+                                            required
+                                            maxLength={2000}
+                                            value={proposed}
+                                            onChange={(e) =>
+                                                setProposed(e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="note">
+                                            Message (facultatif)
+                                        </Label>
+                                        <textarea
+                                            id="note"
+                                            className="min-h-20 w-full rounded-md border bg-transparent p-2 text-sm"
+                                            maxLength={500}
+                                            value={note}
+                                            onChange={(e) =>
+                                                setNote(e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                    {dialogError && (
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
+                                            {dialogError}
+                                        </p>
+                                    )}
+                                    <DialogFooter>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            disabled={busy}
+                                            onClick={() => setReporting(null)}
+                                        >
+                                            Annuler
+                                        </Button>
+                                        <Button disabled={busy}>
+                                            {busy
+                                                ? 'Envoi…'
+                                                : 'Envoyer la demande'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </>
                 )}
                 {session?.authenticated && session.google_enabled && (

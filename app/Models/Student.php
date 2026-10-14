@@ -61,6 +61,17 @@ class Student extends Model
         return $query->when($user->hasRole('establishment'), fn ($query) => $query->whereHas('studentRecords', fn ($record) => $record->where('establishment_id', $user->establishment_id)));
     }
 
+    /**
+     * Students the establishment currently answers for: an active declaration in the current active year.
+     *
+     * @param  Builder<Student>  $query
+     * @return Builder<Student>
+     */
+    public function scopeCurrentlyDeclaredBy(Builder $query, ?int $establishmentId): Builder
+    {
+        return $query->whereHas('studentRecords', fn ($record) => $record->currentActive()->where('establishment_id', $establishmentId));
+    }
+
     /** @return HasOne<User,$this> */
     public function user(): HasOne
     {

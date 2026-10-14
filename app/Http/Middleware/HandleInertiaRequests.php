@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Student;
+use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -48,6 +49,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'permissions' => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
+                'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
                 'canViewImports' => $request->user() !== null && Gate::allows('viewAny', StudentImport::class),
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
             ],

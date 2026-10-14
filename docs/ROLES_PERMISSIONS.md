@@ -51,6 +51,17 @@ Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour
 
 Les attributions et retraits de rôles/permissions via les méthodes Spatie sont audités avec sujet, acteur authentifié et identifiants concernés. Les écritures directes dans les tables pivots contournent ces événements : les futures opérations d'administration devront passer par les méthodes Spatie dans une transaction et être testées.
 
+## Demandes de correction
+
+Matrice existante, sans nouvelle permission :
+
+- `student` (`corrections.create`, `corrections.view`) : crée, consulte et annule ses propres demandes via `/api/student/corrections`, uniquement pour la fiche liée à son compte.
+- `central_scholarship_office` (`corrections.view`) : consultation globale de `/corrections`, **lecture seule**.
+- `establishment` (`corrections.view`, `corrections.review`) : consulte et décide les demandes des étudiants ayant une déclaration `active` dans son établissement sur l'année courante active (même périmètre que les rattachements, scope partagé `Student::currentlyDeclaredBy`).
+- `superadmin`, `developer` : consultation et décision globales.
+
+Décider exige en plus le droit de modifier l'identité (`StudentPolicy::update`) : comme pour la saisie manuelle, un établissement ne peut pas approuver une correction sur une identité également déclarée par un autre établissement ; la demande reste visible en lecture et relève du superadmin. La Policy est revérifiée sous verrou dans l'Action.
+
 ## Isolation
 
 Pour un rôle établissement, chaque Policy doit aussi comparer le `establishment_id`. Ne jamais faire ce contrôle uniquement dans React.

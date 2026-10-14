@@ -18,6 +18,7 @@ Route::domain(config('portals.scol_domain'))->middleware(EnsureInternalPortal::c
     require __DIR__.'/students.php';
 
     require __DIR__.'/imports.php';
+    require __DIR__.'/corrections.php';
     Route::get('student-links', [LinkReviewController::class, 'index'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.index');
     Route::post('student-links/{student_link_request}/review', [LinkReviewController::class, 'review'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.review');
 

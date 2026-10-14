@@ -40,7 +40,7 @@
 - [x] portail `bourse` : compte OTP/Google et rattachement sécurisé
 - [x] consultation
 - [ ] confirmation
-- [ ] correction
+- [x] demande de correction (étudiant) et revue (personnel)
 
 ## Phase 5 — Bourse
 

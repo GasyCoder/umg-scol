@@ -81,6 +81,15 @@ export function AppSidebar() {
                                   },
                               ]
                             : []),
+                        ...(auth.canViewCorrections
+                            ? [
+                                  {
+                                      title: 'Corrections',
+                                      href: '/corrections',
+                                      icon: BookOpen,
+                                  },
+                              ]
+                            : []),
                         ...(auth.canViewImports
                             ? [
                                   {
