@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\StudentCorrectionField;
 use App\Enums\StudentCorrectionStatus;
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,8 @@ use Illuminate\Support\Carbon;
 #[Hidden(['current_fingerprint', 'pending_marker'])]
 class StudentCorrectionRequest extends Model
 {
+    use HasPublicUuid;
+
     protected function casts(): array
     {
         return ['field' => StudentCorrectionField::class, 'status' => StudentCorrectionStatus::class, 'proposed_value' => 'encrypted', 'reviewed_at' => 'datetime'];
