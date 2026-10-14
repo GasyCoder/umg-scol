@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reporting;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reporting\AuditFilterRequest;
+use App\Models\Activity;
 use App\Models\User;
 use App\Support\Audit\AuditPresenter;
 use App\Support\CsvExport;
@@ -13,7 +14,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuditController extends Controller
