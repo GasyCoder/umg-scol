@@ -16,6 +16,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 // Commits real rows to exercise row locks across two connections: run only on a disposable, migrated database
 // whose name contains "check", e.g. DB_DATABASE=umg_scol_check php tests/MySql/ScholarshipChecks.php
@@ -77,7 +78,7 @@ $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $year-
 $receive = fn (Student $student, ?string $ddb = null) => app(ReceiveScholarshipApplication::class)->handle($central, $campaign->id, $student->id, $ddb, null);
 
 $first = $receive($declared(), 'DDB 1');
-$row = fn (array $overrides) => [...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'application_number' => 'CHK-'.bin2hex(random_bytes(3)), 'sequence' => random_int(1000, 999999), 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now(), ...$overrides];
+$row = fn (array $overrides) => [...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'uuid' => (string) Str::uuid7(), 'application_number' => 'CHK-'.bin2hex(random_bytes(3)), 'sequence' => random_int(1000, 999999), 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now(), ...$overrides];
 scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row([])), 'unique campaign + student');
 $other = $declared();
 scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'ddb_key' => 'DDB1'])), 'unique campaign + DDB key');
