@@ -6,6 +6,7 @@ use App\Actions\Corrections\ReviewStudentCorrection;
 use App\Enums\StudentCorrectionField;
 use App\Enums\StudentCorrectionStatus;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
@@ -16,9 +17,9 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
-use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -106,7 +107,7 @@ it('allows a single pending request per field, in the application and in SQL', f
     $first = makeCorrection($this);
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => 'phone', 'value' => '0329999999'])->assertUnprocessable()->assertJsonValidationErrors('field');
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => 'address', 'value' => 'Lot III'])->assertCreated();
-    expect(fn () => DB::table('student_correction_requests')->insert(['student_id' => $this->student->id, 'user_id' => $this->studentUser->id, 'field' => 'phone', 'proposed_value' => 'x', 'current_fingerprint' => str_repeat('0', 64), 'status' => 'pending', 'created_at' => now(), 'updated_at' => now()]))
+    expect(fn () => DB::table('student_correction_requests')->insert(['uuid' => (string) Str::uuid7(), 'student_id' => $this->student->id, 'user_id' => $this->studentUser->id, 'field' => 'phone', 'proposed_value' => 'x', 'current_fingerprint' => str_repeat('0', 64), 'status' => 'pending', 'created_at' => now(), 'updated_at' => now()]))
         ->toThrow(QueryException::class);
     app(CancelStudentCorrection::class)->handle($this->studentUser, $first);
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => 'phone', 'value' => '0329999999'])->assertCreated();
@@ -115,16 +116,16 @@ it('lets the student cancel only their own pending request', function () {
     $correction = makeCorrection($this);
     [, $otherUser] = otherLinkedStudent($this);
     $foreign = makeCorrection($this, user: $otherUser);
-    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$foreign->id.'/cancel', [])->assertNotFound();
+    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$foreign->uuid.'/cancel', [])->assertNotFound();
     expect($foreign->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
-    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->id.'/cancel', [])->assertOk()->assertJsonPath('correction.status', 'cancelled');
+    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->uuid.'/cancel', [])->assertOk()->assertJsonPath('correction.status', 'cancelled');
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Cancelled);
-    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->id.'/cancel', [])->assertOk();
+    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->uuid.'/cancel', [])->assertOk();
 });
 it('does not let a student cancel a decided request', function (bool $approve) {
     $correction = makeCorrection($this);
     app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, $approve, $approve ? null : 'Justificatif manquant.');
-    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->id.'/cancel', [])->assertUnprocessable();
+    asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections/'.$correction->uuid.'/cancel', [])->assertUnprocessable();
     expect($correction->fresh()->status)->toBe($approve ? StudentCorrectionStatus::Approved : StudentCorrectionStatus::Rejected);
 })->with(['approved' => true, 'rejected' => false]);
 it('lists only the student own requests without internal data', function () {
@@ -159,8 +160,8 @@ it('scopes the internal list and review to the current active declaration of the
     $foreign = makeCorrection($this, user: $otherUser);
     $this->actingAs($this->staffA, 'web')->get('/corrections')->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('corrections/index')->has('corrections.data', 1)->where('corrections.data.0.id', $mine->id)->where('corrections.data.0.establishments.0', 'Établissement A'));
-    $this->get('/corrections/'.$foreign->id)->assertForbidden();
-    $this->post('/corrections/'.$foreign->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->get('/corrections/'.$foreign->uuid)->assertForbidden();
+    $this->post('/corrections/'.$foreign->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
     $this->get('/corrections?establishment_id='.$this->b->id)->assertForbidden();
     expect($foreign->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
 });
@@ -174,16 +175,16 @@ it('denies an establishment whose declaration is inactive or from another year',
         AcademicYear::factory()->create(['is_current' => true, 'is_active' => true]);
     }
     $this->actingAs($this->staffA, 'web')->get('/corrections')->assertInertia(fn (Assert $page) => $page->has('corrections.data', 0));
-    $this->get('/corrections/'.$correction->id)->assertForbidden();
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->get('/corrections/'.$correction->uuid)->assertForbidden();
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
 })->with(['inactive', 'past year']);
 it('keeps an identity shared with another establishment read-only for the establishment', function () {
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'establishment_id' => $this->b->id, 'status' => 'inactive']);
     $correction = makeCorrection($this);
-    $this->actingAs($this->staffA, 'web')->get('/corrections/'.$correction->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('canReview', false));
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertForbidden();
-    $this->actingAs($this->admin, 'web')->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertRedirect();
+    $this->actingAs($this->staffA, 'web')->get('/corrections/'.$correction->uuid)->assertOk()->assertInertia(fn (Assert $page) => $page->where('canReview', false));
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->actingAs($this->admin, 'web')->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertRedirect();
     expect($this->student->fresh()->phone)->toBe('0381234567');
 });
 it('never exposes values in the internal list', function () {
@@ -199,15 +200,15 @@ it('gives the central office global read-only access', function () {
     makeCorrection($this, user: $otherUser);
     $this->actingAs($this->central, 'web')->get('/corrections')->assertInertia(fn (Assert $page) => $page->has('corrections.data', 2));
     $this->get('/corrections?establishment_id='.$this->b->id)->assertInertia(fn (Assert $page) => $page->has('corrections.data', 1));
-    $this->get('/corrections/'.$mine->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('canReview', false)->where('correction.current_value', '0341234567')->where('correction.proposed_value', '0381234567'));
-    $this->post('/corrections/'.$mine->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->get('/corrections/'.$mine->uuid)->assertOk()->assertInertia(fn (Assert $page) => $page->where('canReview', false)->where('correction.current_value', '0341234567')->where('correction.proposed_value', '0381234567'));
+    $this->post('/corrections/'.$mine->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
     expect(fn () => app(ReviewStudentCorrection::class)->handle($this->central, $mine, true, null))->toThrow(AuthorizationException::class);
     expect($this->student->fresh()->phone)->toBe('0341234567');
 });
 it('refuses student accounts on the internal correction screens', function () {
     $correction = makeCorrection($this);
     $this->actingAs($this->studentUser, 'web')->get('/corrections')->assertForbidden();
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
 });
 it('shows the menu entry only to authorized internal accounts', function () {
     $this->actingAs($this->central, 'web')->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.canViewCorrections', true));
@@ -218,7 +219,7 @@ it('shows the menu entry only to authorized internal accounts', function () {
 it('approves by changing only the requested field', function () {
     $before = $this->student->fresh()->getAttributes();
     $correction = makeCorrection($this);
-    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertRedirect('/corrections/'.$correction->id);
+    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertRedirect('/corrections/'.$correction->uuid);
     $after = $this->student->fresh()->getAttributes();
     expect($after['phone'])->toBe('0381234567');
     unset($before['phone'], $before['updated_at'], $after['phone'], $after['updated_at']);
@@ -239,7 +240,7 @@ it('makes a repeated approval a safe no-op', function () {
     $correction = makeCorrection($this);
     app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, true, null);
     app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, true, null);
-    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertRedirect();
+    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertRedirect();
     expect(Activity::where('event', 'correction_approved')->count())->toBe(1);
 });
 it('refuses a correction that would duplicate another identity', function (string $field, string $value) {
@@ -256,10 +257,10 @@ it('refuses a CIN issue date earlier than the birth date', function () {
 it('blocks approval when the official value changed since the request', function () {
     $correction = makeCorrection($this);
     $this->student->update(['phone' => '0320000000']);
-    $this->actingAs($this->staffA, 'web')->get('/corrections/'.$correction->id)->assertInertia(fn (Assert $page) => $page->where('correction.conflict', true));
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'approve'])->assertSessionHasErrors('correction');
+    $this->actingAs($this->staffA, 'web')->get('/corrections/'.$correction->uuid)->assertInertia(fn (Assert $page) => $page->where('correction.conflict', true));
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'approve'])->assertSessionHasErrors('correction');
     expect($this->student->fresh()->phone)->toBe('0320000000')->and($correction->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'reject', 'rejection_reason' => 'Valeur déjà mise à jour.'])->assertRedirect();
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'Valeur déjà mise à jour.'])->assertRedirect();
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Rejected);
 });
 it('refuses approval for an inactive student', function () {
@@ -284,11 +285,11 @@ it('rolls back the identity change and the audit when the decision cannot be sav
 // Rejection
 it('requires a reason to reject and leaves the student unchanged', function () {
     $correction = makeCorrection($this);
-    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->id.'/review', ['decision' => 'reject'])->assertSessionHasErrors('rejection_reason');
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'reject', 'rejection_reason' => 'court'])->assertSessionHasErrors('rejection_reason');
+    $this->actingAs($this->staffA, 'web')->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'reject'])->assertSessionHasErrors('rejection_reason');
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'court'])->assertSessionHasErrors('rejection_reason');
     expect(fn () => app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, false, ' '))->toThrow(ValidationException::class);
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
-    $this->post('/corrections/'.$correction->id.'/review', ['decision' => 'reject', 'rejection_reason' => 'Aucun justificatif fourni.'])->assertRedirect();
+    $this->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'Aucun justificatif fourni.'])->assertRedirect();
     $correction->refresh();
     expect($correction->status)->toBe(StudentCorrectionStatus::Rejected)->and($correction->rejection_reason)->toBe('Aucun justificatif fourni.')
         ->and($correction->reviewed_by)->toBe($this->staffA->id)->and($this->student->fresh()->phone)->toBe('0341234567');
@@ -369,6 +370,6 @@ it('makes a second request for the same field depend on the first decision', fun
 it('lets only one of two establishments review a request', function () {
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => AcademicYear::factory()->create(['is_current' => false])->id, 'establishment_id' => $this->b->id, 'status' => 'active']);
     $correction = makeCorrection($this);
-    $this->actingAs($this->staffB, 'web')->post('/corrections/'.$correction->id.'/review', ['decision' => 'reject', 'rejection_reason' => 'Refus par un autre établissement.'])->assertForbidden();
+    $this->actingAs($this->staffB, 'web')->post('/corrections/'.$correction->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'Refus par un autre établissement.'])->assertForbidden();
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Pending);
 });
