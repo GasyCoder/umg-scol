@@ -25,7 +25,7 @@ Route::domain(config('portals.bourse_domain'))->group(function () {
             Route::post('confirmation', [ConfirmationController::class, 'store'])->middleware('throttle:student-confirmation')->name('confirmation.store');
             Route::get('corrections', [CorrectionController::class, 'index'])->name('corrections.index');
             Route::post('corrections', [CorrectionController::class, 'store'])->middleware('throttle:student-correction')->name('corrections.store');
-            Route::post('corrections/{correction}/cancel', [CorrectionController::class, 'cancel'])->whereNumber('correction')->name('corrections.cancel');
+            Route::post('corrections/{correction}/cancel', [CorrectionController::class, 'cancel'])->whereUuid('correction')->name('corrections.cancel');
         });
     });
 });
