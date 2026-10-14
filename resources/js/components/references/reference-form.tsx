@@ -51,11 +51,11 @@ export default function ReferenceForm({
     const form = useForm(initial);
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (record) form.put(`${baseUrl(kind)}/${record.id}`);
+        if (record) form.put(`${baseUrl(kind)}/${record.uuid}`);
         else form.post(baseUrl(kind));
     };
     return (
-        <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title={definition.title} />
             <Heading
                 title={`${record ? 'Modifier' : 'Créer'} ${articleText} ${definition.singular}`}
@@ -65,100 +65,116 @@ export default function ReferenceForm({
                 onSubmit={submit}
                 className="space-y-5 rounded-lg border bg-card p-5"
             >
-                {definition.fields.map((field) => (
-                    <div className="grid gap-2" key={field.key}>
-                        <Label htmlFor={field.key}>
-                            {field.label}
-                            {field.required ? ' *' : ''}
-                        </Label>
-                        {field.type === 'mention' ? (
-                            <Select
-                                value={String(form.data[field.key]) || 'none'}
-                                onValueChange={(value) =>
-                                    form.setData(
-                                        field.key,
-                                        value === 'none' ? '' : value,
-                                    )
-                                }
-                            >
-                                <SelectTrigger id={field.key}>
-                                    <SelectValue placeholder="Sans mention" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Sans mention
-                                    </SelectItem>
-                                    {mentions
-                                        .filter(
-                                            (option) =>
-                                                String(
-                                                    option.establishment_id,
-                                                ) ===
-                                                String(
-                                                    form.data.establishment_id,
-                                                ),
+                <div className="grid gap-5 lg:grid-cols-2">
+                    {definition.fields.map((field) => (
+                        <div className="grid gap-2" key={field.key}>
+                            <Label htmlFor={field.key}>
+                                {field.label}
+                                {field.required ? ' *' : ''}
+                            </Label>
+                            {field.type === 'mention' ? (
+                                <Select
+                                    value={
+                                        String(form.data[field.key]) || 'none'
+                                    }
+                                    onValueChange={(value) =>
+                                        form.setData(
+                                            field.key,
+                                            value === 'none' ? '' : value,
                                         )
-                                        .map((option) => (
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id={field.key}
+                                        className="w-full"
+                                    >
+                                        <SelectValue placeholder="Sans mention" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Sans mention
+                                        </SelectItem>
+                                        {mentions
+                                            .filter(
+                                                (option) =>
+                                                    String(
+                                                        option.establishment_id,
+                                                    ) ===
+                                                    String(
+                                                        form.data
+                                                            .establishment_id,
+                                                    ),
+                                            )
+                                            .map((option) => (
+                                                <SelectItem
+                                                    key={option.id}
+                                                    value={String(option.id)}
+                                                >
+                                                    {option.name}
+                                                    {!option.is_active
+                                                        ? ' (inactive)'
+                                                        : ''}
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : field.type === 'establishment' ? (
+                                <Select
+                                    value={String(form.data[field.key])}
+                                    onValueChange={(value) =>
+                                        form.setData((data) => ({
+                                            ...data,
+                                            [field.key]: value,
+                                            ...('mention_id' in data &&
+                                            value !== data[field.key]
+                                                ? { mention_id: '' }
+                                                : {}),
+                                        }))
+                                    }
+                                    required
+                                >
+                                    <SelectTrigger
+                                        id={field.key}
+                                        className="w-full"
+                                    >
+                                        <SelectValue placeholder="Sélectionner un établissement" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {establishments.map((option) => (
                                             <SelectItem
                                                 key={option.id}
                                                 value={String(option.id)}
                                             >
-                                                {option.name}
+                                                {option.code} — {option.name}
                                                 {!option.is_active
-                                                    ? ' (inactive)'
+                                                    ? ' (inactif)'
                                                     : ''}
                                             </SelectItem>
                                         ))}
-                                </SelectContent>
-                            </Select>
-                        ) : field.type === 'establishment' ? (
-                            <Select
-                                value={String(form.data[field.key])}
-                                onValueChange={(value) =>
-                                    form.setData((data) => ({
-                                        ...data,
-                                        [field.key]: value,
-                                        ...('mention_id' in data &&
-                                        value !== data[field.key]
-                                            ? { mention_id: '' }
-                                            : {}),
-                                    }))
-                                }
-                                required
-                            >
-                                <SelectTrigger id={field.key}>
-                                    <SelectValue placeholder="Sélectionner un établissement" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {establishments.map((option) => (
-                                        <SelectItem
-                                            key={option.id}
-                                            value={String(option.id)}
-                                        >
-                                            {option.code} — {option.name}
-                                            {!option.is_active
-                                                ? ' (inactif)'
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        ) : (
-                            <Input
-                                id={field.key}
-                                type={field.type ?? 'text'}
-                                value={String(form.data[field.key])}
-                                onChange={(event) =>
-                                    form.setData(field.key, event.target.value)
-                                }
-                                required={field.required}
-                                maxLength={field.maxLength}
-                                min={field.type === 'number' ? 0 : undefined}
-                            />
-                        )}
-                        <InputError message={form.errors[field.key]} />
-                    </div>
-                ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Input
+                                    id={field.key}
+                                    type={field.type ?? 'text'}
+                                    value={String(form.data[field.key])}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            field.key,
+                                            event.target.value,
+                                        )
+                                    }
+                                    required={field.required}
+                                    maxLength={field.maxLength}
+                                    min={
+                                        field.type === 'number' ? 0 : undefined
+                                    }
+                                />
+                            )}
+                            <InputError message={form.errors[field.key]} />
+                        </div>
+                    ))}
+                </div>
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id="is_active"
