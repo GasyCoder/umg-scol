@@ -1,12 +1,12 @@
 <?php
 
+use App\Models\Activity;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SuperadminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
