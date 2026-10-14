@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 
 type Correction = {
     id: number;
+    uuid: string;
     field_label: string;
     status: string;
     status_label: string;
@@ -76,7 +77,7 @@ export default function CorrectionShow({
         ]);
 
     return (
-        <div className="max-w-3xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title="Demande de correction" />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <Heading
@@ -207,7 +208,7 @@ export default function CorrectionShow({
                             disabled={form.processing}
                             onClick={() =>
                                 form.post(
-                                    `/corrections/${correction.id}/review`,
+                                    `/corrections/${correction.uuid}/review`,
                                     {
                                         preserveScroll: true,
                                         onSuccess: () => setDecision(null),
