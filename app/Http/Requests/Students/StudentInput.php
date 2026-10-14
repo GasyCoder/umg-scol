@@ -14,6 +14,12 @@ abstract class StudentInput extends FormRequest
     }
 
     /** @return array<string, array<mixed>> */
+    public function importIdentityRules(): array
+    {
+        return $this->identityRules();
+    }
+
+    /** @return array<string,array<mixed>> */
     protected function identityRules(): array
     {
         return [

@@ -14,6 +14,7 @@ export type Auth = {
     user: User;
     permissions: string[];
     canViewStudents: boolean;
+    canViewImports: boolean;
 };
 
 export type Passkey = {

@@ -4,6 +4,7 @@ namespace App\Actions\Students;
 
 use App\Models\Student;
 use App\Models\User;
+use App\Support\StudentIdentityLocks;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +25,7 @@ class SaveStudentIdentity
             $target = $student === null ? new Student : Student::query()->lockForUpdate()->findOrFail($student->id);
             Gate::forUser($actor)->authorize($student === null ? 'create' : 'update', $student === null ? Student::class : $target);
             $target->fill($data);
+            StudentIdentityLocks::acquire(StudentIdentityLocks::keys($target->attributesToArray()));
             foreach (['student_number', 'cin', 'bac_registration_number'] as $field) {
                 if (filled($target->getAttribute($field)) && Student::query()->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id))->where($field, $target->getAttribute($field))->exists()) {
                     throw ValidationException::withMessages([$field => 'Une identité correspondante existe déjà. Vérifiez les données ou contactez la Scolarité Centrale.']);

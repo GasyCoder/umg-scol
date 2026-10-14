@@ -26,14 +26,14 @@
 - [x] recherche/filtres
 - [x] isolation
 
-## Phase 3 — Imports
+## Phase 3 — Imports Excel/CSV implémentés
 
-- [ ] upload
-- [ ] validation
-- [ ] preview
-- [ ] doublons
-- [ ] commit transactionnel
-- [ ] rapport erreurs
+- [x] upload
+- [x] validation
+- [x] preview
+- [x] doublons
+- [x] commit transactionnel
+- [x] rapport erreurs
 
 ## Phase 4 — Vérification étudiant
 

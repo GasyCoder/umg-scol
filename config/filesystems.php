@@ -29,6 +29,13 @@ return [
     */
 
     'disks' => [
+        'student_imports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/student-imports'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+        ],
 
         'local' => [
             'driver' => 'local',
