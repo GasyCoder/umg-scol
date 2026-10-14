@@ -11,6 +11,7 @@ use App\Enums\ScholarshipApplicationStatus;
 use App\Enums\ScholarshipCheckStatus;
 use App\Enums\StudentCorrectionField;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Program;
@@ -27,7 +28,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
-use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
