@@ -26,6 +26,7 @@ type Check = {
 };
 type Application = {
     id: number;
+    uuid: string;
     application_number: string;
     ddb_number: string | null;
     status: string;
@@ -119,13 +120,13 @@ export default function ApplicationShow({
     const needsReason = target === 'needs_correction' || target === 'rejected';
     const updateCheck = (check: Check, status: string, note: string) =>
         router.post(
-            `/scholarships/applications/${application.id}/checks`,
+            `/scholarships/applications/${application.uuid}/checks`,
             { key: check.key, status, note },
             { preserveScroll: true },
         );
     const student = application.student;
     return (
-        <div className="max-w-5xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title={`Dossier ${application.application_number}`} />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <Heading
@@ -317,7 +318,7 @@ export default function ApplicationShow({
                             disabled={form.processing}
                             onClick={() =>
                                 form.post(
-                                    `/scholarships/applications/${application.id}/status`,
+                                    `/scholarships/applications/${application.uuid}/status`,
                                     {
                                         preserveScroll: true,
                                         onSuccess: () => setTarget(null),
