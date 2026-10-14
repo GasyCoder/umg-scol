@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -20,6 +21,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @property int $id
  * @property string $name
+ * @property int|null $establishment_id
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string $password
@@ -41,9 +43,23 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return LogOptions::defaults()
             ->useLogName('identity')
-            ->logOnly(['name', 'email_verified_at'])
+            ->logOnly(['name', 'email_verified_at', 'establishment_id'])
             ->logOnlyDirty()
             ->logEmptyChanges();
+    }
+
+    /** @return BelongsTo<Establishment, $this> */
+    public function establishment(): BelongsTo
+    {
+        return $this->belongsTo(Establishment::class);
+    }
+
+    public function hasUsableEstablishment(): bool
+    {
+        return ! $this->hasRole('establishment') || (
+            $this->establishment_id !== null
+            && Establishment::query()->whereKey($this->establishment_id)->where('is_active', true)->exists()
+        );
     }
 
     /**
@@ -55,6 +71,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'establishment_id' => 'integer',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

@@ -17,3 +17,9 @@
 - ADR-014 : provisionnement superadmin par variables d'environnement et seeder transactionnel idempotent, sans compte de démonstration, sans mot de passe codé en dur et sans rotation implicite du mot de passe existant.
 - ADR-015 : désactivation globale de l'inscription Fortify actuelle tant que le routage par domaine est absent. La future inscription étudiante sera mise en place séparément, sans réouverture de la création publique de comptes administratifs.
 - ADR-016 : audit synchrone de User par liste de champs autorisés et audit des attributions/retraits Spatie. Aucune exception developer, aucune journalisation de secrets, aucune purge automatique.
+
+- ADR-017 : référentiels institutionnels administrables par les permissions existantes, avec routes web Inertia, pagination serveur et désactivation. Aucune liste officielle UMG ni donnée de démonstration n'est seedée.
+- ADR-018 : au plus une année courante, garantie par index unique sur une colonne générée nullable. Changement transactionnel avec verrouillage ordonné, mises à jour Eloquent auditées et retrait du statut courant lors de la désactivation. Aucun effacement des années historiques.
+- ADR-019 : code de parcours unique par établissement lorsqu'il est renseigné ; nom libre et non unique globalement. FK restrictives vers les établissements ; aucune relation niveau/parcours imposée.
+- ADR-020 : rattachement utilisateur/établissement nullable en base, avec Action validée et contrôle de contexte sur les routes métier internes. Les comptes établissement sans rattachement actif sont inexploitables sur ces routes ; aucun CRUD utilisateur n'est créé dans cette phase.
+- ADR-021 : audit des champs structurels des référentiels ; les changements limités aux contacts sont tracés sans leurs valeurs. Programmes et établissements sont filtrés par périmètre lorsque le rôle établissement reçoit une permission de gestion, sans modification de la matrice initiale.

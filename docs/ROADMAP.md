@@ -8,14 +8,15 @@
 - [x] Pest installé et tests de fondation identité/permissions/audit
 - [x] mécanisme de seed superadmin sécurisé et idempotent
 
-## Phase 1 — Référentiels
+## Phase 1 — Référentiels institutionnels implémentés
 
-- [ ] établissements
-- [ ] années universitaires
-- [ ] niveaux
-- [ ] parcours
+- [x] établissements
+- [x] années universitaires
+- [x] niveaux
+- [x] parcours
 - [x] catalogue et matrice initiale rôles/permissions
-- [ ] utilisateurs
+- [x] rattachement utilisateur/établissement et validation du contexte
+- [ ] CRUD utilisateurs complet
 
 ## Phase 2 — Étudiants
 
