@@ -5,6 +5,7 @@ use App\Actions\Imports\CommitStudentImport;
 use App\Enums\StudentImportRowStatus as RowStatus;
 use App\Enums\StudentImportStatus as ImportStatus;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Program;
@@ -22,7 +23,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -121,7 +121,7 @@ it('rejects foreign and malformed establishment payloads', function (mixed $valu
 it('isolates every import endpoint from a foreign establishment', function (string $endpoint, string $method) {
     $import = uploadStudentCsv($this, [$this->data]);
     $import->update(['establishment_id' => $this->b->id]);
-    $this->{$method}('/imports/'.$import->id.$endpoint)->assertForbidden();
+    $this->{$method}('/imports/'.$import->uuid.$endpoint)->assertForbidden();
 })->with([['', 'get'], ['/analyze', 'post'], ['/commit', 'post'], ['/errors', 'get']]);
 it('blocks central and student roles even if granted import permissions', function (string $role) {
     $user = User::factory()->create()->assignRole($role);
@@ -139,12 +139,12 @@ it('maps canonical fields and French aliases deterministically', function () {
 });
 it('rejects incomplete, duplicated, unknown and out of range mappings', function (array $mapping) {
     $import = uploadStudentCsv($this, [$this->data]);
-    $this->post('/imports/'.$import->id.'/analyze', ['mapping' => $mapping])->assertSessionHasErrors();
+    $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $mapping])->assertSessionHasErrors();
     expect($import->fresh()->status)->toBe(ImportStatus::Uploaded);
 })->with([[['last_name' => 0]], [['last_name' => 0, 'level' => 0]], [['last_name' => 0, 'level' => 999]], [['last_name' => 0, 'level' => 1, 'unknown' => 2]]]);
 it('permits a corrected mapping before analysis', function () {
     $import = uploadStudentCsv($this, [$this->data]);
-    $this->post('/imports/'.$import->id.'/analyze', ['mapping' => $import->mapping])->assertSessionHasNoErrors()->assertRedirect();
+    $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $import->mapping])->assertSessionHasNoErrors()->assertRedirect();
     expect($import->fresh()->status)->toBe(ImportStatus::Ready)->and(Student::count())->toBe(0);
 });
 it('reuses student normalization and preserves identifiers', function () {
@@ -241,31 +241,31 @@ it('commits only valid rows and ignores warnings rejected rows and duplicates', 
     existingImportStudent($this, ['student_number' => 'OLD']);
     $import = analyzeStudentCsv($this, [$this->data, $this->data, [...$this->data, 'student_number' => 'INVALID', 'email' => 'bad'], [...$this->data, 'student_number' => 'OLD', 'last_name' => 'Conflit']]);
     expect($import->valid_rows)->toBe(1)->and($import->duplicate_rows)->toBe(1)->and($import->warning_rows)->toBe(1)->and($import->rejected_rows)->toBe(1);
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasNoErrors()->assertRedirect();
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors()->assertRedirect();
     expect(Student::count())->toBe(2)->and(StudentRecord::count())->toBe(2)->and($import->fresh()->status)->toBe(ImportStatus::Completed)->and($import->fresh()->created_rows)->toBe(1)->and($import->fresh()->declared_rows)->toBe(1)->and($import->fresh()->skipped_rows)->toBe(3);
 });
 it('makes repeat commits a no-op and disallows reanalysis after completion', function () {
     $import = analyzeStudentCsv($this, [$this->data]);
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasNoErrors();
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasNoErrors();
-    $this->post('/imports/'.$import->id.'/analyze', ['mapping' => $import->mapping])->assertSessionHasErrors('mapping');
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $import->mapping])->assertSessionHasErrors('mapping');
     expect(Student::count())->toBe(1)->and(StudentRecord::count())->toBe(1)->and(Activity::query()->where('log_name', 'student_imports')->where('event', 'committed')->count())->toBe(1);
 });
 it('requires analysis before commit', function () {
     $import = uploadStudentCsv($this, [$this->data]);
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasErrors('import');
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasErrors('import');
     expect(Student::count())->toBe(0);
 });
 it('rechecks database conflicts introduced after preview', function () {
     $import = analyzeStudentCsv($this, [$this->data]);
     existingImportStudent($this, ['last_name' => 'Changed']);
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasNoErrors();
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
     expect(Student::count())->toBe(1)->and($import->fresh()->warning_rows)->toBe(1)->and($import->fresh()->skipped_rows)->toBe(1);
 });
 it('rechecks references at confirmation', function () {
     $import = analyzeStudentCsv($this, [$this->data]);
     $this->level->update(['is_active' => false]);
-    $this->post('/imports/'.$import->id.'/commit')->assertSessionHasNoErrors();
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
     expect(Student::count())->toBe(0)->and($import->fresh()->rejected_rows)->toBe(1);
 });
 it('rolls back students records staging resolutions and audit on a critical error', function () {
@@ -277,7 +277,7 @@ it('rolls back students records staging resolutions and audit on a critical erro
         }
     });
     try {
-        $this->post('/imports/'.$import->id.'/commit')->assertSessionHasErrors('import');
+        $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasErrors('import');
     } finally {
         StudentRecord::flushEventListeners();
         StudentRecord::clearBootedModels();
@@ -301,8 +301,8 @@ it('paginates preview without sensitive data and filters status', function () {
         $rows[] = [...$this->data, 'last_name' => 'Nom '.$i, 'student_number' => 'M'.$i, 'cin' => 'SECRET-CIN-'.$i];
     }
     $import = analyzeStudentCsv($this, $rows);
-    $this->get('/imports/'.$import->id)->assertInertia(fn (Assert $page) => $page->component('imports/show')->has('rows.data', 25)->where('rows.total', 30)->missing('rows.data.0.data.cin')->missing('rows.data.0.raw_data')->missing('import.stored_path'));
-    $this->get('/imports/'.$import->id.'?status=rejected')->assertInertia(fn (Assert $page) => $page->has('rows.data', 0));
+    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->component('imports/show')->has('rows.data', 25)->where('rows.total', 30)->missing('rows.data.0.data.cin')->missing('rows.data.0.raw_data')->missing('import.stored_path'));
+    $this->get('/imports/'.$import->uuid.'?status=rejected')->assertInertia(fn (Assert $page) => $page->has('rows.data', 0));
 });
 it('loads import history with eager relations and scoped pagination', function () {
     $import = uploadStudentCsv($this, [$this->data]);
@@ -317,7 +317,7 @@ it('keeps preview and history relation queries bounded', function () {
     }
     $import = analyzeStudentCsv($this, $rows);
     DB::enableQueryLog();
-    $this->get('/imports/'.$import->id)->assertOk();
+    $this->get('/imports/'.$import->uuid)->assertOk();
     $queries = DB::getQueryLog();
     DB::disableQueryLog();
     expect(count($queries))->toBeLessThan(30);
@@ -335,13 +335,13 @@ it('chunks a multi-line file without persisting before confirmation', function (
 });
 it('exports minimal error CSV and enforces the export permission', function () {
     $import = analyzeStudentCsv($this, [[...$this->data, 'email' => 'private-invalid', 'cin' => 'SECRET']]);
-    $response = $this->get('/imports/'.$import->id.'/errors')->assertOk();
+    $response = $this->get('/imports/'.$import->uuid.'/errors')->assertOk();
     $csv = $response->streamedContent();
     expect($csv)->toContain('invalid_email')->not->toContain('private-invalid')->not->toContain('SECRET');
     $this->actor->revokePermissionTo('imports.export_errors');
     $role = Role::findByName('establishment');
     $role->revokePermissionTo('imports.export_errors');
-    $this->get('/imports/'.$import->id.'/errors')->assertForbidden();
+    $this->get('/imports/'.$import->uuid.'/errors')->assertForbidden();
 });
 it('purges private files and staging PII while retaining totals', function () {
     $import = analyzeStudentCsv($this, [$this->data]);
@@ -403,7 +403,7 @@ it('hides a foreign match identified by an admin before an establishment views t
     $import = uploadStudentCsv($this, [$this->data]);
     app(AnalyzeStudentImport::class)->handle($this->admin, $import, $import->mapping);
     expect($import->rows()->sole()->matched_student_id)->toBe($student->id);
-    $this->get('/imports/'.$import->id)->assertInertia(fn (Assert $page) => $page->where('rows.data.0.matched_student_id', null));
+    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->where('rows.data.0.matched_student_id', null));
 });
 
 it('always interprets CSV numeric dates using calendar 1900', function () {
