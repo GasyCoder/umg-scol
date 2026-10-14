@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\ReportingFixture;
 use Tests\TestCase;
@@ -142,7 +143,7 @@ it('aggregates several hundred declarations correctly in SQL', function () {
     $rows = [];
     $students = Student::factory()->count(300)->create();
     foreach ($students as $index => $student) {
-        $rows[] = ['student_id' => $student->id, 'academic_year_id' => $this->f->year->id, 'establishment_id' => $this->f->b->id, 'level_id' => $index % 3 === 0 ? $this->f->l2->id : $this->f->l1->id, 'status' => 'active', 'declared_by' => $this->f->superadmin->id, 'declared_at' => now(), 'created_at' => now(), 'updated_at' => now()];
+        $rows[] = ['uuid' => (string) Str::uuid7(), 'student_id' => $student->id, 'academic_year_id' => $this->f->year->id, 'establishment_id' => $this->f->b->id, 'level_id' => $index % 3 === 0 ? $this->f->l2->id : $this->f->l1->id, 'status' => 'active', 'declared_by' => $this->f->superadmin->id, 'declared_at' => now(), 'created_at' => now(), 'updated_at' => now()];
     }
     StudentRecord::query()->insert($rows);
     $props = dashboardData($this, $this->f->staff_b);
