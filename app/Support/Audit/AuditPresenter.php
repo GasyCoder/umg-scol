@@ -48,7 +48,7 @@ final class AuditPresenter
     public static function summary(Activity $activity): array
     {
         return [
-            'id' => $activity->id,
+            'id' => $activity->id, 'uuid' => (string) $activity->getAttribute('uuid'),
             'at' => $activity->created_at?->toIso8601String(),
             'actor' => self::actor($activity->causer),
             'role' => self::role($activity->causer),
