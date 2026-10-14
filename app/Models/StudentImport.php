@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StudentImportStatus;
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['establishment_id', 'academic_year_id', 'user_id', 'original_filename', 'stored_path', 'disk', 'status', 'headers', 'mapping', 'excel_calendar', 'total_rows', 'valid_rows', 'warning_rows', 'rejected_rows', 'duplicate_rows', 'created_rows', 'updated_rows', 'declared_rows', 'skipped_rows', 'started_at', 'analyzed_at', 'committed_at', 'failed_at', 'failure_reason', 'purged_at'])]
 class StudentImport extends Model
 {
+    use HasPublicUuid;
+
     protected function casts(): array
     {
         return ['status' => StudentImportStatus::class, 'headers' => 'array', 'mapping' => 'array', 'excel_calendar' => 'integer', 'started_at' => 'datetime', 'analyzed_at' => 'datetime', 'committed_at' => 'datetime', 'failed_at' => 'datetime', 'purged_at' => 'datetime'];
