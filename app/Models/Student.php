@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use App\Support\StudentNormalization;
 use Carbon\CarbonInterface;
 use Database\Factories\StudentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,29 +24,13 @@ use Spatie\Activitylog\Support\LogOptions;
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
-    use HasFactory, HasUuids, LogsActivity;
+    use HasFactory, HasPublicUuid, LogsActivity;
 
     protected $attributes = ['is_active' => true];
 
     protected function casts(): array
     {
         return ['birth_date' => 'date', 'cin_issued_at' => 'date', 'bac_year' => 'integer', 'is_active' => 'boolean'];
-    }
-
-    /**
-     * Only the public uuid is generated; the integer id stays the primary key.
-     *
-     * @return list<string>
-     */
-    public function uniqueIds(): array
-    {
-        return ['uuid'];
-    }
-
-    /** URLs use the uuid, never the sequential id. */
-    public function getRouteKeyName(): string
-    {
-        return 'uuid';
     }
 
     public function setAttribute($key, $value): static
