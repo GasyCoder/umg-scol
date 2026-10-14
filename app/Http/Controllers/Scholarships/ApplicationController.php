@@ -33,7 +33,7 @@ class ApplicationController extends Controller
 
         return Inertia::render('scholarships/applications/index', [
             'applications' => $query->orderByDesc('received_at')->orderByDesc('id')->paginate(25)->withQueryString()->through(fn (ScholarshipApplication $a) => [
-                'id' => $a->id, 'application_number' => $a->application_number, 'ddb_number' => $a->ddb_number, 'campaign' => $a->campaign->name,
+                'id' => $a->id, 'uuid' => $a->uuid, 'application_number' => $a->application_number, 'ddb_number' => $a->ddb_number, 'campaign' => $a->campaign->name,
                 'student' => $a->student->only(['student_number', 'last_name', 'first_names']), 'establishment' => $a->studentRecord->establishment->name,
                 'level' => $a->studentRecord->level->name, 'status' => $a->status->value, 'status_label' => $a->status->label(), 'received_at' => $a->received_at->toIso8601String(),
             ]),
@@ -62,7 +62,7 @@ class ApplicationController extends Controller
 
         return Inertia::render('scholarships/applications/show', [
             'application' => [
-                'id' => $application->id, 'application_number' => $application->application_number, 'ddb_number' => $application->ddb_number,
+                'id' => $application->id, 'uuid' => $application->uuid, 'application_number' => $application->application_number, 'ddb_number' => $application->ddb_number,
                 'status' => $application->status->value, 'status_label' => $application->status->label(), 'decision_reason' => $application->decision_reason, 'internal_notes' => $application->internal_notes,
                 'campaign' => ['name' => $application->campaign->name, 'academic_year' => $application->campaign->academicYear->name, 'status_label' => $application->campaign->status->label()],
                 'received' => ['at' => $application->received_at->toIso8601String(), 'by' => $application->receiver->name],
