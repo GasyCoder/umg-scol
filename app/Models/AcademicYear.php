@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
 use Carbon\CarbonInterface;
 use Database\Factories\AcademicYearFactory;
@@ -22,7 +23,7 @@ class AcademicYear extends Model
     protected $attributes = ['is_current' => false, 'is_active' => true];
 
     /** @use HasFactory<AcademicYearFactory> */
-    use HasFactory, InstitutionalReference;
+    use HasFactory, HasPublicUuid, InstitutionalReference;
 
     protected function casts(): array
     {
