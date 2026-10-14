@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Reporting;
 
+use App\Models\Activity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
-use Spatie\Activitylog\Models\Activity;
 
 class AuditFilterRequest extends FormRequest
 {
