@@ -4,6 +4,7 @@ use App\Actions\Corrections\RequestStudentCorrection;
 use App\Actions\StudentPortal\ConfirmStudentInformation;
 use App\Enums\StudentCorrectionField;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
@@ -15,7 +16,6 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Spatie\Activitylog\Models\Activity;
 
 // Commits real rows to exercise row locks across two connections: run only on a disposable, migrated database
 // whose name contains "check", e.g. DB_DATABASE=umg_scol_check php tests/MySql/StudentConfirmationChecks.php
