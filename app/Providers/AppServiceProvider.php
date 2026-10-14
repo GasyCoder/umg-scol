@@ -2,13 +2,17 @@
 
 namespace App\Providers;
 
+use App\Policies\AuditPolicy;
+use App\Policies\ReportPolicy;
 use App\Support\InternalUserProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,6 +30,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Auth::provider('internal-eloquent', fn ($app, array $config) => new InternalUserProvider($app['hash'], $config['model']));
+        Gate::policy(Activity::class, AuditPolicy::class);
+        Gate::define('reports.view', [ReportPolicy::class, 'view']);
+        Gate::define('reports.export', [ReportPolicy::class, 'export']);
         $this->configureDefaults();
     }
 

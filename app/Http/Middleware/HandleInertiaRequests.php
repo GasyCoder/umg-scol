@@ -10,6 +10,7 @@ use App\Models\StudentImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
+use Spatie\Activitylog\Models\Activity;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -59,6 +60,8 @@ class HandleInertiaRequests extends Middleware
                 'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
                 'canViewImports' => $request->user() !== null && Gate::allows('viewAny', StudentImport::class),
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
+                'canViewReports' => $request->user() !== null && Gate::allows('reports.view'),
+                'canViewAudits' => $request->user() !== null && Gate::allows('viewAny', Activity::class),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

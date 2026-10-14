@@ -102,9 +102,14 @@ final class StudentConfirmationContext
         if ($this->latest === null) {
             return self::NEVER_CONFIRMED;
         }
-        $fingerprint = $this->fingerprint();
 
-        return $fingerprint !== null && $this->latest->student_record_id === $this->record?->id && hash_equals($this->latest->information_fingerprint, $fingerprint) ? self::CONFIRMED : self::STALE;
+        return $this->record !== null && self::matches($this->latest, $this->record, (string) $this->fingerprint()) ? self::CONFIRMED : self::STALE;
+    }
+
+    /** Single rule for "still current", shared with batch counts: same declaration and same fingerprint. */
+    public static function matches(StudentInformationConfirmation $latest, StudentRecord $record, string $fingerprint): bool
+    {
+        return $latest->student_record_id === $record->id && hash_equals($latest->information_fingerprint, $fingerprint);
     }
 
     public function canConfirm(): bool

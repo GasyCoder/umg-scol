@@ -22,6 +22,11 @@ class StudentPolicy
         return $this->access($user, 'students.view') && Student::query()->visibleTo($user)->whereKey($student->id)->exists();
     }
 
+    public function export(User $user): bool
+    {
+        return $this->access($user, 'students.export') && $this->access($user, 'students.viewAny');
+    }
+
     public function create(User $user): bool
     {
         return $this->access($user, 'students.create') && $this->access($user, 'student_records.create');

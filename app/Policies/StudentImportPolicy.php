@@ -37,6 +37,12 @@ class StudentImportPolicy
         return $this->view($user, $import) && $this->access($user, 'imports.commit');
     }
 
+    /** Aggregated import report export, within the actor's perimeter. */
+    public function exportReport(User $user): bool
+    {
+        return $this->viewAny($user) && $this->access($user, 'imports.export_errors');
+    }
+
     public function exportErrors(User $user, StudentImport $import): bool
     {
         return $this->view($user, $import) && $this->access($user, 'imports.export_errors');

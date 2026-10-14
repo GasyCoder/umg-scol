@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, LayoutGrid } from 'lucide-react';
+import { BookOpen, ChartColumn, LayoutGrid, ShieldCheck } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -68,6 +68,14 @@ export function AppSidebar() {
               ]
             : []),
     ];
+    const steeringItems: NavItem[] = [
+        ...(auth.canViewReports
+            ? [{ title: 'Rapports', href: '/reports', icon: ChartColumn }]
+            : []),
+        ...(auth.canViewAudits
+            ? [{ title: 'Audit', href: '/audits', icon: ShieldCheck }]
+            : []),
+    ];
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -118,6 +126,9 @@ export function AppSidebar() {
                 />
                 {scholarshipItems.length > 0 && (
                     <NavMain items={scholarshipItems} label="Bourses" />
+                )}
+                {steeringItems.length > 0 && (
+                    <NavMain items={steeringItems} label="Pilotage" />
                 )}
                 {references.length > 0 && (
                     <NavMain items={references} label="Référentiels" />

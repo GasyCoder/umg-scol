@@ -85,3 +85,20 @@ La séparation des domaines ne remplace pas les contrôles serveur. L'API étudi
 Le rôle étudiant ne reçoit aucune permission de modification directe des données officielles. Il peut soumettre une demande de correction, traitée par l'établissement, et confirmer ses propres informations affichées (sans nouvelle permission). L'état de confirmation n'est visible que par lui via l'API et, sur `scol`, par le personnel qui peut consulter la fiche (`StudentPolicy::view`). Le compte `student` n'utilise aucune permission Spatie sur `bourse` : l'accès est déterminé par le garde `student`, le rôle `student` seul, l'email vérifié, le marqueur de session du portail et `users.student_id`. Un compte portant un autre rôle (même en plus de `student`) est refusé sur l'API étudiante ; un compte `student` est refusé sur toutes les routes de `scol`, y compris Fortify et passkeys.
 
 Revue des rattachements (`/student-links`) : permission `student_links.review` + compte interne avec contexte valide. `establishment` ne voit et ne traite que les demandes dont l'étudiant a une déclaration `active` dans son établissement sur l'année courante active ; `central_scholarship_office`, `superadmin` et `developer` ont une revue globale. La Policy recontrôle ce périmètre sur l'ID de la demande et l'Action le revérifie sous verrou.
+
+## Pilotage : tableaux de bord, rapports, audit
+
+Aucune nouvelle permission. Le tableau de bord et les rapports réutilisent les Policies des modules :
+
+| Bloc                                        | Condition                      | Périmètre                                                  |
+| ------------------------------------------- | ------------------------------ | ---------------------------------------------------------- |
+| Étudiants, niveaux, parcours, confirmations | `students.viewAny`             | établissement propre ou global                             |
+| Imports                                     | `imports.view`                 | établissement propre ou global (pas la Scolarité Centrale) |
+| Corrections                                 | `corrections.view`             | scope de revue existant                                    |
+| Rattachements                               | `student_links.review`         | scope de revue existant                                    |
+| Dossiers et campagnes de bourse             | `scholarships.view`            | global (pas les établissements)                            |
+| Utilisateurs internes                       | `users.manage` + acteur global | global                                                     |
+| Activité récente, page Audit                | `audits.view`                  | global                                                     |
+| Indicateurs techniques                      | rôle `developer`               | compteurs seulement                                        |
+
+Exports de rapports : `students.export` (étudiants), `imports.export_errors` (imports), `scholarships.export` (bourses). Export d'audit : `audits.export`. Le rôle `student` n'a accès à aucune de ces routes. Le filtre d'année est réservé aux acteurs globaux sur le tableau de bord ; dans les rapports, un établissement peut changer d'année mais reste dans son établissement.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -220,11 +221,19 @@ function Portal() {
         <div className="min-h-screen">
             <header className="border-b">
                 <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-5">
-                    <div>
-                        <p className="font-semibold">Université de Mahajanga</p>
-                        <p className="text-sm text-muted-foreground">
-                            Portail étudiant
-                        </p>
+                    <div className="flex items-center gap-3">
+                        <AppLogoIcon
+                            className="size-10 shrink-0 fill-current text-foreground"
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <p className="font-semibold">
+                                Université de Mahajanga
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Portail étudiant
+                            </p>
+                        </div>
                     </div>
                     {session?.authenticated && (
                         <Button

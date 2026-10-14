@@ -16,6 +16,8 @@ export type Auth = {
     canViewStudents: boolean;
     canViewImports: boolean;
     canViewCorrections: boolean;
+    canViewReports: boolean;
+    canViewAudits: boolean;
     scholarships: {
         campaigns: boolean;
         receive: boolean;

@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $excel_calendar
  * @property int $total_rows
+ * @property int $rejected_rows
+ * @property int $declared_rows
  * @property StudentImportStatus $status
  * @property array<int,string> $headers
  * @property array<string,int> $mapping

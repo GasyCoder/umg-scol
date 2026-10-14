@@ -38,6 +38,8 @@ Portail étudiant -> /api/student/* Laravel
 
 `app/Actions`, `app/Enums`, `app/Http/Controllers`, `app/Http/Requests`, `app/Imports`, `app/Jobs`, `app/Models`, `app/Policies`, `app/Services`.
 
+Pilotage : `app/Support/Reporting` (`ReportScope` pour le périmètre et l'année, `InstitutionalMetrics` pour les agrégats SQL partagés, `InstitutionalDashboard` et `InstitutionalReports` pour la composition), `app/Support/Audit/AuditPresenter` (sortie unique et assainie des journaux), `app/Support/CsvExport`. Contrôleurs minces sous `App\Http\Controllers\Reporting`. Les agrégats sont calculés en SQL (`COUNT`, `SUM(CASE…)`, `GROUP BY`) ; seul l'état des confirmations étudiantes exige de recalculer l'empreinte HMAC, par lots de 500 étudiants ayant déjà confirmé. Pas de cache : le tableau de bord exécute un nombre borné de requêtes (environ 30 pour un superadmin, indépendant du volume, vérifié par test) ; un cache court par rôle, établissement et année serait à envisager seulement si les mesures sur le volume réel le justifient.
+
 ## Frontend
 
 `resources/js/components`, `components/ui`, `layouts`, `pages`, `hooks`, `lib`, `types`.

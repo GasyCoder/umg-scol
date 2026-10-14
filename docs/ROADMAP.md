@@ -52,9 +52,9 @@
 
 ## Phase 6 — Audit/rapports
 
-- [ ] dashboards
-- [ ] exports
-- [ ] audit développeur
+- [x] dashboards (par rôle : établissement, Scolarité Centrale, superadmin, developer)
+- [x] exports (rapports agrégés étudiants/imports/bourses, export d'audit)
+- [x] audit développeur (interface d'audit filtrée, détail assaini, developer tracé comme tout acteur)
 
 ## Phase 7 — Durcissement
 
