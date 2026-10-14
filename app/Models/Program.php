@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
 use Database\Factories\ProgramFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,7 +17,7 @@ class Program extends Model
     protected $attributes = ['is_active' => true];
 
     /** @use HasFactory<ProgramFactory> */
-    use HasFactory, InstitutionalReference;
+    use HasFactory, HasPublicUuid, InstitutionalReference;
 
     protected function casts(): array
     {
