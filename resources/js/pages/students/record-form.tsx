@@ -33,11 +33,11 @@ export default function AnnualRecordForm({
     });
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (record) form.put(`/student-records/${record.id}`);
+        if (record) form.put(`/student-records/${record.uuid}`);
         else form.post(`/students/${student.uuid}/records`);
     };
     return (
-        <div className="mx-auto w-full max-w-3xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title="Déclaration annuelle" />
             <Heading
                 title={
