@@ -1,21 +1,24 @@
 # Roadmap
 
 ## Phase 0 — Fondation
-- [ ] Spatie Permission
-- [ ] Spatie Activitylog
+
+- [x] Spatie Permission
+- [x] Spatie Activitylog
 - [ ] Laravel Excel
-- [ ] Pest/config
-- [ ] seed superadmin
+- [x] Pest installé et tests de fondation identité/permissions/audit
+- [x] mécanisme de seed superadmin sécurisé et idempotent
 
 ## Phase 1 — Référentiels
+
 - [ ] établissements
 - [ ] années universitaires
 - [ ] niveaux
 - [ ] parcours
-- [ ] rôles/permissions
+- [x] catalogue et matrice initiale rôles/permissions
 - [ ] utilisateurs
 
 ## Phase 2 — Étudiants
+
 - [ ] Student
 - [ ] StudentRecord
 - [ ] CRUD établissement
@@ -23,6 +26,7 @@
 - [ ] isolation
 
 ## Phase 3 — Imports
+
 - [ ] upload
 - [ ] validation
 - [ ] preview
@@ -31,11 +35,13 @@
 - [ ] rapport erreurs
 
 ## Phase 4 — Vérification étudiant
+
 - [ ] consultation
 - [ ] confirmation
 - [ ] correction
 
 ## Phase 5 — Bourse
+
 - [ ] campagnes
 - [ ] réception dossier
 - [ ] numéro DDB
@@ -43,11 +49,13 @@
 - [ ] validation/correction/rejet
 
 ## Phase 6 — Audit/rapports
+
 - [ ] dashboards
 - [ ] exports
 - [ ] audit développeur
 
 ## Phase 7 — Durcissement
+
 - [ ] tests permissions/import/workflow
 - [ ] performance
 - [ ] sécurité

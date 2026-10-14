@@ -12,3 +12,8 @@
 - ADR-010 : authentification étudiante prévue par email + OTP ou Google OAuth, puis rattachement sécurisé à une fiche `Student` existante. Un compte vérifié ne vaut ni inscription universitaire ni preuve de propriété d'une fiche. La fréquence OTP, le rattachement et le mécanisme de session API restent à définir.
 - ADR-011 : l'étudiant propose une correction ; l'établissement décide de la modification des données officielles. Aucun accès étudiant en écriture directe à l'identité administrative.
 - ADR-012 : MySQL est le moteur local et celui du setup CI ; SQLite en mémoire est conservé pour les tests existants. Le fichier SQLite local résiduel est conservé jusqu'à une décision explicite de nettoyage.
+
+- ADR-013 : fondation d'accès avec Spatie Permission, cinq rôles et 33 permissions explicites. Superadmin et developer ont le catalogue complet sans bypass global ; la portée réelle sera contrôlée par les futures Policies métier.
+- ADR-014 : provisionnement superadmin par variables d'environnement et seeder transactionnel idempotent, sans compte de démonstration, sans mot de passe codé en dur et sans rotation implicite du mot de passe existant.
+- ADR-015 : désactivation globale de l'inscription Fortify actuelle tant que le routage par domaine est absent. La future inscription étudiante sera mise en place séparément, sans réouverture de la création publique de comptes administratifs.
+- ADR-016 : audit synchrone de User par liste de champs autorisés et audit des attributions/retraits Spatie. Aucune exception developer, aucune journalisation de secrets, aucune purge automatique.

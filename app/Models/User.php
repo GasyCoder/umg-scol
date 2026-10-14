@@ -13,6 +13,9 @@ use Illuminate\Support\Carbon;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * @property int $id
@@ -32,7 +35,16 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, LogsActivity, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('identity')
+            ->logOnly(['name', 'email_verified_at'])
+            ->logOnlyDirty()
+            ->logEmptyChanges();
+    }
 
     /**
      * Get the attributes that should be cast.

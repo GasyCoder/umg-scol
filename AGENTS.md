@@ -1,6 +1,7 @@
 # AGENTS.md — UMG Bourse
 
 ## Mission
+
 Application web interne de l'Université de Mahajanga destinée à centraliser les listes des étudiants déjà régulièrement inscrits dans les établissements et à aider la Scolarité Centrale à vérifier et traiter les demandes papier de bourse nationale.
 
 **Le système ne gère pas l'inscription universitaire.**
@@ -8,6 +9,7 @@ Application web interne de l'Université de Mahajanga destinée à centraliser l
 Flux de référence : inscription hors système → établissement ajoute/importe l'étudiant → Scolarité Centrale consulte → étudiant dépose le dossier papier → secrétaire vérifie → valide / demande correction / rejette.
 
 ## Stack obligatoire
+
 - Laravel 13 / PHP 8.4+
 - MySQL
 - Inertia.js
@@ -19,13 +21,15 @@ Flux de référence : inscription hors système → établissement ajoute/import
 Packages privilégiés : `spatie/laravel-permission`, `spatie/laravel-activitylog`, `maatwebsite/excel`.
 
 ## Architecture
-- Monolithe Laravel + Inertia ; pas d'API séparée en V1.
+
+- Un seul backend Laravel ; portail interne `scol.umg.test:8000` avec Inertia et portail étudiant `bourse.umg.test:8000` avec une future API `/api/student/*`. Aucun deuxième backend.
 - Contrôleurs minces, Form Requests, Policies/Gates, Actions/Services pour la logique métier.
 - Enums PHP pour les statuts.
 - Transactions DB pour imports et décisions sensibles.
 - Autorisation serveur obligatoire ; le frontend ne remplace jamais les Policies.
 
 ## Règles métier
+
 - `students` = identité permanente.
 - `student_records` = déclaration annuelle d'un étudiant déjà inscrit (année, établissement, niveau, parcours).
 - Un établissement ne voit/modifie que ses propres étudiants.
@@ -35,10 +39,12 @@ Packages privilégiés : `spatie/laravel-permission`, `spatie/laravel-activitylo
 - Le rôle `developer` peut être absent des listes opérationnelles mais jamais des audits.
 
 ## Imports
+
 Toujours : upload → parsing → validation → doublons/anomalies → prévisualisation → confirmation → import transactionnel → résumé.
 Ne jamais importer silencieusement une ligne invalide.
 
 ## Sécurité
+
 - Moindre privilège.
 - Pas de secrets dans Git.
 - Tracer créations/modifications/imports/exports/décisions sensibles.
@@ -46,9 +52,11 @@ Ne jamais importer silencieusement une ligne invalide.
 - Éviter les suppressions physiques des données administratives importantes.
 
 ## UI/UX
+
 Interface institutionnelle, sobre, rapide et responsive. Préférer DataTable, filtres, recherche, badges de statut, dialogues de confirmation. Éviter les interfaces "AI-looking" et les effets décoratifs inutiles.
 
 ## Avant de terminer une tâche
+
 1. Lire le CDC et les docs concernés.
 2. Vérifier permissions/validation/audit.
 3. Ajouter ou mettre à jour les tests Pest.
