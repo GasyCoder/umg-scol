@@ -133,9 +133,9 @@ it('lets authorised actors manage mentions within their perimeter', function () 
 });
 it('keeps a program and its mention in the same establishment', function () {
     $foreign = Mention::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->admin)->put('/references/programs/'.$this->maths->id, ['establishment_id' => $this->a->id, 'mention_id' => $foreign->id, 'name' => 'Mathématiques'])->assertSessionHasErrors('mention_id');
-    $this->actingAs($this->admin)->put('/references/programs/'.$this->maths->id, ['establishment_id' => $this->a->id, 'mention_id' => $this->info->id, 'name' => 'Mathématiques'])->assertRedirect();
+    $this->actingAs($this->admin)->put('/references/programs/'.$this->maths->uuid, ['establishment_id' => $this->a->id, 'mention_id' => $foreign->id, 'name' => 'Mathématiques'])->assertSessionHasErrors('mention_id');
+    $this->actingAs($this->admin)->put('/references/programs/'.$this->maths->uuid, ['establishment_id' => $this->a->id, 'mention_id' => $this->info->id, 'name' => 'Mathématiques'])->assertRedirect();
     expect($this->maths->fresh()->mention_id)->toBe($this->info->id);
     expect(fn () => $this->reseaux->forceFill(['mention_id' => $foreign->id])->save())->toThrow(QueryException::class);
-    $this->actingAs($this->admin)->put('/references/mentions/'.$this->info->id, ['establishment_id' => $this->b->id, 'name' => 'Informatique'])->assertSessionHasErrors('establishment_id');
+    $this->actingAs($this->admin)->put('/references/mentions/'.$this->info->uuid, ['establishment_id' => $this->b->id, 'name' => 'Informatique'])->assertSessionHasErrors('establishment_id');
 });
