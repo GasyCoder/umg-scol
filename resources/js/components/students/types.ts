@@ -36,6 +36,7 @@ export type Options = {
 };
 export type AnnualRecord = {
     id: number;
+    uuid: string;
     student_id: number;
     establishment_id: number;
     academic_year_id: number;
