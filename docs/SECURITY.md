@@ -112,3 +112,4 @@ Verrou d'import + verrous DB ciblés partagés avec la saisie manuelle, nouvelle
 - Indicateurs techniques du developer : compteurs uniquement (jobs en échec, imports en échec, volume d'audit) ; aucun contenu de job, de configuration, de session ni secret.
 
 - Fiches étudiantes adressées par UUID dans les URL : pas d'identifiant séquentiel devinable ni d'indication du volume de fiches. Ce n'est pas un contrôle d'accès : les Policies restent seules à décider de la visibilité.
+- Même règle pour tous les enregistrements adressés par URL (référentiels, déclarations, imports, corrections, rattachements, campagnes, dossiers, audit, annulation de correction côté portail étudiant) : UUID uniquement, identifiant numérique → 404 ; la recherche de la correction à annuler reste limitée au compte et à l'étudiant connectés.
