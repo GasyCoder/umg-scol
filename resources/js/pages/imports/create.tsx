@@ -39,7 +39,7 @@ export default function ImportCreate({
         form.post('/imports', { forceFormData: true });
     };
     return (
-        <div className="max-w-3xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title="Importer un fichier" />
             <Heading
                 title="1. Fichier"
@@ -79,7 +79,7 @@ export default function ImportCreate({
                                 options.fixedEstablishmentId !== null
                             }
                         >
-                            <SelectTrigger id={field.key}>
+                            <SelectTrigger id={field.key} className="w-full">
                                 <SelectValue placeholder="Sélectionner" />
                             </SelectTrigger>
                             <SelectContent>
