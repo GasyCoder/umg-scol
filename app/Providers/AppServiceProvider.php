@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Activity;
 use App\Policies\AuditPolicy;
 use App\Policies\ReportPolicy;
 use App\Support\InternalUserProvider;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
