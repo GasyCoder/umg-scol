@@ -5,6 +5,7 @@ use App\Actions\Imports\CommitStudentImport;
 use App\Actions\Imports\UploadStudentImport;
 use App\Enums\StudentImportStatus;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Student;
@@ -18,7 +19,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use Spatie\Activitylog\Models\Activity;
 
 // Run against the configured MySQL database; every temporary DB write is rolled back.
 require dirname(__DIR__, 2).'/vendor/autoload.php';
