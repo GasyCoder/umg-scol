@@ -108,14 +108,14 @@ final class InstitutionalMetrics
         return array_map(fn ($value) => (int) $value, (array) $row);
     }
 
-    /** @return array<int,array{id:int,filename:string,establishment:string,status:string,total_rows:int,rejected_rows:int,declared_rows:int,created_at:string}> */
+    /** @return array<int,array{id:int,uuid:string,filename:string,establishment:string,status:string,total_rows:int,rejected_rows:int,declared_rows:int,created_at:string}> */
     public function recentImports(int $limit = 5): array
     {
         return StudentImport::query()->with('establishment:id,name')
             ->when(! $this->scope->isGlobal(), fn ($q) => $q->where('establishment_id', $this->scope->establishmentId))
-            ->latest('id')->limit($limit)->get(['id', 'establishment_id', 'original_filename', 'status', 'total_rows', 'rejected_rows', 'declared_rows', 'created_at'])
+            ->latest('id')->limit($limit)->get(['id', 'uuid', 'establishment_id', 'original_filename', 'status', 'total_rows', 'rejected_rows', 'declared_rows', 'created_at'])
             ->map(fn (StudentImport $import) => [
-                'id' => $import->id, 'filename' => (string) $import->original_filename, 'establishment' => (string) $import->establishment?->name, 'status' => $import->status->value,
+                'id' => $import->id, 'uuid' => $import->uuid, 'filename' => (string) $import->original_filename, 'establishment' => (string) $import->establishment?->name, 'status' => $import->status->value,
                 'total_rows' => (int) $import->total_rows, 'rejected_rows' => (int) $import->rejected_rows, 'declared_rows' => (int) $import->declared_rows, 'created_at' => $import->created_at?->toIso8601String() ?? '',
             ])->values()->all();
     }
