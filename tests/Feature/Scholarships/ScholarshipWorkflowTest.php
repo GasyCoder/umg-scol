@@ -8,6 +8,7 @@ use App\Enums\ScholarshipApplicationStatus;
 use App\Enums\ScholarshipCampaignStatus;
 use App\Enums\ScholarshipCheckStatus;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Program;
@@ -23,9 +24,9 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
-use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -91,7 +92,7 @@ it('follows the campaign lifecycle and refuses incoherent transitions', function
     }
     expect(fn () => $transition('open'))->toThrow(ValidationException::class);
     expect(Activity::where('event', 'campaign_status_changed')->where('subject_id', $campaign->id)->count())->toBe(4);
-    $this->actingAs($this->admin)->put('/scholarships/campaigns/'.$campaign->id, ['academic_year_id' => $this->year->id, 'name' => 'Renommée'])->assertSessionHasErrors('campaign');
+    $this->actingAs($this->admin)->put('/scholarships/campaigns/'.$campaign->uuid, ['academic_year_id' => $this->year->id, 'name' => 'Renommée'])->assertSessionHasErrors('campaign');
 });
 it('refuses to open a campaign of an inactive academic year', function () {
     $year = AcademicYear::factory()->create(['is_active' => false]);
@@ -101,9 +102,9 @@ it('refuses to open a campaign of an inactive academic year', function () {
 it('restricts campaign administration to campaigns.manage and keeps the central office read-only', function () {
     $this->actingAs($this->central)->get('/scholarships/campaigns')->assertOk()->assertInertia(fn (Assert $page) => $page->where('canManage', false)->where('campaigns.data.0.targets', []));
     $this->post('/scholarships/campaigns', ['academic_year_id' => $this->year->id, 'name' => 'Interdite'])->assertForbidden();
-    $this->post('/scholarships/campaigns/'.$this->campaign->id.'/status', ['status' => 'closed'])->assertForbidden();
+    $this->post('/scholarships/campaigns/'.$this->campaign->uuid.'/status', ['status' => 'closed'])->assertForbidden();
     $this->actingAs($this->staff)->get('/scholarships/campaigns')->assertForbidden();
-    $this->actingAs(User::factory()->create()->assignRole('developer'))->post('/scholarships/campaigns/'.$this->campaign->id.'/status', ['status' => 'closed'])->assertRedirect();
+    $this->actingAs(User::factory()->create()->assignRole('developer'))->post('/scholarships/campaigns/'.$this->campaign->uuid.'/status', ['status' => 'closed'])->assertRedirect();
     expect($this->campaign->fresh()->status)->toBe(ScholarshipCampaignStatus::Closed);
 });
 it('refuses reception outside an open campaign', function (string $status) {
@@ -156,7 +157,7 @@ it('numbers files uniquely per campaign and enforces it in SQL', function () {
 it('allows one file per student and campaign, in the action and in SQL', function () {
     $first = receiveFile($this);
     $this->actingAs($this->central)->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id])->assertSessionHasErrors('student_id');
-    expect(fn () => DB::table('scholarship_applications')->insert([...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'application_number' => 'X-1', 'sequence' => 99, 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]))
+    expect(fn () => DB::table('scholarship_applications')->insert([...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'uuid' => (string) Str::uuid7(), 'application_number' => 'X-1', 'sequence' => 99, 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]))
         ->toThrow(QueryException::class);
     $other = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'status' => 'open', 'created_by' => $this->admin->id]);
     expect(app(ReceiveScholarshipApplication::class)->handle($this->central, $other->id, $this->student->id, null, null)->application_number)->toBe('BRS'.$other->id.'-000001');
@@ -207,11 +208,11 @@ it('denies students and establishments on every scholarship route', function (st
     }
     $application = receiveFile($this);
     $this->actingAs($user);
-    foreach (['/scholarships/campaigns', '/scholarships/reception', '/scholarships/applications', '/scholarships/applications/'.$application->id, '/scholarships/applications/export'] as $url) {
+    foreach (['/scholarships/campaigns', '/scholarships/reception', '/scholarships/applications', '/scholarships/applications/'.$application->uuid, '/scholarships/applications/export'] as $url) {
         $this->get($url)->assertForbidden();
     }
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'rejected', 'reason' => 'Tentative non autorisée.'])->assertForbidden();
-    $this->post('/scholarships/applications/'.$application->id.'/checks', ['key' => 'identity', 'status' => 'ok'])->assertForbidden();
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'rejected', 'reason' => 'Tentative non autorisée.'])->assertForbidden();
+    $this->post('/scholarships/applications/'.$application->uuid.'/checks', ['key' => 'identity', 'status' => 'ok'])->assertForbidden();
     expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::Pending);
 })->with(['student', 'establishment']);
 it('checks the specific permission of each action whatever the URL', function () {
@@ -220,8 +221,8 @@ it('checks the specific permission of each action whatever the URL', function ()
     Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.validate');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     completeChecks($application, $this->central);
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'validated'])->assertForbidden();
-    $this->get('/scholarships/applications/'.$application->id)->assertInertia(fn (Assert $page) => $page->where('actions', ['needs_correction', 'rejected']));
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertForbidden();
+    $this->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page->where('actions', ['needs_correction', 'rejected']));
     $this->get('/scholarships/applications/999999')->assertNotFound();
     expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::InReview);
 });
@@ -229,31 +230,31 @@ it('checks the specific permission of each action whatever the URL', function ()
 // Review
 it('starts the review explicitly and records actor and time', function () {
     $application = receiveFile($this);
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'in_review'])->assertRedirect();
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'in_review'])->assertRedirect();
     $application->refresh();
     expect($application->status)->toBe(ScholarshipApplicationStatus::InReview)->and($application->review_started_by)->toBe($this->central->id)
         ->and($application->review_started_at)->not->toBeNull()->and($application->decided_at)->toBeNull();
 });
 it('records checklist results and starts the review from a received file', function () {
     $application = receiveFile($this);
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/checks', ['key' => 'identity', 'status' => 'issue', 'note' => 'Prénom différent sur le papier'])->assertRedirect();
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/checks', ['key' => 'identity', 'status' => 'issue', 'note' => 'Prénom différent sur le papier'])->assertRedirect();
     $check = $application->checks()->where('key', 'identity')->sole();
     expect($check->status)->toBe(ScholarshipCheckStatus::Issue)->and($check->note)->toBe('Prénom différent sur le papier')
         ->and($check->checked_by)->toBe($this->central->id)->and($check->checked_at)->not->toBeNull()
         ->and($application->fresh()->status)->toBe(ScholarshipApplicationStatus::InReview)->and($application->fresh()->review_started_by)->toBe($this->central->id);
-    $this->post('/scholarships/applications/'.$application->id.'/checks', ['key' => 'unknown', 'status' => 'ok'])->assertSessionHasErrors('check');
-    $this->post('/scholarships/applications/'.$application->id.'/checks', ['key' => 'identity', 'status' => 'excellent'])->assertSessionHasErrors('status');
+    $this->post('/scholarships/applications/'.$application->uuid.'/checks', ['key' => 'unknown', 'status' => 'ok'])->assertSessionHasErrors('check');
+    $this->post('/scholarships/applications/'.$application->uuid.'/checks', ['key' => 'identity', 'status' => 'excellent'])->assertSessionHasErrors('status');
 });
 
 // Validation
 it('validates a file only when every check is conforming', function () {
     $application = receiveFile($this);
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
     completeChecks($application, $this->central);
     app(UpdateScholarshipCheck::class)->handle($this->central, $application, 'contact', ScholarshipCheckStatus::Issue, null);
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
     app(UpdateScholarshipCheck::class)->handle($this->central, $application, 'contact', ScholarshipCheckStatus::NotApplicable, null);
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'validated'])->assertRedirect();
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertRedirect();
     $application->refresh();
     expect($application->status)->toBe(ScholarshipApplicationStatus::Validated)->and($application->decided_by)->toBe($this->central->id)
         ->and($application->decided_at)->not->toBeNull()->and($application->decision_reason)->toBeNull();
@@ -285,7 +286,7 @@ it('protects final decisions from any later change', function (string $final) {
         expect(fn () => app(TransitionScholarshipApplication::class)->handle($this->admin, $application, ScholarshipApplicationStatus::from($target), 'Tentative de réouverture.'))->toThrow(ValidationException::class);
     }
     expect(fn () => app(UpdateScholarshipCheck::class)->handle($this->admin, $application, 'identity', ScholarshipCheckStatus::Issue, null))->toThrow(ValidationException::class);
-    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->id)->assertInertia(fn (Assert $page) => $page->where('actions', [])->where('canEditChecks', false));
+    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page->where('actions', [])->where('canEditChecks', false));
     expect($application->fresh()->status->value)->toBe($final);
 })->with(['validated', 'rejected']);
 
@@ -293,10 +294,10 @@ it('protects final decisions from any later change', function (string $final) {
 it('requires a reason to request a correction and never modifies the student', function () {
     $application = receiveFile($this);
     $before = $this->student->fresh()->getAttributes();
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'needs_correction'])->assertSessionHasErrors('reason');
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'needs_correction', 'reason' => 'court'])->assertSessionHasErrors('reason');
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'needs_correction'])->assertSessionHasErrors('reason');
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'needs_correction', 'reason' => 'court'])->assertSessionHasErrors('reason');
     expect(fn () => app(TransitionScholarshipApplication::class)->handle($this->central, $application, ScholarshipApplicationStatus::NeedsCorrection, '  '))->toThrow(ValidationException::class);
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'needs_correction', 'reason' => 'Attestation de l’établissement manquante.'])->assertRedirect();
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'needs_correction', 'reason' => 'Attestation de l’établissement manquante.'])->assertRedirect();
     $application->refresh();
     expect($application->status)->toBe(ScholarshipApplicationStatus::NeedsCorrection)->and($application->decision_reason)->toBe('Attestation de l’établissement manquante.')
         ->and($application->decided_at)->toBeNull()->and($this->student->fresh()->getAttributes())->toBe($before)
@@ -318,8 +319,8 @@ it('returns a file needing correction to review, then to a decision', function (
 it('requires a reason to reject and leaves the student unchanged', function () {
     $application = receiveFile($this);
     $before = $this->student->fresh()->getAttributes();
-    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'rejected'])->assertSessionHasErrors('reason');
-    $this->post('/scholarships/applications/'.$application->id.'/status', ['status' => 'rejected', 'reason' => 'Dossier déposé hors délai.'])->assertRedirect();
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'rejected'])->assertSessionHasErrors('reason');
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'rejected', 'reason' => 'Dossier déposé hors délai.'])->assertRedirect();
     $application->refresh();
     expect($application->status)->toBe(ScholarshipApplicationStatus::Rejected)->and($application->decision_reason)->toBe('Dossier déposé hors délai.')
         ->and($application->decided_by)->toBe($this->central->id)->and($this->student->fresh()->getAttributes())->toBe($before);
@@ -414,7 +415,7 @@ it('keeps a readable business history of every transition', function () {
         ['in_review', 'needs_correction', $this->central->id, 'Copie du BAC illisible.'],
         ['needs_correction', 'rejected', $this->admin->id, 'Aucune réponse de l’étudiant.'],
     ]);
-    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->id)->assertInertia(fn (Assert $page) => $page->has('application.history', 4)->where('application.history.3.reason', 'Aucune réponse de l’étudiant.'));
+    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page->has('application.history', 4)->where('application.history.3.reason', 'Aucune réponse de l’étudiant.'));
     expect(fn () => DB::table('scholarship_application_status_histories')->insert(['scholarship_application_id' => 999999, 'to_status' => 'pending', 'actor_id' => $this->central->id, 'created_at' => now()]))->toThrow(QueryException::class);
 });
 
@@ -464,7 +465,7 @@ it('gives each throttled action its own counter, so processing files never block
     $this->actingAs($this->central);
     foreach (range(1, 6) as $i) {
         foreach (['identity', 'enrollment'] as $key) {
-            $this->post('/scholarships/applications/'.$application->id.'/checks', ['key' => $key, 'status' => $i % 2 ? 'ok' : 'issue'])->assertRedirect();
+            $this->post('/scholarships/applications/'.$application->uuid.'/checks', ['key' => $key, 'status' => $i % 2 ? 'ok' : 'issue'])->assertRedirect();
         }
     }
     $this->get('/scholarships/applications/export')->assertOk();
@@ -488,7 +489,7 @@ it('shows the scholarship menu only to authorized accounts', function () {
 });
 it('renders the file detail with official data, checklist and allowed actions', function () {
     $application = receiveFile($this, ddb: 'DDB-1');
-    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->id)->assertOk()->assertInertia(fn (Assert $page) => $page->component('scholarships/applications/show')
+    $this->actingAs($this->central)->get('/scholarships/applications/'.$application->uuid)->assertOk()->assertInertia(fn (Assert $page) => $page->component('scholarships/applications/show')
         ->where('application.student.establishment', 'Faculté des Sciences')->where('application.student.program', 'Biologie')->has('application.checks', 5)
         ->where('actions', ['in_review', 'validated', 'needs_correction', 'rejected'])->where('canEditChecks', true)->where('canViewStudent', true)
         ->missing('application.student.cin')->missing('application.student.address'));
