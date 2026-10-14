@@ -3,6 +3,7 @@
 use App\Actions\References\SaveAcademicYear;
 use App\Actions\Users\AssignUserEstablishment;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Program;
@@ -13,7 +14,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
-use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -33,7 +33,7 @@ it('allows superadmin to list create edit and change reference status', function
     $record = $model::factory()->create();
     $this->get('/references/'.$slug)->assertOk();
     $this->get('/references/'.$slug.'/create')->assertOk();
-    $this->get('/references/'.$slug.'/'.$record->id.'/edit')->assertOk();
+    $this->get('/references/'.$slug.'/'.$record->uuid.'/edit')->assertOk();
     $data = ['name' => 'Nouveau référentiel', 'is_active' => true];
     if ($slug === 'establishments' || $slug === 'levels') {
         $data['code'] = ' NEW-CODE ';
@@ -50,12 +50,12 @@ it('allows superadmin to list create edit and change reference status', function
     if ($slug === 'establishments' || $slug === 'levels') {
         $data['code'] = $record->code;
     }
-    $this->put('/references/'.$slug.'/'.$record->id, $data)->assertSessionHasNoErrors()->assertRedirect();
-    $this->patch('/references/'.$slug.'/'.$record->id.'/status', ['is_active' => false])->assertRedirect();
+    $this->put('/references/'.$slug.'/'.$record->uuid, $data)->assertSessionHasNoErrors()->assertRedirect();
+    $this->patch('/references/'.$slug.'/'.$record->uuid.'/status', ['is_active' => false])->assertRedirect();
     expect($record->fresh()->name)->toBe('Référentiel modifié')->and($record->fresh()->is_active)->toBeFalse();
-    $this->patch('/references/'.$slug.'/'.$record->id.'/status', ['is_active' => true])->assertRedirect();
+    $this->patch('/references/'.$slug.'/'.$record->uuid.'/status', ['is_active' => true])->assertRedirect();
     expect($record->fresh()->is_active)->toBeTrue();
-    $this->delete('/references/'.$slug.'/'.$record->id)->assertStatus(405);
+    $this->delete('/references/'.$slug.'/'.$record->uuid)->assertStatus(405);
     expect($record->fresh())->not->toBeNull();
 })->with('reference_models');
 
@@ -67,10 +67,10 @@ it('returns 403 on direct reference urls for unprivileged establishment users', 
     $this->actingAs($user);
     $this->get('/references/'.$slug)->assertForbidden();
     $this->get('/references/'.$slug.'/create')->assertForbidden();
-    $this->get('/references/'.$slug.'/'.$record->id.'/edit')->assertForbidden();
+    $this->get('/references/'.$slug.'/'.$record->uuid.'/edit')->assertForbidden();
     $this->post('/references/'.$slug, [])->assertForbidden();
-    $this->put('/references/'.$slug.'/'.$record->id, [])->assertForbidden();
-    $this->patch('/references/'.$slug.'/'.$record->id.'/status', ['is_active' => false])->assertForbidden();
+    $this->put('/references/'.$slug.'/'.$record->uuid, [])->assertForbidden();
+    $this->patch('/references/'.$slug.'/'.$record->uuid.'/status', ['is_active' => false])->assertForbidden();
 })->with('reference_models');
 
 it('normalizes and enforces unique establishment and level codes', function (string $slug, string $model) {
@@ -91,12 +91,12 @@ it('retains level order and deterministically sorts equal orders', function () {
 it('switches current years transactionally and keeps historical years', function () {
     $a = AcademicYear::factory()->create(['is_current' => true]);
     $b = AcademicYear::factory()->create();
-    $this->actingAs($this->admin)->patch('/references/academic-years/'.$b->id.'/current')->assertRedirect();
+    $this->actingAs($this->admin)->patch('/references/academic-years/'.$b->uuid.'/current')->assertRedirect();
     expect($a->fresh()->is_current)->toBeFalse()->and($b->fresh()->is_current)->toBeTrue()
         ->and(AcademicYear::where('is_current', true)->count())->toBe(1)->and(AcademicYear::count())->toBe(2);
-    $this->patch('/references/academic-years/'.$b->id.'/status', ['is_active' => false])->assertRedirect();
+    $this->patch('/references/academic-years/'.$b->uuid.'/status', ['is_active' => false])->assertRedirect();
     expect($b->fresh()->is_current)->toBeFalse();
-    $this->patch('/references/academic-years/'.$b->id.'/current')->assertSessionHasErrors('is_current');
+    $this->patch('/references/academic-years/'.$b->uuid.'/current')->assertSessionHasErrors('is_current');
 });
 
 it('enforces the single-current invariant in the database itself', function () {
@@ -159,9 +159,9 @@ it('scopes future program management permission to the users establishment', fun
     $own = Program::factory()->create(['establishment_id' => $a->id]);
     $other = Program::factory()->create(['establishment_id' => $b->id]);
     $this->actingAs($user)->get('/references/programs')->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->where('records.data.0.id', $own->id));
-    $this->get('/references/programs/'.$other->id.'/edit')->assertForbidden();
-    $this->patch('/references/programs/'.$other->id.'/status', ['is_active' => false])->assertForbidden();
-    $this->put('/references/programs/'.$own->id, ['establishment_id' => $b->id, 'name' => 'Moved', 'is_active' => true])->assertForbidden();
+    $this->get('/references/programs/'.$other->uuid.'/edit')->assertForbidden();
+    $this->patch('/references/programs/'.$other->uuid.'/status', ['is_active' => false])->assertForbidden();
+    $this->put('/references/programs/'.$own->uuid, ['establishment_id' => $b->id, 'name' => 'Moved', 'is_active' => true])->assertForbidden();
     $this->post('/references/programs', ['establishment_id' => $b->id, 'name' => 'Foreign', 'is_active' => true])->assertForbidden();
 });
 
@@ -191,8 +191,8 @@ it('audits useful changes without institutional contact data and preserves actor
     $this->actingAs($this->admin);
     $record = $model::factory()->create();
     $record->update(['name' => 'Audit modification']);
-    $this->patch('/references/'.$slug.'/'.$record->id.'/status', ['is_active' => false])->assertRedirect();
-    $this->patch('/references/'.$slug.'/'.$record->id.'/status', ['is_active' => true])->assertRedirect();
+    $this->patch('/references/'.$slug.'/'.$record->uuid.'/status', ['is_active' => false])->assertRedirect();
+    $this->patch('/references/'.$slug.'/'.$record->uuid.'/status', ['is_active' => true])->assertRedirect();
     $logs = Activity::where('log_name', 'references')->where('subject_type', $record->getMorphClass())->where('subject_id', $record->id)->get();
     expect($logs->count())->toBe(4)->and($logs->pluck('event')->all())->toBe(['created', 'updated', 'updated', 'updated']);
     foreach ($logs as $log) {
@@ -224,6 +224,6 @@ it('protects user foreign keys and does not allow profile reassignment', functio
 
 it('validates the complete academic date interval on partial updates', function () {
     $year = AcademicYear::factory()->create(['starts_at' => '2026-10-01', 'ends_at' => '2027-06-30']);
-    $this->actingAs($this->admin)->put('/references/academic-years/'.$year->id, ['name' => $year->name, 'ends_at' => '2026-09-01'])->assertSessionHasErrors('ends_at');
+    $this->actingAs($this->admin)->put('/references/academic-years/'.$year->uuid, ['name' => $year->name, 'ends_at' => '2026-09-01'])->assertSessionHasErrors('ends_at');
     expect($year->fresh()->ends_at->format('Y-m-d'))->toBe('2027-06-30');
 });
