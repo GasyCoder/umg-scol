@@ -8,6 +8,7 @@ use App\Actions\StudentPortal\VerifyEmailOtp;
 use App\Enums\StudentLinkStatus;
 use App\Mail\StudentOtpMail;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\EmailOtpChallenge;
 use App\Models\Establishment;
 use App\Models\SocialAccount;
@@ -30,7 +31,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\User as GoogleUser;
-use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -308,7 +308,7 @@ it('scopes establishment review to the active declaration in the current year', 
     $staff->forceFill(['establishment_id' => $this->b->id])->save();
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'establishment_id' => $this->b->id, 'status' => 'inactive']);
     $this->actingAs($staff, 'web')->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 0));
-    $this->post('/student-links/'.$request->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->post('/student-links/'.$request->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
     $staff->forceFill(['establishment_id' => $this->a->id])->save();
     $this->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 1));
 });
@@ -316,7 +316,7 @@ it('allows central global review but never a student', function () {
     $request = pendingPortalLink($this);
     $central = User::factory()->create()->assignRole('central_scholarship_office');
     $this->actingAs($central, 'web')->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 1));
-    $this->actingAs($this->studentUser, 'web')->post('/student-links/'.$request->id.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->actingAs($this->studentUser, 'web')->post('/student-links/'.$request->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
 });
 it('approves atomically and makes a repeated approval a no-op', function () {
     $request = pendingPortalLink($this);
@@ -327,8 +327,8 @@ it('approves atomically and makes a repeated approval a no-op', function () {
 });
 it('requires a rejection reason and leaves the account unlinked', function () {
     $request = pendingPortalLink($this);
-    $this->actingAs($this->admin, 'web')->post('/student-links/'.$request->id.'/review', ['decision' => 'reject'])->assertSessionHasErrors('rejection_reason');
-    $this->post('/student-links/'.$request->id.'/review', ['decision' => 'reject', 'rejection_reason' => 'Justificatifs insuffisants.'])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin, 'web')->post('/student-links/'.$request->uuid.'/review', ['decision' => 'reject'])->assertSessionHasErrors('rejection_reason');
+    $this->post('/student-links/'.$request->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'Justificatifs insuffisants.'])->assertSessionHasNoErrors();
     expect($request->fresh()->status)->toBe(StudentLinkStatus::Rejected)->and($this->studentUser->fresh()->student_id)->toBeNull();
 });
 it('refuses approval if the account role identity activity or association changed', function (string $case) {
