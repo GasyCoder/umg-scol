@@ -29,7 +29,11 @@ type Result = {
         program: string | null;
         status: string;
     }[];
-    application: { id: number; application_number: string } | null;
+    application: {
+        id: number;
+        uuid: string;
+        application_number: string;
+    } | null;
 };
 
 export default function Reception({
@@ -79,7 +83,7 @@ export default function Reception({
     const activeRecord = (result: Result) =>
         result.records.find((record) => record.status === 'active');
     return (
-        <div className="max-w-5xl space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <Head title="Réception des dossiers" />
             <Heading
                 title="Réception des dossiers papier"
@@ -184,7 +188,7 @@ export default function Reception({
                                 {result.application ? (
                                     <Button variant="outline" size="sm" asChild>
                                         <Link
-                                            href={`/scholarships/applications/${result.application.id}`}
+                                            href={`/scholarships/applications/${result.application.uuid}`}
                                         >
                                             Dossier existant n°{' '}
                                             {
