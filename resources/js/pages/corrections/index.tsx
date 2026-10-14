@@ -14,6 +14,7 @@ import { CorrectionStatusBadge } from '@/components/corrections/status-badge';
 
 type Row = {
     id: number;
+    uuid: string;
     field_label: string;
     status: string;
     status_label: string;
@@ -176,7 +177,7 @@ export default function CorrectionsIndex({
                                     label={item.status_label}
                                 />
                                 <Button variant="outline" asChild>
-                                    <Link href={`/corrections/${item.id}`}>
+                                    <Link href={`/corrections/${item.uuid}`}>
                                         Examiner
                                     </Link>
                                 </Button>
