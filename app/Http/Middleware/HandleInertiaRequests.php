@@ -2,15 +2,16 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Activity;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
+use App\Support\Audit\AuditPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
-use Spatie\Activitylog\Models\Activity;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -62,6 +63,7 @@ class HandleInertiaRequests extends Middleware
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
                 'canViewReports' => $request->user() !== null && Gate::allows('reports.view'),
                 'canViewAudits' => $request->user() !== null && Gate::allows('viewAny', Activity::class),
+                'roleLabel' => $request->user() === null ? null : AuditPresenter::role($request->user()),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
