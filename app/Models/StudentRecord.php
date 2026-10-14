@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\StudentRecordStatus;
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\StudentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -20,7 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
 class StudentRecord extends Model
 {
     /** @use HasFactory<StudentRecordFactory> */
-    use HasFactory, LogsActivity;
+    use HasFactory, HasPublicUuid, LogsActivity;
 
     protected $attributes = ['status' => 'active'];
 
