@@ -14,6 +14,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 // Commits real rows to exercise row locks across two connections: run only on a disposable, migrated database
 // whose name contains "check", e.g. DB_DATABASE=umg_scol_check php tests/MySql/StudentCorrectionChecks.php
@@ -55,7 +56,7 @@ $staff = User::factory()->create()->assignRole('establishment');
 $staff->forceFill(['establishment_id' => $establishment->id])->save();
 
 $correction = app(RequestStudentCorrection::class)->handle($user, StudentCorrectionField::Phone, '0381234567', null);
-$row = fn (array $overrides = []) => ['student_id' => $student->id, 'user_id' => $user->id, 'field' => 'phone', 'proposed_value' => 'x', 'current_fingerprint' => str_repeat('0', 64), 'status' => 'pending', 'created_at' => now(), 'updated_at' => now(), ...$overrides];
+$row = fn (array $overrides = []) => ['uuid' => (string) Str::uuid7(), 'student_id' => $student->id, 'user_id' => $user->id, 'field' => 'phone', 'proposed_value' => 'x', 'current_fingerprint' => str_repeat('0', 64), 'status' => 'pending', 'created_at' => now(), 'updated_at' => now(), ...$overrides];
 correctionRejected(fn () => DB::table('student_correction_requests')->insert($row()), '23000', 'unique pending request per student and field');
 DB::table('student_correction_requests')->insert($row(['status' => 'cancelled']));
 DB::table('student_correction_requests')->insert($row(['status' => 'rejected']));
