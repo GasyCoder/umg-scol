@@ -50,6 +50,11 @@ export function AppSidebar() {
             href: baseUrl(kind),
             icon: BookOpen,
         }));
+    const studentItems: NavItem[] = auth.permissions.includes(
+        'students.viewAny',
+    )
+        ? [{ title: 'Étudiants', href: '/students', icon: BookOpen }]
+        : [];
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -65,7 +70,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={[...mainNavItems, ...studentItems]} />
                 {references.length > 0 && (
                     <NavMain items={references} label="Référentiels" />
                 )}

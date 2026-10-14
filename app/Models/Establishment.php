@@ -38,4 +38,10 @@ class Establishment extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    /** @return HasMany<StudentRecord, $this> */
+    public function studentRecords(): HasMany
+    {
+        return $this->hasMany(StudentRecord::class);
+    }
 }

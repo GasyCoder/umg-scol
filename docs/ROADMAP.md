@@ -18,13 +18,13 @@
 - [x] rattachement utilisateur/établissement et validation du contexte
 - [ ] CRUD utilisateurs complet
 
-## Phase 2 — Étudiants
+## Phase 2 — Étudiants et déclarations manuelles implémentés
 
-- [ ] Student
-- [ ] StudentRecord
-- [ ] CRUD établissement
-- [ ] recherche/filtres
-- [ ] isolation
+- [x] Student
+- [x] StudentRecord
+- [x] CRUD établissement
+- [x] recherche/filtres
+- [x] isolation
 
 ## Phase 3 — Imports
 

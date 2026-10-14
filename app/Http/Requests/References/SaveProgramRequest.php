@@ -4,6 +4,7 @@ namespace App\Http\Requests\References;
 
 use App\Models\Program;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveProgramRequest extends ReferenceRequest
 {
@@ -29,5 +30,16 @@ class SaveProgramRequest extends ReferenceRequest
         $id = $record instanceof Program ? $record->id : null;
 
         return ['establishment_id' => ['required', 'integer', Rule::exists('establishments', 'id')], 'code' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/', Rule::unique('programs')->where('establishment_id', $this->input('establishment_id'))->ignore($id)], 'name' => ['required', 'string', 'max:255'], 'is_active' => ['sometimes', 'boolean']];
+    }
+
+    /** @return array<\Closure(Validator): void> */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $program = $this->route('program');
+            if ($program instanceof Program && $program->establishment_id !== $this->integer('establishment_id') && $program->studentRecords()->exists()) {
+                $validator->errors()->add('establishment_id', 'Un parcours utilisé par des déclarations annuelles ne peut pas changer d’établissement.');
+            }
+        }];
     }
 }

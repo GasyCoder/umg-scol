@@ -7,6 +7,7 @@ use Database\Factories\LevelFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['code', 'name', 'sort_order', 'is_active'])]
 class Level extends Model
@@ -24,5 +25,11 @@ class Level extends Model
     protected function referenceAuditAttributes(): array
     {
         return ['code', 'name', 'sort_order', 'is_active'];
+    }
+
+    /** @return HasMany<StudentRecord, $this> */
+    public function studentRecords(): HasMany
+    {
+        return $this->hasMany(StudentRecord::class);
     }
 }

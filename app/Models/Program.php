@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['establishment_id', 'code', 'name', 'is_active'])]
 class Program extends Model
@@ -31,5 +32,11 @@ class Program extends Model
     public function establishment(): BelongsTo
     {
         return $this->belongsTo(Establishment::class);
+    }
+
+    /** @return HasMany<StudentRecord, $this> */
+    public function studentRecords(): HasMany
+    {
+        return $this->hasMany(StudentRecord::class);
     }
 }

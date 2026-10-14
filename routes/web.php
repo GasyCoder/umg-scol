@@ -11,3 +11,5 @@ Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->grou
 
 require __DIR__.'/settings.php';
 require __DIR__.'/references.php';
+
+require __DIR__.'/students.php';

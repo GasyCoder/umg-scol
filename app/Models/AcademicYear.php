@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property CarbonInterface|null $starts_at
@@ -31,5 +32,11 @@ class AcademicYear extends Model
     protected function referenceAuditAttributes(): array
     {
         return ['name', 'starts_at', 'ends_at', 'is_current', 'is_active'];
+    }
+
+    /** @return HasMany<StudentRecord, $this> */
+    public function studentRecords(): HasMany
+    {
+        return $this->hasMany(StudentRecord::class);
     }
 }

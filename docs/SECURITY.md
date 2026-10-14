@@ -37,3 +37,13 @@ Tracer connexions, modifications, exports, changements de configuration/permissi
 L'inscription Fortify du starter kit est désactivée globalement tant que les domaines ne sont pas routés : GET et POST `/register` ne sont plus exposés, y compris sur `scol`. Les liens de création de compte ont été retirés de l'accueil et de la connexion. Les tests historiques d'inscription restent présents mais sont ignorés lorsque la fonctionnalité Fortify est désactivée ; des tests dédiés vérifient désormais le refus effectif de création.
 
 La future inscription étudiante sur `bourse` et `/api/student/*` sera indépendante de cette inscription administrative. OTP, Google OAuth et rattachement à une fiche `Student` ne sont pas implémentés ici. Il ne faudra pas réactiver globalement l'inscription Fortify pour ouvrir ce portail.
+
+## Données étudiantes et audit minimal
+
+Les routes internes Student/StudentRecord refusent les comptes student avant leur futur rattachement sécurisé. Les Policies et les Actions recontrôlent permission et établissement ; modifier une URL ou envoyer un établissement/parcours étranger ne donne aucun droit supplémentaire. La Scolarité Centrale consulte sans éditer. La navigation dépend de l'autorisation serveur partagée, et non d'un rôle supposé côté React.
+
+L'audit `students` conserve événement, identifiant du sujet, acteur, liste des noms de champs modifiés et changements du seul indicateur `is_active`. Il n'enregistre ni nom/prénoms, matricule, CIN, téléphone, email, adresse, date/lieu de naissance ni valeurs BAC, même en old/new. Le hook `beforeActivityLogged` du package Activitylog 5 ajoute les noms de champs sans leurs valeurs. L'audit `student_records` conserve uniquement les identifiants administratifs, statut et attribution/date de déclaration. Toutes les écritures du workflow sont synchrones et leur audit est annulé avec le rollback transactionnel. Le developer reste identifiable comme acteur.
+
+Les contacts et identifiants personnels ne sont pas renvoyés dans la liste principale mais restent accessibles dans les fiches autorisées. Les recherches personnelles figurent dans les URL de filtres : elles peuvent être présentes dans l'historique navigateur ou les access logs de l'infrastructure. La production doit limiter l'accès à ces logs et éviter de capturer les paramètres sensibles dans la télémétrie. Aucun journal manuel ne reçoit le payload d'une requête.
+
+Les données officielles sont stockées en base avec contrôle d'accès ; cette phase ne met pas en place un chiffrement applicatif de tous les champs recherchables. Le durcissement d'infrastructure (TLS, sauvegardes protégées, compte DB au moindre privilège, accès restreint et rétention) reste applicable.
