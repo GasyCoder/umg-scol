@@ -25,7 +25,7 @@ class CampaignController extends Controller
 
         return Inertia::render('scholarships/campaigns', [
             'campaigns' => ScholarshipCampaign::query()->with('academicYear:id,name')->withCount('applications')->orderByDesc('id')->paginate(20)->through(fn (ScholarshipCampaign $campaign) => [
-                'id' => $campaign->id, 'name' => $campaign->name, 'academic_year_id' => $campaign->academic_year_id, 'academic_year' => $campaign->academicYear->name,
+                'id' => $campaign->id, 'uuid' => $campaign->uuid, 'name' => $campaign->name, 'academic_year_id' => $campaign->academic_year_id, 'academic_year' => $campaign->academicYear->name,
                 'starts_at' => $campaign->starts_at?->format('Y-m-d'), 'ends_at' => $campaign->ends_at?->format('Y-m-d'), 'notes' => $campaign->notes,
                 'status' => $campaign->status->value, 'status_label' => $campaign->status->label(), 'applications_count' => $campaign->applications_count,
                 'targets' => $canManage ? array_map(fn ($s) => ['value' => $s->value, 'label' => $s->label()], $campaign->status->targets()) : [],
