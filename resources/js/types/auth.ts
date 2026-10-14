@@ -17,6 +17,8 @@ export type Auth = {
     canViewImports: boolean;
     canViewCorrections: boolean;
     canViewReports: boolean;
+    /** Label of the account's role, shown in the top bar. */
+    roleLabel?: string | null;
     canViewAudits: boolean;
     scholarships: {
         campaigns: boolean;
