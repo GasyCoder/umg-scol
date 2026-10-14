@@ -18,6 +18,7 @@ import {
 
 type Row = {
     id: number;
+    uuid: string;
     at: string | null;
     actor: string;
     role: string | null;
@@ -226,7 +227,7 @@ export default function AuditIndex({
                                             size="sm"
                                             asChild
                                         >
-                                            <Link href={`/audits/${row.id}`}>
+                                            <Link href={`/audits/${row.uuid}`}>
                                                 Détail
                                             </Link>
                                         </Button>
