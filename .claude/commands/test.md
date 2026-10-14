@@ -1,0 +1,1 @@
+Exécute les tests pertinents : Feature/Pest ciblés, permissions, règles métier, imports, TypeScript si concerné. En cas d'échec, explique la cause sans contourner une règle métier. Termine par PASS/FAIL.

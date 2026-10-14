@@ -1,0 +1,1 @@
+Analyse la tâche demandée avec `CLAUDE.md`, `AGENTS.md` et `docs/`. Ne code pas encore. Retourne : compréhension, règles métier, fichiers impactés, DB, permissions, tests, plan ordonné, risques. Ne propose jamais un module d'inscription universitaire.

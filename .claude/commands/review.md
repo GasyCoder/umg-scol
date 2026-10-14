@@ -1,0 +1,1 @@
+Fais une revue du changement courant : conformité CDC, absence d'inscription universitaire, isolation établissement, permissions backend, validation, sécurité, audit, intégrité DB, indexes/N+1, TypeScript, UX erreurs, tests. Classe : Bloquant / Important / Mineur. Ne modifie rien sauf demande.

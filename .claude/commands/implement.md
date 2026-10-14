@@ -1,0 +1,1 @@
+Implémente la tâche en respectant `CLAUDE.md`, `AGENTS.md` et le CDC. Autorisation serveur, validation, tests Pest, pas d'élargissement du périmètre. Après implémentation : exécute tests, vérifie TypeScript/lint si applicable, résume fichiers et commandes, signale le reste.

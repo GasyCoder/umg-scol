@@ -29,7 +29,9 @@ yarn-error.log
 /.zed
 /.agents
 /.amp
-/.claude
+# Versionner les commandes partagées, garder les réglages locaux privés.
+/.claude/*
+!/.claude/commands/
 /.cursor
 /.factory
 /.grok
@@ -37,8 +39,14 @@ yarn-error.log
 /.kiro
 /.pi
 /.mcp.json
-/AGENTS.md
-/CLAUDE.md
+# Exceptions aux éventuelles règles globales d'exclusion.
+!/AGENTS.md
+!/CLAUDE.md
+!/docs/
+!/docs/**
+!/.claude/
+!/.claude/commands/**
+/.claude/settings.local.json
 /boost.json
 /opencode.json
 /opencode.jsonc
