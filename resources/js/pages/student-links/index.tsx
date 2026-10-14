@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 type Review = {
     id: number;
+    uuid: string;
     requested_at: string;
     user: { name: string; email: string };
     student: {
@@ -165,7 +166,7 @@ export default function LinkReview({
                             disabled={form.processing}
                             onClick={() =>
                                 form.post(
-                                    `/student-links/${selected?.id}/review`,
+                                    `/student-links/${selected?.uuid}/review`,
                                     { onSuccess: () => setSelected(null) },
                                 )
                             }
