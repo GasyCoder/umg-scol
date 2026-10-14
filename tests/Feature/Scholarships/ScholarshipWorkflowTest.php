@@ -459,6 +459,16 @@ it('loads the file list with a constant number of queries', function () {
     }
     expect($queries())->toBe($few);
 });
+it('gives each throttled action its own counter, so processing files never blocks the export', function () {
+    $application = receiveFile($this);
+    $this->actingAs($this->central);
+    foreach (range(1, 6) as $i) {
+        foreach (['identity', 'enrollment'] as $key) {
+            $this->post('/scholarships/applications/'.$application->id.'/checks', ['key' => $key, 'status' => $i % 2 ? 'ok' : 'issue'])->assertRedirect();
+        }
+    }
+    $this->get('/scholarships/applications/export')->assertOk();
+});
 it('exports filtered files as CSV without sensitive data and requires the export permission', function () {
     receiveFile($this, ddb: '=HYPERLINK("x")');
     $rejected = receiveFile($this, declaredStudent($this, ['last_name' => 'REJETE']));

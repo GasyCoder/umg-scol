@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\User;
+use App\Support\PortalRouteDomain;
 use App\Support\StudentPortalAccess;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -27,7 +28,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Fortify routes live on the internal portal domain; see PortalRouteDomain for generated URLs.
+        config(['fortify.domain' => PortalRouteDomain::for((string) config('fortify.domain'))]);
     }
 
     /**

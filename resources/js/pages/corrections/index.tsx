@@ -112,7 +112,10 @@ export default function CorrectionsIndex({
                                 )
                             }
                         >
-                            <SelectTrigger aria-label={select.label}>
+                            <SelectTrigger
+                                className="w-full"
+                                aria-label={select.label}
+                            >
                                 <SelectValue placeholder={select.label} />
                             </SelectTrigger>
                             <SelectContent>

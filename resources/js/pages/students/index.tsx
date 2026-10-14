@@ -107,7 +107,10 @@ export default function StudentsIndex({
                                 options.fixedEstablishmentId !== null
                             }
                         >
-                            <SelectTrigger aria-label={field.label}>
+                            <SelectTrigger
+                                className="w-full"
+                                aria-label={field.label}
+                            >
                                 <SelectValue placeholder={field.label} />
                             </SelectTrigger>
                             <SelectContent>
@@ -131,13 +134,14 @@ export default function StudentsIndex({
                             form.setData('status', value === 'all' ? '' : value)
                         }
                     >
-                        <SelectTrigger aria-label="Statut déclaration">
+                        <SelectTrigger
+                            className="w-full"
+                            aria-label="Statut déclaration"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">
-                                Tous les statuts de déclaration
-                            </SelectItem>
+                            <SelectItem value="all">Statut : tous</SelectItem>
                             <SelectItem value="active">Active</SelectItem>
                             <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>

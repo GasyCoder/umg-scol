@@ -3,10 +3,12 @@
 use App\Http\Controllers\StudentPortal\LinkReviewController;
 use App\Http\Middleware\EnsureEstablishmentContext;
 use App\Http\Middleware\EnsureInternalPortal;
+use App\Support\PortalRouteDomain;
 use Illuminate\Support\Facades\Route;
 
-Route::domain(config('portals.scol_domain'))->middleware(EnsureInternalPortal::class)->group(function () {
-    Route::inertia('/', 'welcome')->name('home');
+Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware(EnsureInternalPortal::class)->group(function () {
+    // No public landing page on the internal portal: guests land on the login page.
+    Route::get('/', fn () => to_route('dashboard'))->name('home');
 
     Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->group(function () {
         Route::inertia('dashboard', 'dashboard')->name('dashboard');

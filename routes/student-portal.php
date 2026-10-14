@@ -7,6 +7,7 @@ use App\Http\Controllers\StudentPortal\ProfileController;
 use App\Http\Middleware\EnsureStudentPortal;
 use Illuminate\Support\Facades\Route;
 
+// Always bound, even while Wayfinder generates URLs: the bourse SPA does not use them, and an unbound '/' would replace the internal 'home' route.
 Route::domain(config('portals.bourse_domain'))->group(function () {
     Route::view('/', 'bourse')->name('student-portal');
     Route::prefix('api/student')->name('student-api.')->group(function () {

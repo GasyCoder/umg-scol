@@ -21,8 +21,10 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
@@ -72,12 +74,25 @@ function pendingPortalLink(TestCase $test): StudentLinkRequest
 }
 
 it('serves each portal only on its own configured domain', function () {
-    $this->get('http://'.config('portals.scol_domain').'/')->assertOk();
+    $this->get('http://'.config('portals.scol_domain').'/')->assertRedirect('/dashboard');
+    $this->get('http://'.config('portals.scol_domain').'/dashboard')->assertRedirect('/login');
     $this->get($this->base.'/')->assertOk()->assertSee('bourse-root');
     $this->get($this->base.'/dashboard')->assertNotFound();
     $this->get($this->base.'/login')->assertNotFound();
     $this->get('/api/student/session')->assertNotFound();
     $this->get('http://unknown.test/')->assertNotFound();
+});
+it('generates front-end route URLs relative to the current portal, without the portal domain or port', function () {
+    $path = sys_get_temp_dir().'/wayfinder-'.bin2hex(random_bytes(4));
+    $result = Process::path(base_path())->run([PHP_BINARY, 'artisan', 'wayfinder:generate', '--with-form', '--path='.$path]);
+    expect($result->successful())->toBeTrue();
+    $generated = collect(File::allFiles($path))->map(fn ($file) => $file->getContents())->implode("\n");
+    File::deleteDirectory($path);
+    expect($generated)->toContain("url: '/login'")->toContain("url: '/students'")->toContain('export const home =')->toContain('export const dashboard =')
+        ->not->toContain('//'.config('portals.scol_domain'));
+    // Runtime host routing is unchanged.
+    $this->get('http://'.config('portals.scol_domain').'/login')->assertOk();
+    $this->get($this->base.'/login')->assertNotFound();
 });
 it('rejects students on all internal auth and settings routes', function (string $url) {
     $this->actingAs($this->studentUser, 'web')->get($url)->assertForbidden();
