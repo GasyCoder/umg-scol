@@ -3,6 +3,7 @@
 namespace App\Support\Reporting;
 
 use App\Enums\StudentImportStatus;
+use App\Models\Activity;
 use App\Models\ScholarshipApplication;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
@@ -13,7 +14,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
-use Spatie\Activitylog\Models\Activity;
 
 /**
  * Role-aware dashboard. Each block is computed only when the existing Policy allows the underlying
