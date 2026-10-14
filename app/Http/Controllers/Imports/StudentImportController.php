@@ -27,7 +27,7 @@ class StudentImportController extends Controller
     {
         Gate::authorize('viewAny', StudentImport::class);
 
-        return Inertia::render('imports/index', ['imports' => StudentImport::query()->visibleTo($request->user())->select(['id', 'original_filename', 'status', 'total_rows', 'valid_rows', 'warning_rows', 'rejected_rows', 'duplicate_rows', 'created_rows', 'updated_rows', 'declared_rows', 'skipped_rows', 'establishment_id', 'academic_year_id', 'user_id', 'created_at'])->with(['establishment:id,code,name', 'academicYear:id,name', 'user:id,name'])->latest('id')->paginate(20), 'canCreate' => Gate::allows('create', StudentImport::class)]);
+        return Inertia::render('imports/index', ['imports' => StudentImport::query()->visibleTo($request->user())->select(['id', 'uuid', 'original_filename', 'status', 'total_rows', 'valid_rows', 'warning_rows', 'rejected_rows', 'duplicate_rows', 'created_rows', 'updated_rows', 'declared_rows', 'skipped_rows', 'establishment_id', 'academic_year_id', 'user_id', 'created_at'])->with(['establishment:id,code,name', 'academicYear:id,name', 'user:id,name'])->latest('id')->paginate(20), 'canCreate' => Gate::allows('create', StudentImport::class)]);
     }
 
     public function create(Request $request): Response
