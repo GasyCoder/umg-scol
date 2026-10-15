@@ -32,13 +32,13 @@ export function TrashButton({
             <Button
                 size="sm"
                 variant="outline"
-                className="text-destructive hover:text-destructive"
+                className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger-foreground"
                 onClick={() => {
                     setError('');
                     setOpen(true);
                 }}
             >
-                <Trash2 className="size-4" />
+                <Trash2 className="size-4" aria-hidden="true" />
                 Supprimer
             </Button>
             <Dialog
@@ -49,6 +49,12 @@ export function TrashButton({
             >
                 <DialogContent>
                     <DialogHeader>
+                        <span
+                            className="mx-auto mb-1 flex size-10 items-center justify-center rounded-full bg-danger-soft text-danger sm:mx-0"
+                            aria-hidden="true"
+                        >
+                            <Trash2 className="size-5" />
+                        </span>
                         <DialogTitle>Déplacer dans la corbeille</DialogTitle>
                         <DialogDescription>
                             « {label} » disparaîtra des listes courantes et
