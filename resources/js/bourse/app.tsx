@@ -26,7 +26,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import AppLogoIcon from '@/components/app-logo-icon';
+import { BrandMark } from '@/components/brand-mark';
 import { EmptyState } from '@/components/empty-state';
 import {
     ScholarshipIllustration,
@@ -52,6 +52,33 @@ import { api } from './api';
 import { ConfirmationBadge, ConfirmationSection } from './confirmation';
 import type { ConfirmationState } from './confirmation';
 import type { Session } from './api';
+
+/** Platform identity injected by bourse.blade.php (settings → Plateforme on the internal portal). */
+type PortalBranding = {
+    institution_name: string;
+    bourse_name: string;
+    support_email: string | null;
+    logo_url: string | null;
+};
+const branding: PortalBranding = (() => {
+    const fallback = {
+        institution_name: 'Université de Mahajanga',
+        bourse_name: 'UMG Bourse',
+        support_email: null,
+        logo_url: null,
+    };
+    try {
+        const raw =
+            typeof document === 'undefined'
+                ? null
+                : document.getElementById('bourse-root')?.dataset.branding;
+        return raw
+            ? { ...fallback, ...(JSON.parse(raw) as Partial<PortalBranding>) }
+            : fallback;
+    } catch {
+        return fallback;
+    }
+})();
 type Correction = {
     uuid: string;
     field: string;
@@ -465,18 +492,21 @@ function Portal() {
                         href="/"
                         className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sidebar shadow-sm ring-1 ring-sidebar-border">
-                            <AppLogoIcon
-                                className="size-7 fill-current text-brand-gold"
-                                aria-hidden="true"
-                            />
-                        </span>
+                        <BrandMark
+                            logoUrl={branding.logo_url}
+                            className={cn(
+                                'size-10 shadow-sm',
+                                branding.logo_url
+                                    ? 'border'
+                                    : 'bg-sidebar ring-sidebar-border',
+                            )}
+                        />
                         <span className="min-w-0 leading-tight">
                             <span className="block font-heading text-base font-extrabold tracking-tight text-foreground">
-                                UMG Bourse
+                                {branding.bourse_name}
                             </span>
                             <span className="block truncate text-xs text-muted-foreground">
-                                Portail étudiant · Université de Mahajanga
+                                Portail étudiant · {branding.institution_name}
                             </span>
                         </span>
                     </a>
@@ -1360,10 +1390,24 @@ function Portal() {
             <footer className="border-t">
                 <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <p>
-                        © {new Date().getFullYear()} Université de Mahajanga ·
-                        Portail étudiant
+                        © {new Date().getFullYear()} {branding.institution_name}{' '}
+                        · {branding.bourse_name}
                     </p>
-                    <p>Bourses nationales · Vérification des informations</p>
+                    <p>
+                        {branding.support_email ? (
+                            <>
+                                Une question ?{' '}
+                                <a
+                                    href={`mailto:${branding.support_email}`}
+                                    className="font-medium text-primary underline-offset-4 hover:underline"
+                                >
+                                    {branding.support_email}
+                                </a>
+                            </>
+                        ) : (
+                            'Bourses nationales · Vérification des informations'
+                        )}
+                    </p>
                 </div>
             </footer>
         </div>
