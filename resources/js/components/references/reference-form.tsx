@@ -3,6 +3,7 @@ import {
     ArrowLeft,
     CalendarRange,
     Contact,
+    GraduationCap,
     Network,
     Power,
     Star,
@@ -30,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 import { article, baseUrl, definitions } from './definitions';
 import type {
+    DomainOption,
     EstablishmentOption,
     Field,
     MentionOption,
@@ -42,6 +44,7 @@ export type ReferenceFormProps = {
     record: ReferenceRecord | null;
     establishments?: EstablishmentOption[];
     mentions?: MentionOption[];
+    domains?: DomainOption[];
 };
 
 const CODE_HINT =
@@ -59,15 +62,28 @@ const help: Record<string, { placeholder?: string; hint?: string }> = {
         placeholder: '1',
         hint: 'Position dans les listes (du plus petit au plus grand).',
     },
+    scholarship_max_bac_year: {
+        placeholder: 'Ex. : 2024',
+        hint: 'Règle bourse du modèle établissement : BAC obtenu au plus tard cette année. Vide = éligibilité indéterminée.',
+    },
+    sector: { hint: 'Facultatif : publique ou privée.' },
+    training_type: { hint: 'Facultatif : académique ou professionnalisant.' },
 };
 
-type SectionKey = 'attachment' | 'identity' | 'period' | 'contact';
+type SectionKey =
+    | 'attachment'
+    | 'identity'
+    | 'period'
+    | 'scholarship'
+    | 'contact';
 /** Which form section each field belongs to; unknown fields fall back to "identity". */
 const sectionOf: Record<string, SectionKey> = {
     establishment_id: 'attachment',
     mention_id: 'attachment',
+    domain_id: 'attachment',
     starts_at: 'period',
     ends_at: 'period',
+    scholarship_max_bac_year: 'scholarship',
     address: 'contact',
     phone: 'contact',
     email: 'contact',
@@ -76,6 +92,7 @@ const sectionOrder: SectionKey[] = [
     'attachment',
     'identity',
     'period',
+    'scholarship',
     'contact',
 ];
 /** Wide fields span the whole section row. */
@@ -86,6 +103,7 @@ export default function ReferenceForm({
     record,
     establishments = [],
     mentions = [],
+    domains = [],
 }: ReferenceFormProps & { kind: ReferenceKind }) {
     const definition = definitions[kind];
     const articleText = article(kind);
@@ -128,7 +146,7 @@ export default function ReferenceForm({
             description:
                 kind === 'programs'
                     ? 'Établissement du parcours et, si possible, sa mention.'
-                    : 'Établissement auquel appartient cette mention.',
+                    : 'Établissement auquel appartient cette mention et son domaine LMD.',
         },
         identity: {
             icon: referenceIcons[kind],
@@ -139,6 +157,12 @@ export default function ReferenceForm({
             icon: CalendarRange,
             title: 'Période',
             description: 'Dates indicatives de l’année universitaire.',
+        },
+        scholarship: {
+            icon: GraduationCap,
+            title: 'Bourse',
+            description:
+                'Règle d’éligibilité appliquée aux dossiers de cette année.',
         },
         contact: {
             icon: Contact,
@@ -158,6 +182,60 @@ export default function ReferenceForm({
 
     const control = (field: Field) => {
         const fieldHelp = help[field.key] ?? {};
+        if (field.type === 'select')
+            return (
+                <Select
+                    value={String(form.data[field.key]) || 'none'}
+                    onValueChange={(value) =>
+                        form.setData(field.key, value === 'none' ? '' : value)
+                    }
+                >
+                    <SelectTrigger
+                        id={field.key}
+                        className="w-full"
+                        aria-invalid={errors[field.key] ? true : undefined}
+                    >
+                        <SelectValue placeholder="Non précisé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="none">Non précisé</SelectItem>
+                        {(field.options ?? []).map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            );
+        if (field.type === 'domain')
+            return (
+                <Select
+                    value={String(form.data[field.key]) || 'none'}
+                    onValueChange={(value) =>
+                        form.setData(field.key, value === 'none' ? '' : value)
+                    }
+                >
+                    <SelectTrigger
+                        id={field.key}
+                        className="w-full"
+                        aria-invalid={errors[field.key] ? true : undefined}
+                    >
+                        <SelectValue placeholder="Sans domaine" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="none">Sans domaine</SelectItem>
+                        {domains.map((option) => (
+                            <SelectItem
+                                key={option.id}
+                                value={String(option.id)}
+                            >
+                                {option.code} — {option.name}
+                                {!option.is_active ? ' (inactif)' : ''}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            );
         if (field.type === 'mention')
             return (
                 <Select
@@ -235,7 +313,8 @@ export default function ReferenceForm({
                 }
                 required={field.required}
                 maxLength={field.maxLength}
-                min={field.type === 'number' ? 0 : undefined}
+                min={field.type === 'number' ? (field.min ?? 0) : undefined}
+                max={field.max}
                 placeholder={fieldHelp.placeholder}
                 autoComplete="off"
                 aria-invalid={errors[field.key] ? true : undefined}
@@ -250,7 +329,11 @@ export default function ReferenceForm({
                 : availableMentions.length === 0
                   ? 'Aucune mention pour cet établissement : créez-la d’abord dans Mentions.'
                   : 'Facultatif : le parcours peut rester sans mention.'
-            : help[field.key]?.hint;
+            : field.type === 'domain'
+              ? domains.length === 0
+                  ? 'Aucun domaine : créez-le d’abord dans Domaines.'
+                  : 'Facultatif : domaine LMD (ALSH, STS…) de la mention.'
+              : help[field.key]?.hint;
 
     return (
         <PageBody className="pb-0 md:pb-0 lg:pb-0">
