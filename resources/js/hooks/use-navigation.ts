@@ -1,5 +1,6 @@
 import { usePage } from '@inertiajs/react';
 import {
+    Bell,
     BookMarked,
     Building2,
     CalendarDays,
@@ -74,6 +75,7 @@ export function useNavigation(): NavGroup[] {
                     href: dashboard(),
                     icon: LayoutGrid,
                 },
+                item('Notifications', '/notifications', Bell),
             ],
         },
         {
