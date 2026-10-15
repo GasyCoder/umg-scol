@@ -17,11 +17,11 @@ export default defineConfig({
             ],
             refresh: true,
             fonts: [
-                bunny('Roboto', {
-                    weights: [400, 500, 700],
+                bunny('Public Sans', {
+                    weights: [400, 500, 600, 700],
                 }),
-                bunny('Nunito', {
-                    weights: [600, 700, 800],
+                bunny('Plus Jakarta Sans', {
+                    weights: [500, 600, 700, 800],
                 }),
             ],
         }),
@@ -53,6 +53,7 @@ export default defineConfig({
     lint: {
         ignorePatterns: [
             'template-model/**',
+            'docs/template-model/**',
             'vendor/**',
             'node_modules/**',
             'public/**',
@@ -77,6 +78,7 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             'template-model/**',
+            'docs/template-model/**',
             '.github/**',
             'composer.json',
             'resources/js/components/ui/*',
