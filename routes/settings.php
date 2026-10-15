@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Platform\PlatformSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Middleware\EnsureEstablishmentContext;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +27,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+
+    Route::get('settings/platform', [PlatformSettingsController::class, 'edit'])->middleware(EnsureEstablishmentContext::class)->name('platform.edit');
+    Route::put('settings/platform', [PlatformSettingsController::class, 'update'])->middleware([EnsureEstablishmentContext::class, 'throttle:20,1,platform-settings'])->name('platform.update');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {
