@@ -20,7 +20,7 @@ class LinkStudentRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['identifier_type' => ['required', 'in:student_number,bac_registration_number'], 'identifier' => ['required', 'string', 'max:100'], 'birth_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today']];
+        return ['cin' => ['required', 'string', 'max:100'], 'birth_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today']];
     }
 
     public function messages(): array
