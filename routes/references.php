@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->pref
             Route::patch($uri.'/{'.$parameter.'}/status', [$controller, 'status'])->name($uri.'.status');
         });
     }
+    Route::get('establishments/{establishment}/logo', [EstablishmentController::class, 'logo'])->middleware('can:viewAny,'.Establishment::class)->name('establishments.logo');
     Route::patch('academic-years/{academic_year}/current', [AcademicYearController::class, 'current'])->name('academic-years.current');
 
     // Mention/program spreadsheets: model, export and previewed import (authorization in the controller, per kind).
