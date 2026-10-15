@@ -5,6 +5,8 @@ namespace App\Actions\StudentPortal;
 use App\Models\Student;
 use App\Models\StudentInformationConfirmation;
 use App\Models\User;
+use App\Notifications\StudentActivity;
+use App\Support\StaffNotifications;
 use App\Support\StudentConfirmationContext;
 use App\Support\StudentInformationFingerprint;
 use App\Support\StudentPortalAccess;
@@ -49,6 +51,7 @@ class ConfirmStudentInformation
                 activity('student_confirmations')->causedBy($user)->performedOn($confirmation)->event('student_information_confirmed')
                     ->withProperties(['user_id' => $user->id, 'student_id' => $student->id, 'student_record_id' => $record->id, 'academic_year_id' => $record->academic_year_id, 'confirmation_id' => $confirmation->id])
                     ->log('student_information_confirmed');
+                StaffNotifications::student($student, StudentActivity::INFORMATION_CONFIRMED, trim($student->last_name.' '.$student->first_names).' a confirmé ses informations ('.$record->academicYear->name.').', $student->uuid, 'students.view');
 
                 return StudentConfirmationContext::load($student->setRelation('studentRecords', collect([$record])));
             }, 5);
