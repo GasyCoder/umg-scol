@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="light dark">
-    <title>Portail étudiant — Université de Mahajanga</title>
+    <title>{{ $branding['bourse_name'] }} — {{ $branding['institution_name'] }}</title>
 
     {{-- Same theme detection as the internal portal: applied before paint to avoid a flash. --}}
     <script>
@@ -33,14 +33,19 @@
         }
     </style>
 
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    @if ($branding['favicon_url'])
+        <link rel="icon" href="{{ $branding['favicon_url'] }}" type="image/png">
+        <link rel="apple-touch-icon" href="{{ $branding['favicon_url'] }}">
+    @else
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    @endif
     @fonts
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/bourse/app.tsx'])
 </head>
 <body class="bg-background font-sans text-foreground antialiased">
-    <div id="bourse-root"></div>
+    <div id="bourse-root" data-branding="{{ json_encode($branding) }}"></div>
 </body>
 </html>
