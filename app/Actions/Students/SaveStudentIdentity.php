@@ -26,9 +26,13 @@ class SaveStudentIdentity
             Gate::forUser($actor)->authorize($student === null ? 'create' : 'update', $student === null ? Student::class : $target);
             $target->fill($data);
             StudentIdentityLocks::acquire(StudentIdentityLocks::keys($target->attributesToArray()));
-            foreach (['student_number', 'cin', 'bac_registration_number'] as $field) {
-                if (filled($target->getAttribute($field)) && Student::query()->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id))->where($field, $target->getAttribute($field))->exists()) {
-                    throw ValidationException::withMessages([$field => 'Une identité correspondante existe déjà. Vérifiez les données ou contactez la Scolarité Centrale.']);
+            foreach (StudentIdentityLocks::uniqueValues($target->attributesToArray()) as $field => $value) {
+                if (Student::query()->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id))->where($field, $value)->exists()) {
+                    throw ValidationException::withMessages([$field => match ($field) {
+                        'phone' => 'Ce numéro de téléphone est déjà utilisé par un autre étudiant.',
+                        'email' => 'Cette adresse mail est déjà utilisée par un autre étudiant.',
+                        default => 'Une identité correspondante existe déjà. Vérifiez les données ou contactez la Scolarité Centrale.',
+                    }]);
                 }
             }
             if ($target->birth_date !== null && Student::query()->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id))
