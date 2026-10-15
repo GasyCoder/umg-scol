@@ -1,7 +1,15 @@
 import { useForm } from '@inertiajs/react';
-import { Download, FileSpreadsheet, FileUp, Upload, X } from 'lucide-react';
+import {
+    ArrowRight,
+    Download,
+    FileSpreadsheet,
+    ShieldCheck,
+    Upload,
+    X,
+} from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
+import { UploadIllustration } from '@/components/illustrations';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import { baseUrl, definitions } from './definitions';
 
 export type TransferKind = 'mentions' | 'programs';
@@ -26,7 +35,13 @@ const formatSize = (bytes: number) =>
         ? `${Math.max(1, Math.round(bytes / 1024))} Ko`
         : `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`;
 
-/** Model download, filtered export and import dialog of the mention/program lists. */
+const transferSteps = [
+    'Modèle XLSX',
+    'Fichier complété',
+    'Vérification puis confirmation',
+];
+
+/** Model download, filtered export and import dialog of the mention/program lists, as one card. */
 export function ReferenceTransferToolbar({
     kind,
     filters,
@@ -40,33 +55,89 @@ export function ReferenceTransferToolbar({
             .filter(([, value]) => value !== undefined && value !== '')
             .map(([key, value]) => [key, String(value)]),
     ).toString();
+    const definition = definitions[kind];
     return (
-        <div
-            className="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Modèle, export et import"
+        <section
+            className="surface relative overflow-hidden"
+            aria-labelledby={`${kind}-transfer-title`}
         >
-            <Button variant="outline" size="sm" asChild>
-                <a href={`${baseUrl(kind)}/template`} download>
-                    <FileSpreadsheet aria-hidden="true" />
-                    Modèle
-                </a>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-                <a
-                    href={`${baseUrl(kind)}/export${query ? `?${query}` : ''}`}
-                    download
+            <div
+                className="bg-grid absolute inset-y-0 right-0 w-1/2 [mask-image:linear-gradient(to_left,black,transparent)] text-primary opacity-40"
+                aria-hidden="true"
+            />
+            <div className="relative flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                    <span
+                        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success-soft text-success"
+                        aria-hidden="true"
+                    >
+                        <FileSpreadsheet className="size-5" />
+                    </span>
+                    <div className="min-w-0 space-y-1.5">
+                        <h2
+                            id={`${kind}-transfer-title`}
+                            className="text-base font-bold text-foreground"
+                        >
+                            Import et export Excel
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            Créez ou mettez à jour les{' '}
+                            {definition.title.toLowerCase()} en masse. Chaque
+                            ligne est vérifiée avant enregistrement ; l’export
+                            reprend les filtres actifs.
+                        </p>
+                        <ol
+                            className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-xs text-muted-foreground"
+                            aria-label="Étapes d’un import"
+                        >
+                            {transferSteps.map((step, index) => (
+                                <li
+                                    key={step}
+                                    className="inline-flex items-center gap-1.5"
+                                >
+                                    <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-primary">
+                                        {index + 1}
+                                    </span>
+                                    {step}
+                                    {index < transferSteps.length - 1 && (
+                                        <ArrowRight
+                                            className="size-3 text-muted-foreground/60"
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                </div>
+                <div
+                    className="flex shrink-0 flex-wrap gap-2"
+                    role="group"
+                    aria-label="Modèle, export et import"
                 >
-                    <Download aria-hidden="true" />
-                    Exporter
-                </a>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-                <Upload aria-hidden="true" />
-                Importer
-            </Button>
+                    <Button variant="outline" asChild>
+                        <a href={`${baseUrl(kind)}/template`} download>
+                            <FileSpreadsheet aria-hidden="true" />
+                            Modèle
+                        </a>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <a
+                            href={`${baseUrl(kind)}/export${query ? `?${query}` : ''}`}
+                            download
+                        >
+                            <Download aria-hidden="true" />
+                            Exporter
+                        </a>
+                    </Button>
+                    <Button onClick={() => setOpen(true)}>
+                        <Upload aria-hidden="true" />
+                        Importer
+                    </Button>
+                </div>
+            </div>
             <ImportDialog kind={kind} open={open} onOpenChange={setOpen} />
-        </div>
+        </section>
     );
 }
 
@@ -146,14 +217,21 @@ function ImportDialog({
                         }}
                         onDragLeave={() => setDragging(false)}
                         onDrop={drop}
-                        className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors focus-within:ring-2 focus-within:ring-ring ${dragging ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50'}`}
+                        className={cn(
+                            'flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-within:ring-2 focus-within:ring-ring',
+                            dragging
+                                ? 'border-primary bg-accent'
+                                : error
+                                  ? 'border-danger/50 bg-danger-soft/30'
+                                  : 'border-input bg-muted/30 hover:border-primary/60 hover:bg-accent/40',
+                        )}
                     >
-                        <FileUp
-                            className="size-8 text-muted-foreground"
-                            aria-hidden="true"
-                        />
-                        <span className="text-sm font-medium">
-                            Déposez le fichier ici ou cliquez pour le choisir
+                        <UploadIllustration className="h-24 w-auto" />
+                        <span className="text-sm font-bold text-foreground">
+                            Déposez le fichier ici ou{' '}
+                            <span className="text-primary underline underline-offset-4">
+                                cliquez pour le choisir
+                            </span>
                         </span>
                         <span className="text-xs text-muted-foreground">
                             XLSX ou CSV (séparateur « ; » ou « , », UTF-8) — 2
@@ -173,17 +251,21 @@ function ImportDialog({
                         />
                     </label>
                     {form.data.file && (
-                        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                            <span className="flex min-w-0 items-center gap-2">
-                                <FileSpreadsheet
-                                    className="size-4 shrink-0 text-primary"
+                        <div className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm shadow-card">
+                            <span className="flex min-w-0 items-center gap-3">
+                                <span
+                                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success"
                                     aria-hidden="true"
-                                />
-                                <span className="truncate">
-                                    {form.data.file.name}
+                                >
+                                    <FileSpreadsheet className="size-4" />
                                 </span>
-                                <span className="shrink-0 text-xs text-muted-foreground">
-                                    {formatSize(form.data.file.size)}
+                                <span className="min-w-0">
+                                    <span className="block truncate font-semibold text-foreground">
+                                        {form.data.file.name}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {formatSize(form.data.file.size)}
+                                    </span>
                                 </span>
                             </span>
                             <Button
@@ -202,12 +284,18 @@ function ImportDialog({
                     <div id={`${id}-error`}>
                         <InputError message={error} />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        Utilisez le modèle : la feuille « Codes » liste les
-                        codes d’établissement
-                        {kind === 'programs' ? ' et de mention' : ''}{' '}
-                        utilisables. Les lignes en erreur ne sont jamais
-                        importées.
+                    <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                        <ShieldCheck
+                            className="mt-px size-4 shrink-0 text-success"
+                            aria-hidden="true"
+                        />
+                        <span>
+                            Utilisez le modèle : la feuille « Codes » liste les
+                            codes d’établissement
+                            {kind === 'programs' ? ' et de mention' : ''}{' '}
+                            utilisables. Les lignes en erreur ne sont jamais
+                            importées.
+                        </span>
                     </p>
                     <DialogFooter>
                         <Button
