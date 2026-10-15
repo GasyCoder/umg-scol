@@ -59,8 +59,6 @@ import type {
     RowStatus,
 } from './types';
 
-const REQUIRED_FIELDS = ['last_name', 'level'];
-
 /** Soft tinted surfaces per tone (banners, tiles): tokens only, so dark mode follows. */
 const toneSurfaces: Record<Tone, string> = {
     primary: 'border-primary/25 bg-accent text-accent-foreground',
@@ -199,6 +197,7 @@ export default function ImportShow({
     import: item,
     rows,
     columns,
+    requiredColumns,
     filter,
     canAnalyze,
     canCommit,
@@ -207,6 +206,8 @@ export default function ImportShow({
     import: ImportItem;
     rows: Page<ImportRow>;
     columns: Record<string, string>;
+    /** Columns the analysis requires (StudentImportColumns::required()). */
+    requiredColumns: string[];
     filter: string;
     canAnalyze: boolean;
     canCommit: boolean;
@@ -346,9 +347,13 @@ export default function ImportShow({
                                         Associer chaque champ à une colonne
                                     </h2>
                                     <p className="text-sm text-muted-foreground">
-                                        Associez chaque champ à une colonne. Nom
-                                        et niveau sont obligatoires. Les autres
-                                        colonnes peuvent être ignorées.
+                                        Associez chaque champ à une colonne du
+                                        modèle établissement. Nom, sexe, date de
+                                        naissance, nationalité, code de
+                                        redoublement et niveau sont obligatoires
+                                        ; les autres colonnes peuvent être
+                                        ignorées. BOURSIER et TAUX DE BOURSE ne
+                                        sont jamais importés.
                                     </p>
                                 </div>
                             </div>
@@ -386,7 +391,7 @@ export default function ImportShow({
                                 const value = mapping.data.mapping[field];
                                 const mapped = value !== undefined;
                                 const required =
-                                    REQUIRED_FIELDS.includes(field);
+                                    requiredColumns.includes(field);
                                 const error = mappingErrors[`mapping.${field}`];
                                 return (
                                     <div
@@ -741,7 +746,7 @@ export default function ImportShow({
                                                 Ligne
                                             </th>
                                             <th scope="col">Identité</th>
-                                            <th scope="col">Matricule</th>
+                                            <th scope="col">Redoublement</th>
                                             <th scope="col">
                                                 Niveau / parcours
                                             </th>
@@ -783,8 +788,7 @@ export default function ImportShow({
                                                         )}
                                                     </td>
                                                     <td className="font-mono text-xs">
-                                                        {row.data
-                                                            .student_number ??
+                                                        {row.data.repeat_code ??
                                                             '—'}
                                                     </td>
                                                     <td>
