@@ -70,3 +70,12 @@ export type Branding = {
     logo_url: string | null;
     favicon_url: string | null;
 };
+
+/** A notification of the bell (StudentActivity.php): text and link only, never personal values. */
+export type AppNotification = {
+    id: string;
+    data: { kind: string; title: string; message: string; href: string };
+    read_at: string | null;
+    created_at: string;
+};
+export type NotificationFeed = { unread: number; recent: AppNotification[] };
