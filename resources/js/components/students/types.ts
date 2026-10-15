@@ -1,22 +1,23 @@
+export type StudentSex = 'M' | 'F';
+export type RepeatCode = 'N' | 'R' | 'T+';
 export type Student = {
     id: number;
     /** Public identifier used in every URL. */
     uuid: string;
-    student_number: string | null;
     last_name: string;
     first_names: string | null;
+    sex: StudentSex | null;
     birth_date: string | null;
-    birth_place: string | null;
+    mother_name: string | null;
     cin: string | null;
     cin_issued_at: string | null;
     cin_issued_place: string | null;
+    nationality: string | null;
     phone: string | null;
     email: string | null;
     address: string | null;
-    bac_registration_number: string | null;
     bac_series: string | null;
     bac_year: number | null;
-    bac_mention: string | null;
     is_active: boolean;
 };
 export type Option = {
@@ -35,6 +36,12 @@ export type Options = {
     programs: Option[];
     fixedEstablishmentId: number | null;
 };
+/** Indicative scholarship rule of the establishment file, computed by the server per declaration. */
+export type Eligibility = {
+    status: 'eligible' | 'not_eligible' | 'undetermined';
+    rate: string;
+    reasons: string[];
+};
 export type AnnualRecord = {
     id: number;
     uuid: string;
@@ -43,41 +50,107 @@ export type AnnualRecord = {
     academic_year_id: number;
     level_id: number;
     program_id: number | null;
+    repeat_code: RepeatCode | null;
+    scholarship_requested_at: string | null;
+    scholarship_request_reference: string | null;
     status: 'active' | 'inactive';
     declared_at: string;
     student?: Pick<
         Student,
         | 'id'
         | 'uuid'
-        | 'student_number'
         | 'last_name'
         | 'first_names'
+        | 'sex'
+        | 'birth_date'
         | 'is_active'
     >;
     establishment?: Option;
-    academic_year?: Option;
+    academic_year?: Option & { scholarship_max_bac_year?: number | null };
     level?: Option;
     program?: Option | null;
     declared_by?: { id: number; name: string };
+    eligibility?: Eligibility;
     canUpdate?: boolean;
 };
+
+/** Closed lists of the official establishment template (mirrors App\Support\StudentReferenceLists). */
+export const NATIONALITIES = [
+    'Malagasy',
+    'Comorien',
+    'Africain',
+    'Européen',
+    'Asiatique',
+    'Mauricien',
+    'Autres',
+] as const;
+export const BAC_SERIES = [
+    'A1',
+    'A2',
+    'C',
+    'D',
+    'L',
+    'S',
+    'OSE',
+    'Tech. Génie civil',
+    'Tech. Industriel',
+    'Tech. Tertiaire',
+    'Tech. Agricole',
+    'Technologique',
+    'Autres',
+] as const;
+export const SEX_LABELS: Record<StudentSex, string> = {
+    M: 'Masculin',
+    F: 'Féminin',
+};
+export const REPEAT_CODE_LABELS: Record<RepeatCode, string> = {
+    N: 'N (Nouveau)',
+    R: 'R (Redoublant)',
+    'T+': 'T+ (Triplant ou plus)',
+};
+export type SelectChoice = { value: string; label: string };
+const choices = (values: readonly string[]): SelectChoice[] =>
+    values.map((value) => ({ value, label: value }));
+export const SEX_CHOICES: SelectChoice[] = Object.entries(SEX_LABELS).map(
+    ([value, label]) => ({ value, label }),
+);
+export const REPEAT_CODE_CHOICES: SelectChoice[] = Object.entries(
+    REPEAT_CODE_LABELS,
+).map(([value, label]) => ({ value, label }));
+export const NATIONALITY_CHOICES = choices(NATIONALITIES);
+export const BAC_SERIES_CHOICES = choices(BAC_SERIES);
+
 export const identitySections = [
     {
         title: 'Identité',
         fields: [
-            { key: 'student_number', label: 'Matricule', max: 100 },
             { key: 'last_name', label: 'Nom', required: true, max: 150 },
             { key: 'first_names', label: 'Prénoms', max: 150 },
-            { key: 'birth_date', label: 'Date de naissance', type: 'date' },
-            { key: 'birth_place', label: 'Lieu de naissance', max: 255 },
-        ],
-    },
-    {
-        title: 'Contact',
-        fields: [
-            { key: 'phone', label: 'Téléphone', max: 30 },
-            { key: 'email', label: 'Email', type: 'email', max: 255 },
-            { key: 'address', label: 'Adresse', max: 2000 },
+            {
+                key: 'sex',
+                label: 'Sexe',
+                type: 'select',
+                required: true,
+                choices: SEX_CHOICES,
+            },
+            {
+                key: 'birth_date',
+                label: 'Date de naissance',
+                type: 'date',
+                required: true,
+            },
+            {
+                key: 'mother_name',
+                label: 'Nom et prénoms de la mère',
+                max: 255,
+            },
+            {
+                key: 'nationality',
+                label: 'Nationalité',
+                type: 'select',
+                required: true,
+                choices: NATIONALITY_CHOICES,
+            },
         ],
     },
     {
@@ -97,16 +170,23 @@ export const identitySections = [
         ],
     },
     {
+        title: 'Contact',
+        fields: [
+            { key: 'phone', label: 'Téléphone', max: 30 },
+            { key: 'email', label: 'Email', type: 'email', max: 255 },
+            { key: 'address', label: 'Adresse exacte', max: 2000 },
+        ],
+    },
+    {
         title: 'Baccalauréat',
         fields: [
-            {
-                key: 'bac_registration_number',
-                label: 'Numéro d’inscription BAC',
-                max: 100,
-            },
-            { key: 'bac_series', label: 'Série BAC', max: 50 },
             { key: 'bac_year', label: 'Année BAC', type: 'number' },
-            { key: 'bac_mention', label: 'Mention BAC', max: 100 },
+            {
+                key: 'bac_series',
+                label: 'Série BAC',
+                type: 'select',
+                choices: BAC_SERIES_CHOICES,
+            },
         ],
     },
 ] satisfies {
@@ -117,5 +197,6 @@ export const identitySections = [
         type?: string;
         max?: number;
         required?: boolean;
+        choices?: SelectChoice[];
     }[];
 }[];
