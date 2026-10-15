@@ -16,6 +16,7 @@ import {
     ShieldCheck,
     Trash2,
     UserCheck,
+    UserCog,
     Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -149,6 +150,10 @@ export function useNavigation(): NavGroup[] {
         {
             label: 'Administration',
             items: [
+                ...when(
+                    auth.canManageUsers,
+                    item('Utilisateurs', '/users', UserCog),
+                ),
                 ...when(
                     auth.canManagePermissions,
                     item('Permissions', '/permissions', KeyRound),
