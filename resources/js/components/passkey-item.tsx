@@ -26,23 +26,26 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
     };
 
     return (
-        <div className="flex items-center justify-between border-b p-4 last:border-b-0">
-            <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-                    <KeyRound className="h-5 w-5 text-muted-foreground" />
+        <div className="flex items-center justify-between gap-3 border-b p-4 transition-colors last:border-b-0 hover:bg-muted/40">
+            <div className="flex min-w-0 items-center gap-4">
+                <div
+                    className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary"
+                    aria-hidden="true"
+                >
+                    <KeyRound className="size-5" />
                 </div>
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2.5">
-                        <p className="font-medium tracking-tight">
+                <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold tracking-tight text-foreground">
                             {passkey.name}
                         </p>
                         {passkey.authenticator && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase ring-1 ring-border ring-inset">
+                            <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                                 {passkey.authenticator}
                             </span>
                         )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground sm:text-sm">
                         Ajoutée {passkey.created_at_diff}
                         {passkey.last_used_at_diff && (
                             <>
@@ -60,11 +63,13 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                 <DialogTrigger asChild>
                     <Button
                         variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        size="icon"
+                        className="size-9 shrink-0 text-muted-foreground hover:bg-danger-soft hover:text-danger-foreground"
                     >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Supprimer</span>
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        <span className="sr-only">
+                            Supprimer la clé d'accès {passkey.name}
+                        </span>
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
