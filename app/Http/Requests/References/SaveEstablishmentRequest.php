@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\References;
 
+use App\Enums\EstablishmentSector;
 use App\Models\Establishment;
 use Illuminate\Validation\Rule;
 
@@ -28,6 +29,8 @@ class SaveEstablishmentRequest extends ReferenceRequest
             'name' => ['required', 'string', 'max:255'],
             // Faculté, Institut, École or a free "Autre" type: stored as text either way.
             'type' => ['nullable', 'string', 'max:100'],
+            // "Institution" column of the establishment file.
+            'sector' => ['nullable', Rule::enum(EstablishmentSector::class)],
             'address' => ['nullable', 'string', 'max:2000'], 'phone' => ['nullable', 'string', 'max:30'], 'email' => ['nullable', 'email', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
             // Raster images only: an SVG could carry scripts.
