@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import InputError from '@/components/input-error';
 import { PageBody, PageHeader } from '@/components/page-header';
-import { Pagination } from '@/components/scholarships/shared';
+import { formatDate, Pagination } from '@/components/scholarships/shared';
 import type { PageLink } from '@/components/scholarships/shared';
 import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ type Review = {
     student: {
         last_name: string;
         first_names: string | null;
-        student_number: string | null;
+        birth_date: string | null;
     };
 };
 
@@ -109,10 +109,11 @@ export default function LinkReview({
                                                     {item.student.last_name}{' '}
                                                     {item.student.first_names}
                                                 </h2>
-                                                <p className="font-mono text-xs text-muted-foreground">
-                                                    {item.student
-                                                        .student_number ??
-                                                        'Sans matricule'}
+                                                <p className="text-xs text-muted-foreground">
+                                                    Né(e) le{' '}
+                                                    {formatDate(
+                                                        item.student.birth_date,
+                                                    )}
                                                 </p>
                                             </div>
                                             <ToneBadge tone="warning">
