@@ -31,7 +31,7 @@ Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour
 - Imports : `imports.view`, `imports.create`, `imports.commit`, `imports.export_errors`.
 - Corrections : `corrections.create`, `corrections.view`, `corrections.review`.
 - Bourses : `scholarships.view`, `scholarships.receive`, `scholarships.review`, `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`.
-- Administration : `establishments.manage`, `academic_years.manage`, `levels.manage`, `programs.manage`, `campaigns.manage`, `users.manage`, `roles.manage`, `permissions.manage`.
+- Administration : `establishments.manage`, `academic_years.manage`, `levels.manage`, `programs.manage`, `campaigns.manage`, `users.manage`, `roles.manage`, `permissions.manage`, `branding.manage` (identité de la plateforme, ADR-065).
 - Audit : `audits.view`, `audits.export`.
 - Portail étudiant : `student_links.review` (revue des demandes de rattachement manuel).
 
@@ -39,8 +39,8 @@ Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour
 
 | Rôle                         | Permissions attribuées                                                                                                                                     |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `superadmin`                 | Les 36 permissions du catalogue, explicitement attribuées                                                                                                  |
-| `developer`                  | Les mêmes 36 permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                 |
+| `superadmin`                 | Toutes les permissions du catalogue, explicitement attribuées                                                                                              |
+| `developer`                  | Les mêmes permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                    |
 | `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view`, `student_links.review` et les sept permissions bourses |
 | `establishment`              | Les six permissions étudiants, les trois déclarations annuelles, les quatre imports, `corrections.view`, `corrections.review`, `student_links.review`      |
 | `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                                          |
@@ -114,3 +114,13 @@ Les mentions font partie du référentiel des parcours : même permission `progr
 Garde-fous serveur : superadmin conserve `permissions.manage`, `roles.manage`, `users.manage` ; student ne peut recevoir que `students.view`, `student_records.view`, `corrections.create`, `corrections.view`. Les Policies, domaines et périmètres restent applicables après toute attribution. L'API étudiante conserve ses contrôles de compte/rattachement : modifier la matrice ne donne pas accès au portail interne. Un gestionnaire qui retire son propre droit de gestion est renvoyé au tableau de bord.
 
 Corbeille : nouvelles permissions `trash.manage` (déplacer/restaurer/lister) et `trash.purge` (purger), attribuées initialement au superadmin et au developer. Pour ces opérations globales et destructives, le compte doit en plus porter superadmin ou developer, sans rôle establishment (même dans un compte à rôles mixtes) ; attribuer cette permission à un rôle opérationnel ne contourne pas son périmètre. Aucun bypass global. Audit des différences sous `access`, événement `role_permissions_updated`, avec rôle, noms de droits accordés/retirés et acteur ; les événements Spatie attach/detach sont conservés.
+
+## Comptes internes et droits par compte
+
+`/users` exige `users.manage`, un compte interne actif, un contexte utilisable et un rôle global (un compte `establishment` ne gère jamais de comptes, même si la matrice lui donne la permission). Les comptes étudiants ne sont pas gérés ici.
+
+- Un seul rôle interne par compte : `superadmin`, `central_scholarship_office`, `establishment` (rattachement à un établissement actif obligatoire) ou `developer` (visible et attribuable uniquement par un developer).
+- Droits effectifs = droits du rôle + droits ajoutés au compte − droits du rôle retirés au compte. Les retraits s'appliquent à toutes les vérifications (`can`, Gate, Policies, menu partagé). Ajuster exige en plus `permissions.manage`. Les Policies et périmètres restent applicables : ajouter un droit bourse à un compte établissement lui donne l'accès global prévu par cette Policy, à faire en connaissance de cause.
+- Un superadmin conserve toujours `permissions.manage`, `roles.manage` et `users.manage`. Au moins un superadmin actif doit rester. Personne ne modifie son propre rôle, statut ou droits.
+- Création : mot de passe aléatoire inconnu et invitation à définir le mot de passe (lien de réinitialisation). Suspension : connexion refusée, sessions et « se souvenir de moi » invalidés ; réactivation possible. Aucune suppression physique.
+- Audit : `user_created`, `user_updated` (champs modifiés, rôle précédent/nouveau), `user_suspended`, `user_reactivated`, `user_invitation_sent`, `user_permissions_updated` (ajoutés, retirés, rétablis), en plus des événements Spatie.
