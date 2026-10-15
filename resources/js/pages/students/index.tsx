@@ -33,6 +33,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { SEX_LABELS } from '@/components/students/types';
 import type { AnnualRecord, Options } from '@/components/students/types';
 import { cn } from '@/lib/utils';
 
@@ -291,7 +292,7 @@ export default function StudentsIndex({
                             <Input
                                 aria-label="Recherche étudiant"
                                 className="h-10 bg-background pl-9"
-                                placeholder="Matricule, nom, prénom, CIN, numéro BAC, téléphone ou email"
+                                placeholder="Nom, prénoms, CIN, téléphone ou email"
                                 value={form.data.search}
                                 onChange={(event) =>
                                     form.setData('search', event.target.value)
@@ -576,8 +577,8 @@ export default function StudentsIndex({
                                     <thead>
                                         <tr>
                                             {[
-                                                'Matricule',
                                                 'Nom et prénoms',
+                                                'Naissance',
                                                 'Établissement',
                                                 'Niveau',
                                                 'Mention',
@@ -599,13 +600,6 @@ export default function StudentsIndex({
                                     <tbody>
                                         {records.data.map((record) => (
                                             <tr key={record.id}>
-                                                <td>
-                                                    <span className="font-mono text-xs font-semibold text-foreground">
-                                                        {record.student
-                                                            ?.student_number ??
-                                                            '—'}
-                                                    </span>
-                                                </td>
                                                 <td>
                                                     <div className="flex items-center gap-3">
                                                         <span
@@ -644,6 +638,27 @@ export default function StudentsIndex({
                                                             )}
                                                         </div>
                                                     </div>
+                                                </td>
+                                                <td className="whitespace-nowrap">
+                                                    {record.student?.birth_date
+                                                        ? new Date(
+                                                              record.student
+                                                                  .birth_date,
+                                                          ).toLocaleDateString(
+                                                              'fr-FR',
+                                                          )
+                                                        : '—'}
+                                                    {record.student?.sex && (
+                                                        <span className="ml-1.5 text-xs text-muted-foreground">
+                                                            {
+                                                                SEX_LABELS[
+                                                                    record
+                                                                        .student
+                                                                        .sex
+                                                                ]
+                                                            }
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     <span
