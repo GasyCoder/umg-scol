@@ -1,5 +1,8 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
+    AlertCircle,
+    ArrowRight,
+    CalendarDays,
     Download,
     FolderOpen,
     Inbox,
@@ -8,9 +11,8 @@ import {
     SlidersHorizontal,
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { TrashButton } from '@/components/trash/trash-button';
-import Heading from '@/components/heading';
-import InputError from '@/components/input-error';
+import { EmptyState } from '@/components/empty-state';
+import { PageBody, PageHeader } from '@/components/page-header';
 import {
     applicationStatusLabels,
     formatNumber,
@@ -21,6 +23,9 @@ import {
     StatusBadge,
 } from '@/components/scholarships/shared';
 import type { Option, PageLink } from '@/components/scholarships/shared';
+import { toneFor } from '@/components/tone-badge';
+import type { Tone } from '@/components/tone-badge';
+import { TrashButton } from '@/components/trash/trash-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +36,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type Row = {
     id: number;
@@ -59,6 +65,15 @@ const STATUS_TABS = [
     'validated',
     'rejected',
 ];
+
+const dots: Record<Tone, string> = {
+    primary: 'bg-primary',
+    success: 'bg-success',
+    warning: 'bg-warning',
+    info: 'bg-info',
+    danger: 'bg-danger',
+    neutral: 'bg-muted-foreground/60',
+};
 
 /** Query string without empty values, so the URL stays readable. */
 const clean = (data: Record<string, string>) =>
@@ -193,39 +208,41 @@ export default function ApplicationsIndex({
     const exportUrl = `${LIST_URL}/export?${new URLSearchParams(
         clean(applied),
     ).toString()}`;
+    const fieldError = errors.received_to ?? errors.search;
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <PageBody>
             <Head title="Dossiers de bourse" />
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <Heading
-                    title="Dossiers de bourse"
-                    description="Dossiers papier reçus par la Scolarité Centrale et leur traitement."
-                />
-                <div className="flex flex-wrap gap-2">
-                    {canExport && (
-                        <Button variant="outline" asChild>
-                            <a href={exportUrl}>
-                                <Download aria-hidden="true" />
-                                Exporter (CSV)
-                            </a>
-                        </Button>
-                    )}
-                    {canReceive && (
-                        <Button asChild>
-                            <Link href="/scholarships/reception">
-                                <Inbox aria-hidden="true" />
-                                Réceptionner un dossier
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-            </div>
+            <PageHeader
+                icon={FolderOpen}
+                title="Dossiers de bourse"
+                description="Dossiers papier reçus par la Scolarité Centrale et leur traitement."
+                actions={
+                    <>
+                        {canExport && (
+                            <Button variant="outline" asChild>
+                                <a href={exportUrl}>
+                                    <Download aria-hidden="true" />
+                                    Exporter (CSV)
+                                </a>
+                            </Button>
+                        )}
+                        {canReceive && (
+                            <Button asChild>
+                                <Link href="/scholarships/reception">
+                                    <Inbox aria-hidden="true" />
+                                    Réceptionner un dossier
+                                </Link>
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             <nav
                 aria-label="Filtrer par statut"
-                className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0"
+                className="-mx-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0"
             >
-                <ul className="flex w-full min-w-max gap-1 border-b">
+                <ul className="flex w-full min-w-max gap-2">
                     {tabs.map((tab) => {
                         const active = activeStatus === tab.value;
                         return (
@@ -234,19 +251,32 @@ export default function ApplicationsIndex({
                                     type="button"
                                     onClick={() => showStatus(tab.value)}
                                     aria-current={active ? 'true' : undefined}
-                                    className={`-mb-px flex items-center gap-2 rounded-t-md border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                                    className={cn(
+                                        'flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                         active
-                                            ? 'border-primary text-primary'
-                                            : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                    }`}
+                                            ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                                            : 'bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                    )}
                                 >
+                                    {tab.value && (
+                                        <span
+                                            className={cn(
+                                                'size-2 shrink-0 rounded-full',
+                                                active
+                                                    ? 'bg-primary-foreground'
+                                                    : dots[toneFor(tab.value)],
+                                            )}
+                                            aria-hidden="true"
+                                        />
+                                    )}
                                     {tab.label}
                                     <span
-                                        className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                                        className={cn(
+                                            'min-w-6 rounded-full px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
-                                                : 'bg-secondary text-secondary-foreground'
-                                        }`}
+                                                ? 'bg-primary-foreground/20 text-primary-foreground'
+                                                : 'bg-secondary text-secondary-foreground',
+                                        )}
                                     >
                                         {formatNumber(tab.count)}
                                     </span>
@@ -259,7 +289,7 @@ export default function ApplicationsIndex({
 
             <form
                 onSubmit={submit}
-                className="space-y-3 rounded-lg border bg-card p-4"
+                className="surface space-y-4 p-4 sm:p-5"
                 aria-label="Filtres des dossiers"
             >
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[minmax(16rem,2fr)_repeat(5,minmax(0,1fr))]">
@@ -343,8 +373,26 @@ export default function ApplicationsIndex({
                         />
                     </Field>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <InputError message={errors.received_to ?? errors.search} />
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                    {fieldError ? (
+                        <p
+                            role="alert"
+                            className="flex items-center gap-1.5 text-sm text-destructive"
+                        >
+                            <AlertCircle
+                                className="size-4 shrink-0"
+                                aria-hidden="true"
+                            />
+                            {fieldError}
+                        </p>
+                    ) : (
+                        hasFilters && (
+                            <p className="text-xs text-muted-foreground">
+                                Filtres appliqués à la liste
+                                {canExport && ' et à l’export'}.
+                            </p>
+                        )
+                    )}
                     <div className="ml-auto flex flex-wrap gap-2">
                         <Button
                             type="button"
@@ -365,58 +413,69 @@ export default function ApplicationsIndex({
                 </div>
             </form>
 
-            <section className="space-y-3" aria-labelledby="applications-total">
-                <p
-                    id="applications-total"
-                    className="text-sm text-muted-foreground"
-                    aria-live="polite"
-                >
-                    {formatNumber(applications.total)}{' '}
-                    {applications.total > 1 ? 'dossiers' : 'dossier'}
-                    {activeStatus && ` · ${statusLabel(activeStatus)}`}
-                </p>
+            <section
+                className="surface overflow-hidden"
+                aria-labelledby="applications-total"
+            >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5">
+                    <p
+                        id="applications-total"
+                        className="text-sm text-muted-foreground"
+                        aria-live="polite"
+                    >
+                        <span className="font-heading text-base font-bold text-foreground tabular-nums">
+                            {formatNumber(applications.total)}
+                        </span>{' '}
+                        {applications.total > 1 ? 'dossiers' : 'dossier'}
+                        {activeStatus && ` · ${statusLabel(activeStatus)}`}
+                    </p>
+                    {activeStatus && (
+                        <StatusBadge
+                            status={activeStatus}
+                            label={statusLabel(activeStatus)}
+                        />
+                    )}
+                </div>
                 {applications.data.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed bg-card px-6 py-12 text-center">
-                        <span
-                            className="flex size-16 items-center justify-center rounded-full bg-accent text-primary"
-                            aria-hidden="true"
-                        >
-                            <FolderOpen className="size-8" />
-                        </span>
-                        <div className="space-y-1">
-                            <p className="font-bold text-foreground">
-                                Aucun dossier ne correspond à ces critères.
-                            </p>
-                            <p className="max-w-md text-sm text-muted-foreground">
-                                {hasFilters
-                                    ? 'Élargissez la recherche ou réinitialisez les filtres.'
-                                    : 'Les dossiers papier réceptionnés apparaîtront ici.'}
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-2">
-                            {hasFilters && (
-                                <Button variant="outline" onClick={reset}>
-                                    <RotateCcw aria-hidden="true" />
-                                    Réinitialiser les filtres
-                                </Button>
-                            )}
-                            {canReceive && (
-                                <Button asChild>
-                                    <Link href="/scholarships/reception">
-                                        <Inbox aria-hidden="true" />
-                                        Réceptionner un dossier
-                                    </Link>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <EmptyState
+                        illustration={hasFilters ? 'search' : 'scholarship'}
+                        title="Aucun dossier ne correspond à ces critères."
+                        description={
+                            hasFilters
+                                ? 'Élargissez la recherche ou réinitialisez les filtres.'
+                                : 'Les dossiers papier réceptionnés apparaîtront ici.'
+                        }
+                        action={
+                            (hasFilters || canReceive) && (
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {hasFilters && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={reset}
+                                        >
+                                            <RotateCcw aria-hidden="true" />
+                                            Réinitialiser les filtres
+                                        </Button>
+                                    )}
+                                    {canReceive && (
+                                        <Button asChild>
+                                            <Link href="/scholarships/reception">
+                                                <Inbox aria-hidden="true" />
+                                                Réceptionner un dossier
+                                            </Link>
+                                        </Button>
+                                    )}
+                                </div>
+                            )
+                        }
+                    />
                 ) : (
-                    <div className="overflow-x-auto rounded-lg border bg-card">
-                        <table className="w-full min-w-[64rem] text-left text-sm">
+                    <div className="overflow-x-auto">
+                        <table className="data-table min-w-[64rem]">
                             <caption className="sr-only">
                                 Dossiers de bourse
                             </caption>
-                            <thead className="border-b bg-muted text-muted-foreground">
+                            <thead>
                                 <tr>
                                     {[
                                         'N° dossier',
@@ -428,81 +487,106 @@ export default function ApplicationsIndex({
                                         'Statut',
                                         'Réception',
                                     ].map((label) => (
-                                        <th
-                                            key={label}
-                                            scope="col"
-                                            className="px-4 py-3 font-medium"
-                                        >
+                                        <th key={label} scope="col">
                                             {label}
                                         </th>
                                     ))}
-                                    <th scope="col" className="px-4 py-3">
+                                    <th scope="col">
                                         <span className="sr-only">Actions</span>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody>
                                 {applications.data.map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        className="transition-colors hover:bg-muted/50"
-                                    >
-                                        <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap text-foreground">
-                                            {item.application_number}
+                                    <tr key={item.id}>
+                                        <td className="whitespace-nowrap">
+                                            <Link
+                                                href={`${LIST_URL}/${item.uuid}`}
+                                                className="rounded font-mono text-xs font-semibold text-foreground hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                            >
+                                                {item.application_number}
+                                            </Link>
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
+                                        <td className="font-mono text-xs whitespace-nowrap">
                                             {item.ddb_number ?? (
                                                 <span className="text-muted-foreground">
                                                     —
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <p className="font-semibold text-foreground">
-                                                {item.student.last_name}{' '}
-                                                {item.student.first_names}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {item.student.student_number ??
-                                                    'Sans matricule'}
-                                            </p>
+                                        <td>
+                                            <div className="flex items-center gap-3">
+                                                <span
+                                                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent font-heading text-xs font-bold text-primary"
+                                                    aria-hidden="true"
+                                                >
+                                                    {`${item.student.last_name.charAt(0)}${item.student.first_names?.charAt(0) ?? ''}`.toUpperCase()}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-foreground">
+                                                        {item.student.last_name}{' '}
+                                                        {
+                                                            item.student
+                                                                .first_names
+                                                        }
+                                                    </p>
+                                                    <p className="font-mono text-xs text-muted-foreground">
+                                                        {item.student
+                                                            .student_number ??
+                                                            'Sans matricule'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            {item.establishment}
+                                        <td className="max-w-56">
+                                            <span className="line-clamp-2">
+                                                {item.establishment}
+                                            </span>
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap">
+                                        <td className="whitespace-nowrap">
                                             {item.level}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td className="text-muted-foreground">
                                             {item.campaign}
                                         </td>
-                                        <td className="px-4 py-3">
+                                        <td>
                                             <StatusBadge
                                                 status={item.status}
                                                 label={item.status_label}
                                             />
                                         </td>
-                                        <td className="px-4 py-3 whitespace-nowrap tabular-nums">
-                                            {formatDate(item.received_at)}
+                                        <td className="whitespace-nowrap text-muted-foreground tabular-nums">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <CalendarDays
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                                {formatDate(item.received_at)}
+                                            </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`${LIST_URL}/${item.uuid}`}
-                                                    aria-label={`Ouvrir le dossier ${item.application_number}`}
+                                        <td>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
                                                 >
-                                                    Ouvrir
-                                                </Link>
-                                            </Button>
-                                            <TrashButton
-                                                kind="applications"
-                                                uuid={item.uuid}
-                                                label={item.application_number}
-                                            />
+                                                    <Link
+                                                        href={`${LIST_URL}/${item.uuid}`}
+                                                        aria-label={`Ouvrir le dossier ${item.application_number}`}
+                                                    >
+                                                        Ouvrir
+                                                        <ArrowRight aria-hidden="true" />
+                                                    </Link>
+                                                </Button>
+                                                <TrashButton
+                                                    kind="applications"
+                                                    uuid={item.uuid}
+                                                    label={
+                                                        item.application_number
+                                                    }
+                                                />
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -510,9 +594,9 @@ export default function ApplicationsIndex({
                         </table>
                     </div>
                 )}
-                <Pagination links={applications.links} />
             </section>
-        </div>
+            <Pagination links={applications.links} />
+        </PageBody>
     );
 }
 ApplicationsIndex.layout = {
