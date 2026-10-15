@@ -5,7 +5,7 @@ $records = ['student_records.view', 'student_records.create', 'student_records.u
 $imports = ['imports.view', 'imports.create', 'imports.commit', 'imports.export_errors'];
 $corrections = ['corrections.create', 'corrections.view', 'corrections.review'];
 $scholarships = ['scholarships.view', 'scholarships.receive', 'scholarships.review', 'scholarships.validate', 'scholarships.request_correction', 'scholarships.reject', 'scholarships.export'];
-$administration = ['establishments.manage', 'academic_years.manage', 'levels.manage', 'programs.manage', 'campaigns.manage', 'users.manage', 'roles.manage', 'permissions.manage'];
+$administration = ['establishments.manage', 'academic_years.manage', 'levels.manage', 'programs.manage', 'campaigns.manage', 'users.manage', 'roles.manage', 'permissions.manage', 'branding.manage'];
 $audits = ['audits.view', 'audits.export'];
 // Trash: move to the trash and restore (manage), permanent deletion (purge).
 $trash = ['trash.manage', 'trash.purge'];
