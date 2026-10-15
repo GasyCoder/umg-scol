@@ -8,7 +8,9 @@ use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
+use App\Models\User;
 use App\Support\Audit\AuditPresenter;
+use App\Support\Branding;
 use App\Support\PendingTasks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -50,7 +52,8 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
-            'name' => config('app.name'),
+            'name' => Branding::get()['scol_name'],
+            'branding' => Branding::get(),
             'auth' => [
                 'user' => $request->user(),
                 'permissions' => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
@@ -62,6 +65,8 @@ class HandleInertiaRequests extends Middleware
                 'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
                 'canViewImports' => $request->user() !== null && Gate::allows('viewAny', StudentImport::class),
                 'canViewStudents' => $request->user() !== null && Gate::allows('viewAny', Student::class),
+                'canManageBranding' => $request->user() !== null && Gate::allows('branding.manage-ui'),
+                'canManageUsers' => $request->user() !== null && Gate::allows('viewAny', User::class),
                 'canManagePermissions' => $request->user() !== null && Gate::allows('permissions.manage-ui'),
                 'canManageTrash' => $request->user() !== null && Gate::allows('trash.manage-ui'),
                 'canViewReports' => $request->user() !== null && Gate::allows('reports.view'),
