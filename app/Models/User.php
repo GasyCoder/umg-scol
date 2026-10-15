@@ -30,6 +30,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $establishment_id
  * @property string $uuid
  * @property bool $is_active
+ * @property array{off?: list<string>}|null $notification_preferences
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string $password
@@ -56,6 +57,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     /** A new account is active until an administrator suspends it. */
     protected $attributes = ['is_active' => true];
+
+    /** Whether the user receives this type of notification (all types unless turned off). */
+    public function wantsNotification(string $kind): bool
+    {
+        return ! in_array($kind, $this->notification_preferences['off'] ?? [], true);
+    }
 
     /**
      * Role permissions withdrawn from this account only (additions are Spatie direct permissions).
@@ -128,6 +135,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     protected function casts(): array
     {
         return [
+            'notification_preferences' => 'array',
             'email_verified_at' => 'datetime',
             'establishment_id' => 'integer',
             'student_id' => 'integer',
