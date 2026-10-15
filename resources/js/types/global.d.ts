@@ -1,4 +1,4 @@
-import type { Auth } from '@/types/auth';
+import type { Auth, PendingTasks } from '@/types/auth';
 
 declare module 'react' {
     interface InputHTMLAttributes<T> {
@@ -12,6 +12,9 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            /** Sidebar width in px chosen with the splitter (cookie). */
+            sidebarWidth: number;
+            tasks: PendingTasks;
             [key: string]: unknown;
         };
     }
