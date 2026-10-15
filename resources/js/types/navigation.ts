@@ -11,4 +11,11 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Pending work counter shown next to the entry. */
+    badge?: number;
+};
+
+export type NavGroup = {
+    label: string;
+    items: NavItem[];
 };
