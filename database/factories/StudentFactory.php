@@ -10,6 +10,6 @@ class StudentFactory extends Factory
 {
     public function definition(): array
     {
-        return ['student_number' => fake()->unique()->bothify('TEST-####????'), 'last_name' => fake()->lastName(), 'first_names' => fake()->firstName(), 'birth_date' => fake()->dateTimeBetween('-30 years', '-18 years')->format('Y-m-d'), 'email' => fake()->safeEmail(), 'is_active' => true];
+        return ['last_name' => fake()->lastName(), 'first_names' => fake()->firstName(), 'sex' => fake()->randomElement(['M', 'F']), 'birth_date' => fake()->dateTimeBetween('-30 years', '-18 years')->format('Y-m-d'), 'cin' => fake()->unique()->numerify('4###########'), 'nationality' => 'Malagasy', 'email' => fake()->unique()->safeEmail(), 'is_active' => true];
     }
 }
