@@ -59,7 +59,9 @@ try {
     $year = AcademicYear::create(['name' => $tag]);
     $level = Level::create(['code' => $tag, 'name' => 'Temporary import check']);
     $actor = User::factory()->create()->assignRole('superadmin');
-    $csv = "last_name;student_number;level\nTemporary check;".$tag.';'.$tag."\n";
+    // Columns of the establishment file required by the analysis; the tag also serves as an unusual name.
+    $header = "last_name;mother_name;first_names;sex;birth_date;nationality;repeat_code;level\n";
+    $csv = $header.'Temporary '.$tag.';'.$tag.';Check;M;2001-01-01;Malagasy;N;'.$tag."\n";
     file_put_contents($path, $csv);
     $upload = fn () => app(UploadStudentImport::class)->handle($actor, new UploadedFile($path, 'check.csv', 'text/csv', null, true), $establishment->id, $year->id);
     $import = $upload();
@@ -102,7 +104,7 @@ try {
         DB::purge('import_lock_probe');
     }
     // Failure on the second declaration must undo the first student and its audit.
-    file_put_contents($path, "last_name;student_number;level\nRollback one;".$tag.'-R1;'.$tag."\nRollback two;".$tag.'-R2;'.$tag."\n");
+    file_put_contents($path, $header.'Rollback one '.$tag.';'.$tag.'-R1;Check;F;2001-01-01;Malagasy;N;'.$tag."\n".'Rollback two '.$tag.';'.$tag.'-R2;Check;M;2001-01-01;Malagasy;R;'.$tag."\n");
     $failed = $upload();
     $files[] = $failed->stored_path;
     app(AnalyzeStudentImport::class)->handle($actor, $failed, $failed->mapping);
