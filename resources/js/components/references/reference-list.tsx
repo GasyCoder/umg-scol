@@ -39,8 +39,16 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { article, baseUrl, definitions } from './definitions';
+import {
+    article,
+    baseUrl,
+    definitions,
+    optionLabel,
+    sectorOptions,
+    trainingTypeOptions,
+} from './definitions';
 import type {
+    DomainOption,
     EstablishmentOption,
     ReferenceKind,
     ReferenceRecord,
@@ -59,6 +67,7 @@ export type ReferenceListProps = {
     filters: { search?: string; establishment_id?: string };
     canCreate: boolean;
     establishments?: EstablishmentOption[];
+    domains?: DomainOption[];
 };
 
 function Code({ value }: { value?: string | null }) {
@@ -135,14 +144,20 @@ export default function ReferenceList({
         );
     const columns =
         kind === 'establishments'
-            ? ['Sigle', 'Établissement', 'Type', 'Contact']
+            ? ['Sigle', 'Établissement', 'Type', 'Institution', 'Contact']
             : kind === 'academic-years'
-              ? ['Nom', 'Dates', 'Année courante']
-              : kind === 'levels'
+              ? ['Nom', 'Dates', 'BAC limite (bourse)', 'Année courante']
+              : kind === 'levels' || kind === 'domains'
                 ? ['Code', 'Nom', 'Ordre']
                 : kind === 'programs'
-                  ? ['Établissement', 'Mention', 'Code', 'Nom']
-                  : ['Établissement', 'Code', 'Nom'];
+                  ? [
+                        'Établissement',
+                        'Mention',
+                        'Code',
+                        'Nom',
+                        'Type de formation',
+                    ]
+                  : ['Établissement', 'Domaine', 'Code', 'Nom'];
     const cells = (row: ReferenceRecord): ReactNode[] =>
         kind === 'establishments'
             ? [
@@ -156,6 +171,7 @@ export default function ReferenceList({
                       {name(row)}
                   </span>,
                   row.type ?? <Muted>—</Muted>,
+                  optionLabel(sectorOptions, row.sector) ?? <Muted>—</Muted>,
                   row.phone || row.email ? (
                       <span className="flex flex-col gap-0.5 text-xs">
                           {row.phone && (
@@ -196,6 +212,13 @@ export default function ReferenceList({
                         <span className="sr-only">au</span>
                         {formatDay(row.ends_at) ?? <Muted>—</Muted>}
                     </span>,
+                    row.scholarship_max_bac_year ? (
+                        <span key="bac" className="tabular-nums">
+                            {row.scholarship_max_bac_year}
+                        </span>
+                    ) : (
+                        <Muted>Non définie</Muted>
+                    ),
                     row.is_current ? (
                         <ToneBadge key="current" tone="primary">
                             Courante
@@ -204,7 +227,7 @@ export default function ReferenceList({
                         <Muted>—</Muted>
                     ),
                 ]
-              : kind === 'levels'
+              : kind === 'levels' || kind === 'domains'
                 ? [
                       <Code key="code" value={row.code} />,
                       name(row),
@@ -218,9 +241,26 @@ export default function ReferenceList({
                         row.mention?.name ?? <Muted>Sans mention</Muted>,
                         <Code key="code" value={row.code} />,
                         name(row),
+                        optionLabel(trainingTypeOptions, row.training_type) ?? (
+                            <Muted>—</Muted>
+                        ),
                     ]
                   : [
                         establishment(row),
+                        row.domain ? (
+                            <span
+                                key="domain"
+                                className="flex min-w-0 items-center gap-2"
+                                title={row.domain.name}
+                            >
+                                <Code value={row.domain.code} />
+                                <span className="truncate">
+                                    {row.domain.name}
+                                </span>
+                            </span>
+                        ) : (
+                            <Muted>Sans domaine</Muted>
+                        ),
                         <Code key="code" value={row.code} />,
                         name(row),
                     ];
@@ -468,11 +508,14 @@ export default function ReferenceList({
                                                         ? 'Désactiver'
                                                         : 'Activer'}
                                                 </Button>
-                                                <TrashButton
-                                                    kind={kind}
-                                                    uuid={row.uuid}
-                                                    label={row.name}
-                                                />
+                                                {/* Domains have no trash support (no soft delete on the server). */}
+                                                {kind !== 'domains' && (
+                                                    <TrashButton
+                                                        kind={kind}
+                                                        uuid={row.uuid}
+                                                        label={row.name}
+                                                    />
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
