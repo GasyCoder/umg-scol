@@ -19,9 +19,17 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            // Read-only account facts shown on the profile card.
+            'account' => [
+                'establishment' => $user->establishment?->only(['code', 'name']),
+                'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
+                'created_at' => $user->created_at?->toIso8601String(),
+            ],
         ]);
     }
 
