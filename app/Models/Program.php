@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TrainingType;
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
 use App\Models\Concerns\Trashable;
@@ -12,7 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['establishment_id', 'mention_id', 'code', 'name', 'is_active'])]
+/** @property TrainingType|null $training_type */
+#[Fillable(['establishment_id', 'mention_id', 'code', 'name', 'training_type', 'is_active'])]
 class Program extends Model
 {
     protected $attributes = ['is_active' => true];
@@ -22,12 +24,12 @@ class Program extends Model
 
     protected function casts(): array
     {
-        return ['establishment_id' => 'integer', 'mention_id' => 'integer', 'is_active' => 'boolean'];
+        return ['establishment_id' => 'integer', 'mention_id' => 'integer', 'training_type' => TrainingType::class, 'is_active' => 'boolean'];
     }
 
     protected function referenceAuditAttributes(): array
     {
-        return ['establishment_id', 'mention_id', 'code', 'name', 'is_active'];
+        return ['establishment_id', 'mention_id', 'code', 'name', 'training_type', 'is_active'];
     }
 
     /** @return BelongsTo<Establishment, $this> */
