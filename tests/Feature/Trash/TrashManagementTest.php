@@ -104,13 +104,13 @@ it('moves student declarations together and restores only the same batch', funct
     $this->post('/trash/students/'.$student->uuid.'/restore')->assertSessionHasNoErrors();
     expect(StudentRecord::where('student_id', $student->id)->count())->toBe(1)->and(StudentRecord::find($together->id))->not->toBeNull()->and(StudentRecord::find($before->id))->toBeNull();
 });
-it('rejects restoring an identity conflicting with a newly created identity', function () {
-    $student = Student::factory()->create(['student_number' => 'M-CONFLICT']);
+it('rejects restoring an identity conflicting with a newly created identity', function (string $field, string $value) {
+    $student = Student::factory()->create([$field => $value]);
     trashModel($this, 'students', $student);
-    Student::factory()->create(['student_number' => 'M-CONFLICT']);
+    Student::factory()->create([$field => $value]);
     $this->post('/trash/students/'.$student->uuid.'/restore')->assertSessionHasErrors('trash');
     expect(Student::find($student->id))->toBeNull();
-});
+})->with([['cin', '101010101010'], ['phone', '0341010101'], ['email', 'conflict@example.test']]);
 it('makes a deleted active declaration release its uniqueness slot and rejects conflicting restoration', function () {
     $student = Student::factory()->create();
     $record = StudentRecord::factory()->create(['student_id' => $student->id]);
@@ -261,4 +261,11 @@ it('never widens an establishment account scope through a mixed privileged role'
     $user = User::factory()->create()->assignRole(['establishment', 'developer']);
     $user->forceFill(['establishment_id' => Establishment::factory()->create()->id])->save();
     $this->actingAs($user)->get('/trash')->assertForbidden();
+});
+it('frees a deleted declaration request reference and refuses its conflicting restoration', function () {
+    $record = StudentRecord::factory()->create(['scholarship_request_reference' => 'DB-TRASH']);
+    trashModel($this, 'student-records', $record);
+    StudentRecord::factory()->create(['academic_year_id' => $record->academic_year_id, 'establishment_id' => $record->establishment_id, 'scholarship_request_reference' => 'DB-TRASH']);
+    $this->post('/trash/student-records/'.$record->uuid.'/restore')->assertSessionHasErrors('trash');
+    expect(StudentRecord::find($record->id))->toBeNull()->and(StudentRecord::where('scholarship_request_reference', 'DB-TRASH')->count())->toBe(1);
 });
