@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Platform\PlatformSettingsController;
 use App\Http\Controllers\Reporting\DashboardController;
 use App\Http\Controllers\StudentPortal\LinkReviewController;
 use App\Http\Middleware\EnsureEstablishmentContext;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware(EnsureInternalPortal::class)->group(function () {
     // No public landing page on the internal portal: guests land on the login page.
     Route::get('/', fn () => to_route('dashboard'))->name('home');
+    Route::get('branding/{asset}', [PlatformSettingsController::class, 'asset'])->whereIn('asset', ['logo', 'favicon'])->middleware('throttle:120,1,branding-asset')->name('branding.asset');
 
     Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -25,6 +27,7 @@ Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware
     require __DIR__.'/scholarships.php';
     require __DIR__.'/reporting.php';
     require __DIR__.'/permissions.php';
+    require __DIR__.'/users.php';
     require __DIR__.'/trash.php';
     Route::get('student-links', [LinkReviewController::class, 'index'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.index');
     Route::post('student-links/{student_link_request}/review', [LinkReviewController::class, 'review'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.review');
