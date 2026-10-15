@@ -38,7 +38,7 @@ Référence de la refonte UI/UX (ADR-062). Toute nouvelle page suit ces règles 
 - Barre latérale marine (`AppSidebar`), groupes : Général, Étudiants, Bourses, Pilotage, Référentiels, Administration. Définition unique dans `hooks/use-navigation.ts` (aussi utilisée par la recherche de pages). L'entrée reste active sur ses sous-pages ; compteur or = travail en attente.
 - Séparateur glissable entre la barre latérale et le contenu (`components/sidebar-resizer.tsx`) : 224 à 400 px, flèches/Origine/Fin au clavier, double-clic pour revenir à 256 px, relâché tout à gauche il replie le menu en icônes. Largeur gardée dans le cookie `sidebar_width`, relue par le serveur (`sidebarWidth`) pour un premier rendu sans saut.
 - Barre supérieure : à gauche la recherche de pages (Ctrl K, navigation seulement, aucune donnée), sans titre ni fil d'Ariane (le `PageHeader` nomme la page) ; à droite thème et cloche dans des boutons ronds distincts, puis le compte (nom + rôle).
-- Cloche : `App\Support\PendingTasks`, calculée à la lecture dans le périmètre des Policies (`visibleTo`), sans table ni état « lu ». Une tâche disparaît dès qu'elle est traitée.
+- Cloche : notifications étudiantes persistantes (`NotificationInbox`) et tâches à traiter calculées dans le périmètre des Policies (`PendingTasks`). Lire une notification ne clôture pas la tâche associée.
 
 ## Patterns de page
 
@@ -48,3 +48,7 @@ Référence de la refonte UI/UX (ADR-062). Toute nouvelle page suit ces règles 
 - Alertes en ligne : fond doux de la tonalité (`bg-warning-soft text-warning-foreground border-warning/30`) avec icône.
 - Confirmations destructrices : `Dialog` avec bouton `destructive`.
 - Accessibilité : icônes décoratives `aria-hidden`, cibles ≥ 36 px, `focus-visible:ring-2 ring-ring`, contraste AA dans les deux thèmes, `prefers-reduced-motion` respecté.
+
+## Notifications
+
+La cloche présente les derniers événements étudiants avec leur état de lecture ; son badge compte les notifications non lues. La section « À traiter » reste indépendante. La page `/notifications` utilise les mêmes surfaces institutionnelles, avec filtres, pagination, états vides et préférences personnelles. Le flux partagé est distinct de la pagination et se rafraîchit toutes les 30 secondes.
