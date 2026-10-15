@@ -45,9 +45,9 @@ type Row = {
     ddb_number: string | null;
     campaign: string;
     student: {
-        student_number: string | null;
         last_name: string;
         first_names: string | null;
+        birth_date: string | null;
     };
     establishment: string;
     level: string;
@@ -307,7 +307,7 @@ export default function ApplicationsIndex({
                                 id="filter-search"
                                 type="search"
                                 className="pl-9"
-                                placeholder="N° dossier, N° DDB, matricule, nom ou prénom"
+                                placeholder="N° dossier, N° DDB, CIN, nom ou prénom"
                                 maxLength={100}
                                 value={form.data.search}
                                 onChange={(e) =>
@@ -530,10 +530,12 @@ export default function ApplicationsIndex({
                                                                 .first_names
                                                         }
                                                     </p>
-                                                    <p className="font-mono text-xs text-muted-foreground">
-                                                        {item.student
-                                                            .student_number ??
-                                                            'Sans matricule'}
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Né(e) le{' '}
+                                                        {formatDate(
+                                                            item.student
+                                                                .birth_date,
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
