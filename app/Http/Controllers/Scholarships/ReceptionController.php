@@ -27,13 +27,13 @@ class ReceptionController extends Controller
         $results = [];
         if ($campaign !== null && mb_strlen($search) >= 2) {
             // Server-side search, capped: the secretariat refines the query instead of browsing the base.
-            $results = Student::query()->select(['id', 'student_number', 'last_name', 'first_names', 'birth_date', 'is_active'])->matching($search)
+            $results = Student::query()->select(['id', 'last_name', 'first_names', 'birth_date', 'is_active'])->matching($search)
                 ->with([
                     'studentRecords' => fn ($q) => $q->where('academic_year_id', $campaign->academic_year_id)->with(['establishment:id,name', 'level:id,name', 'program:id,name']),
                     'scholarshipApplications' => fn ($q) => $q->where('scholarship_campaign_id', $campaign->id)->select(['id', 'uuid', 'student_id', 'application_number']),
                 ])->orderBy('last_name')->orderBy('first_names')->limit(20)->get()
                 ->map(fn (Student $student) => [
-                    'id' => $student->id, 'student_number' => $student->student_number, 'last_name' => $student->last_name, 'first_names' => $student->first_names,
+                    'id' => $student->id, 'last_name' => $student->last_name, 'first_names' => $student->first_names,
                     'birth_date' => $student->birth_date?->format('Y-m-d'), 'is_active' => $student->is_active,
                     'records' => $student->studentRecords->map(fn ($record) => ['establishment' => $record->establishment->name, 'level' => $record->level->name, 'program' => $record->program?->name, 'status' => $record->status->value])->values(),
                     'application' => $student->scholarshipApplications->first()?->only(['id', 'uuid', 'application_number']),
