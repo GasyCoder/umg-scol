@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StudentSex;
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\Trashable;
 use App\Support\StudentNormalization;
@@ -19,8 +20,9 @@ use Spatie\Activitylog\Support\LogOptions;
 /**
  * @property CarbonInterface|null $birth_date
  * @property CarbonInterface|null $cin_issued_at
+ * @property StudentSex|null $sex
  */
-#[Fillable(['student_number', 'last_name', 'first_names', 'birth_date', 'birth_place', 'cin', 'cin_issued_at', 'cin_issued_place', 'phone', 'email', 'address', 'bac_registration_number', 'bac_series', 'bac_year', 'bac_mention', 'is_active'])]
+#[Fillable(['last_name', 'first_names', 'sex', 'birth_date', 'mother_name', 'cin', 'cin_issued_at', 'cin_issued_place', 'nationality', 'phone', 'email', 'address', 'bac_series', 'bac_year', 'is_active'])]
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
@@ -30,7 +32,7 @@ class Student extends Model
 
     protected function casts(): array
     {
-        return ['birth_date' => 'date', 'cin_issued_at' => 'date', 'bac_year' => 'integer', 'is_active' => 'boolean'];
+        return ['sex' => StudentSex::class, 'birth_date' => 'date', 'cin_issued_at' => 'date', 'bac_year' => 'integer', 'is_active' => 'boolean'];
     }
 
     public function setAttribute($key, $value): static
@@ -68,7 +70,7 @@ class Student extends Model
 
     /**
      * Server-side search shared by the student list and paper file reception:
-     * identifier/contact prefixes and name substrings.
+     * CIN/contact prefixes and name substrings.
      *
      * @param  Builder<Student>  $query
      * @return Builder<Student>
@@ -76,13 +78,19 @@ class Student extends Model
     public function scopeMatching(Builder $query, string $search): Builder
     {
         return $query->where(function ($q) use ($search): void {
-            foreach (['student_number', 'last_name', 'first_names', 'cin', 'bac_registration_number', 'phone', 'email'] as $field) {
+            foreach (['last_name', 'first_names', 'cin', 'phone', 'email'] as $field) {
                 $term = (string) StudentNormalization::value($field, $search);
                 $pattern = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
                 $pattern = in_array($field, ['last_name', 'first_names'], true) ? '%'.$pattern.'%' : $pattern.'%';
                 $q->orWhereRaw($field." LIKE ? ESCAPE '!'", [$pattern]);
             }
         });
+    }
+
+    /** A 12-digit CIN; other values (receipt numbers…) are accepted but shown as non-standard. */
+    public function hasStandardCin(): bool
+    {
+        return StudentNormalization::isStandardCin($this->cin);
     }
 
     /** @return HasMany<StudentInformationConfirmation, $this> */
