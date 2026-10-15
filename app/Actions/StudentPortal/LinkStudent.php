@@ -13,24 +13,23 @@ use Illuminate\Support\Str;
 
 class LinkStudent
 {
-    public function handle(User $actor, string $type, string $identifier, string $birth): bool
+    /** The student proves the link with the CIN and birth date declared by the establishment. */
+    public function handle(User $actor, string $cin, string $birth): bool
     {
-        abort_unless(in_array($type, ['student_number', 'bac_registration_number'], true), 422);
-
-        return DB::transaction(function () use ($actor, $type, $identifier, $birth) {
+        return DB::transaction(function () use ($actor, $cin, $birth) {
             $user = User::query()->lockForUpdate()->findOrFail($actor->id);
             abort_unless(StudentPortalAccess::student($user) && $user->hasVerifiedEmail(), 403);
             if ($user->student_id !== null) {
                 return true;
             }
-            $identifier = StudentNormalization::value($type, $identifier);
-            $candidates = Student::query()->where($type, $identifier)->whereDate('birth_date', $birth)->lockForUpdate()->limit(2)->get();
+            $cin = StudentNormalization::value('cin', $cin);
+            $candidates = Student::query()->where('cin', $cin)->whereDate('birth_date', $birth)->lockForUpdate()->limit(2)->get();
             // Reject collated near matches too: never choose one identity from an ambiguous result.
             if ($candidates->count() !== 1) {
                 return false;
             }
             $student = $candidates->first();
-            if ($student->getAttribute($type) !== $identifier || ! $student->is_active || User::query()->where('student_id', $student->id)->lockForUpdate()->first() !== null) {
+            if ($student->cin !== $cin || ! $student->is_active || User::query()->where('student_id', $student->id)->lockForUpdate()->first() !== null) {
                 return false;
             }
             if (filled($student->email) && Str::lower($student->email) === Str::lower($user->email)) {
