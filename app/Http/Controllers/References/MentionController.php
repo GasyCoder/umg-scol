@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\References\ReferenceListRequest;
 use App\Http\Requests\References\ReferenceStatusRequest;
 use App\Http\Requests\References\SaveMentionRequest;
+use App\Models\Domain;
 use App\Models\Establishment;
 use App\Models\Mention;
 use App\Support\References\ReferenceTransfer;
@@ -34,7 +35,7 @@ class MentionController extends Controller
     {
         Gate::authorize('create', Mention::class);
 
-        return Inertia::render('references/mentions/form', ['record' => null, 'establishments' => $this->establishments($request)]);
+        return Inertia::render('references/mentions/form', ['record' => null, 'establishments' => $this->establishments($request), 'domains' => $this->domains()]);
     }
 
     public function store(SaveMentionRequest $request): RedirectResponse
@@ -49,7 +50,7 @@ class MentionController extends Controller
     {
         Gate::authorize('update', $mention);
 
-        return Inertia::render('references/mentions/form', ['record' => $mention, 'establishments' => $this->establishments($request)]);
+        return Inertia::render('references/mentions/form', ['record' => $mention, 'establishments' => $this->establishments($request), 'domains' => $this->domains()]);
     }
 
     public function update(SaveMentionRequest $request, Mention $mention): RedirectResponse
@@ -66,6 +67,12 @@ class MentionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Statut mis à jour.']);
 
         return to_route('references.mentions.index');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function domains(): array
+    {
+        return Domain::query()->orderBy('sort_order')->orderBy('code')->get(['id', 'code', 'name', 'is_active'])->toArray();
     }
 
     /** @return array<int, array<string, mixed>> */
