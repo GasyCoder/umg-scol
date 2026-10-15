@@ -180,8 +180,8 @@ function Sidebar({
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetHeader className="sr-only">
-          <SheetTitle>Sidebar</SheetTitle>
-          <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+          <SheetTitle>Menu</SheetTitle>
+          <SheetDescription>Navigation du portail.</SheetDescription>
         </SheetHeader>
         <SheetContent
           data-sidebar="sidebar"
@@ -267,7 +267,7 @@ function SidebarTrigger({
       {...props}
     >
       {isMobile || state === "collapsed" ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-      <span className="sr-only">Toggle sidebar</span>
+      <span className="sr-only">Afficher ou masquer le menu</span>
     </Button>
   )
 }
