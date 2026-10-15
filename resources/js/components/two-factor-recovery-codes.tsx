@@ -3,13 +3,6 @@ import { Eye, EyeOff, LockKeyhole, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AlertError from '@/components/alert-error';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
 
 type Props = {
@@ -53,22 +46,30 @@ export default function TwoFactorRecoveryCodes({
     const RecoveryCodeIconComponent = codesAreVisible ? EyeOff : Eye;
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex gap-3">
-                    <LockKeyhole className="size-4" aria-hidden="true" />
-                    Codes de récupération 2FA
-                </CardTitle>
-                <CardDescription>
-                    Les codes de récupération vous permettent de retrouver
-                    l'accès à votre compte si vous perdez votre appareil 2FA.
-                    Conservez-les dans un gestionnaire de mots de passe
-                    sécurisé.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <div className="rounded-xl border bg-muted/30 p-4 sm:p-5">
+            <div className="mb-4 flex items-start gap-3">
+                <span
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-foreground"
+                    aria-hidden="true"
+                >
+                    <LockKeyhole className="size-4" />
+                </span>
+                <div className="space-y-0.5">
+                    <h3 className="font-heading text-sm font-bold text-foreground">
+                        Codes de récupération 2FA
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                        Les codes de récupération vous permettent de retrouver
+                        l'accès à votre compte si vous perdez votre appareil
+                        2FA. Conservez-les dans un gestionnaire de mots de passe
+                        sécurisé.
+                    </p>
+                </div>
+            </div>
+            <div>
                 <div className="flex flex-col gap-3 select-none sm:flex-row sm:items-center sm:justify-between">
                     <Button
+                        variant="outline"
                         onClick={toggleCodesVisibility}
                         className="w-fit"
                         aria-expanded={codesAreVisible}
@@ -95,7 +96,8 @@ export default function TwoFactorRecoveryCodes({
                                     disabled={processing}
                                     aria-describedby="regenerate-warning"
                                 >
-                                    <RefreshCw /> Régénérer les codes
+                                    <RefreshCw aria-hidden="true" /> Régénérer
+                                    les codes
                                 </Button>
                             )}
                         </Form>
@@ -113,7 +115,7 @@ export default function TwoFactorRecoveryCodes({
                             <>
                                 <div
                                     ref={codesSectionRef}
-                                    className="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
+                                    className="grid grid-cols-1 gap-2 rounded-lg border bg-card p-3 font-mono text-sm sm:grid-cols-2"
                                     role="list"
                                     aria-label="Codes de récupération"
                                 >
@@ -122,14 +124,14 @@ export default function TwoFactorRecoveryCodes({
                                             <div
                                                 key={index}
                                                 role="listitem"
-                                                className="select-text"
+                                                className="rounded-md bg-muted px-3 py-1.5 tracking-wider text-foreground select-text"
                                             >
                                                 {code}
                                             </div>
                                         ))
                                     ) : (
                                         <div
-                                            className="space-y-2"
+                                            className="col-span-full space-y-2"
                                             aria-label="Chargement des codes de récupération"
                                         >
                                             {Array.from(
@@ -163,7 +165,7 @@ export default function TwoFactorRecoveryCodes({
                         )}
                     </div>
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
