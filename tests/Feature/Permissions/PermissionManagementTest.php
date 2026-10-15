@@ -26,7 +26,7 @@ function permissionSave(TestCase $test, string $role, array $names): TestRespons
     return $test->put('/permissions/roles/'.$role, ['permissions' => $names, 'version' => PermissionCatalogue::version(roleNames($role))]);
 }
 it('serves a fixed role matrix to authorized personnel', function () {
-    $this->actingAs($this->admin)->get('/permissions')->assertInertia(fn (Assert $page) => $page->component('permissions/index')->has('roles', 5)->has('catalogue', 36));
+    $this->actingAs($this->admin)->get('/permissions')->assertInertia(fn (Assert $page) => $page->component('permissions/index')->has('roles', 5)->has('catalogue', count(config('access.permissions'))));
 });
 it('denies operational roles and students by default', function (string $role) {
     $user = User::factory()->create()->assignRole($role);
