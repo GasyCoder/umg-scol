@@ -16,8 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property CarbonInterface|null $starts_at
  * @property CarbonInterface|null $ends_at
+ * @property int|null $scholarship_max_bac_year
  */
-#[Fillable(['name', 'starts_at', 'ends_at', 'is_current', 'is_active'])]
+#[Fillable(['name', 'starts_at', 'ends_at', 'scholarship_max_bac_year', 'is_current', 'is_active'])]
 #[Hidden(['current_marker'])]
 class AcademicYear extends Model
 {
@@ -28,12 +29,12 @@ class AcademicYear extends Model
 
     protected function casts(): array
     {
-        return ['starts_at' => 'date', 'ends_at' => 'date', 'is_current' => 'boolean', 'is_active' => 'boolean'];
+        return ['starts_at' => 'date', 'ends_at' => 'date', 'scholarship_max_bac_year' => 'integer', 'is_current' => 'boolean', 'is_active' => 'boolean'];
     }
 
     protected function referenceAuditAttributes(): array
     {
-        return ['name', 'starts_at', 'ends_at', 'is_current', 'is_active'];
+        return ['name', 'starts_at', 'ends_at', 'scholarship_max_bac_year', 'is_current', 'is_active'];
     }
 
     /** @return HasMany<StudentRecord, $this> */
