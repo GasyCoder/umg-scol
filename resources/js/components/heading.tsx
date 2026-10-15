@@ -1,3 +1,7 @@
+/**
+ * Section or page title with an optional one-line description.
+ * `small` is the in-card variant (settings sections, sub-blocks); `default` is a page title.
+ */
 export default function Heading({
     title,
     description,
@@ -8,11 +12,11 @@ export default function Heading({
     variant?: 'default' | 'small';
 }) {
     return (
-        <header className={variant === 'small' ? '' : 'space-y-1'}>
+        <header className={variant === 'small' ? 'space-y-0.5' : 'space-y-1'}>
             <h2
                 className={
                     variant === 'small'
-                        ? 'mb-0.5 text-base font-bold text-foreground'
+                        ? 'font-heading text-base font-bold text-foreground'
                         : 'text-2xl leading-tight font-bold tracking-tight text-foreground lg:text-[1.75rem]'
                 }
             >
