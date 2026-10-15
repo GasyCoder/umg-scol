@@ -57,8 +57,8 @@ class CommitStudentImport
 
                             continue;
                         }
-                        $data = array_intersect_key($result['normalized_data'], StudentImportColumns::labels());
-                        unset($data['level'],$data['program']);
+                        $values = $result['normalized_data'];
+                        $data = array_intersect_key($values, array_flip(StudentImportColumns::IDENTITY_FIELDS));
                         $student = $result['matched_student_id'] === null ? new Student : Student::query()->whereKey($result['matched_student_id'])->lockForUpdate()->firstOrFail();
                         if (! $student->exists) {
                             $student->fill($data);
@@ -74,7 +74,7 @@ class CommitStudentImport
                             }
                         }
                         $student->save();
-                        $record = StudentRecord::query()->create(['student_id' => $student->id, 'academic_year_id' => $import->academic_year_id, 'establishment_id' => $import->establishment_id, 'level_id' => $result['normalized_data']['level_id'], 'program_id' => $result['normalized_data']['program_id'], 'status' => 'active', 'declared_by' => $actor->id, 'declared_at' => now()]);
+                        $record = StudentRecord::query()->create(['student_id' => $student->id, 'academic_year_id' => $import->academic_year_id, 'establishment_id' => $import->establishment_id, 'level_id' => $values['level_id'], 'program_id' => $values['program_id'], 'repeat_code' => $values['repeat_code'], 'scholarship_requested_at' => $values['scholarship_requested_at'] ?? null, 'scholarship_request_reference' => $values['scholarship_request_reference'] ?? null, 'status' => 'active', 'declared_by' => $actor->id, 'declared_at' => now()]);
                         $row->update([...$result, 'matched_student_id' => $student->id, 'matched_student_record_id' => $record->id, 'resolution' => 'imported']);
                         $declared++;
                     }
