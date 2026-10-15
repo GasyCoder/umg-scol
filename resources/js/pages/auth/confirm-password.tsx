@@ -1,4 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
+import { LockKeyhole } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,17 @@ export default function ConfirmPassword() {
         <>
             <Head title="Confirmer le mot de passe" />
 
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-info/30 bg-info-soft px-4 py-3 text-sm text-info-foreground">
+                <LockKeyhole
+                    className="mt-0.5 size-4 shrink-0"
+                    aria-hidden="true"
+                />
+                <p>
+                    Par sécurité, cette confirmation est demandée avant toute
+                    opération sensible.
+                </p>
+            </div>
+
             <PasskeyVerify
                 routes={{
                     options: confirmOptions(),
@@ -28,7 +40,7 @@ export default function ConfirmPassword() {
 
             <Form {...store.form()} resetOnSuccess={['password']}>
                 {({ processing, errors }) => (
-                    <div className="space-y-6">
+                    <div className="grid gap-6">
                         <div className="grid gap-2">
                             <Label htmlFor="password">Mot de passe</Label>
                             <PasswordInput
@@ -37,21 +49,20 @@ export default function ConfirmPassword() {
                                 placeholder="Mot de passe"
                                 autoComplete="current-password"
                                 autoFocus
+                                className="h-11"
                             />
 
                             <InputError message={errors.password} />
                         </div>
 
-                        <div className="flex items-center">
-                            <Button
-                                className="w-full"
-                                disabled={processing}
-                                data-test="confirm-password-button"
-                            >
-                                {processing && <Spinner />}
-                                Confirmer le mot de passe
-                            </Button>
-                        </div>
+                        <Button
+                            className="h-11 w-full text-base font-semibold"
+                            disabled={processing}
+                            data-test="confirm-password-button"
+                        >
+                            {processing && <Spinner />}
+                            Confirmer le mot de passe
+                        </Button>
                     </div>
                 )}
             </Form>
