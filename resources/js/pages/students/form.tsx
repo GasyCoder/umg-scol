@@ -1,5 +1,16 @@
 import { Head, useForm } from '@inertiajs/react';
-import { BookOpenCheck, IdCard, Phone, UserRound } from 'lucide-react';
+import {
+    BookOpenCheck,
+    GraduationCap,
+    IdCard,
+    Info,
+    ListChecks,
+    Phone,
+    Save,
+    UserPlus,
+    UserRound,
+    UserRoundPen,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { FormEvent, HTMLInputTypeAttribute } from 'react';
 import {
@@ -8,7 +19,7 @@ import {
     FormField,
     FormSection,
 } from '@/components/forms/form-kit';
-import Heading from '@/components/heading';
+import { PageBody, PageHeader } from '@/components/page-header';
 import RecordFields from '@/components/students/record-fields';
 import type { Options, Student } from '@/components/students/types';
 import { Input } from '@/components/ui/input';
@@ -27,6 +38,7 @@ type Field = {
     wide?: boolean;
 };
 type Section = {
+    id: string;
     title: string;
     description: string;
     icon: LucideIcon;
@@ -35,6 +47,7 @@ type Section = {
 
 const currentYear = new Date().getFullYear();
 const identity: Section = {
+    id: 'section-identity',
     title: 'Identité',
     description:
         'Telle qu’elle figure sur les pièces officielles de l’étudiant.',
@@ -77,6 +90,7 @@ const identity: Section = {
 };
 const sections: Section[] = [
     {
+        id: 'section-bac',
         title: 'Baccalauréat',
         description: 'Informations du diplôme d’accès à l’université.',
         icon: BookOpenCheck,
@@ -109,6 +123,7 @@ const sections: Section[] = [
         ],
     },
     {
+        id: 'section-cin',
         title: 'Pièce d’identité (CIN)',
         description:
             'Données sensibles : visibles uniquement par le personnel autorisé.',
@@ -136,6 +151,7 @@ const sections: Section[] = [
         ],
     },
     {
+        id: 'section-contact',
         title: 'Coordonnées',
         description: 'Pour joindre l’étudiant au sujet de son dossier.',
         icon: Phone,
@@ -217,7 +233,8 @@ export default function StudentForm({
     };
     const renderSection = (section: Section) => (
         <FormSection
-            key={section.title}
+            key={section.id}
+            id={section.id}
             icon={section.icon}
             title={section.title}
             description={section.description}
@@ -272,48 +289,122 @@ export default function StudentForm({
         </FormSection>
     );
 
+    const summary: { id: string; title: string; icon: LucideIcon }[] = [
+        identity,
+        ...(student
+            ? []
+            : [
+                  {
+                      id: 'section-record',
+                      title: 'Déclaration annuelle',
+                      icon: GraduationCap,
+                  },
+              ]),
+        ...sections,
+    ];
+    const fullName = student
+        ? `${student.last_name} ${student.first_names ?? ''}`.trim()
+        : '';
+
     return (
-        <div className="space-y-6 p-4 pb-0 md:p-6 md:pb-0">
+        <>
             <Head
                 title={student ? 'Modifier l’identité' : 'Ajouter un étudiant'}
             />
-            <Heading
-                title={
-                    student
-                        ? `Modifier l’identité — ${student.last_name} ${student.first_names ?? ''}`.trim()
-                        : 'Ajouter un étudiant'
-                }
-                description={
-                    student
-                        ? 'Les modifications sont tracées dans l’audit. La déclaration annuelle se modifie depuis la fiche.'
-                        : 'Déclarez un étudiant déjà régulièrement inscrit dans votre établissement : identité, puis situation de l’année.'
-                }
-            />
-            <form onSubmit={submit} className="space-y-6" noValidate>
-                <ErrorSummary errors={errors} labels={labels} />
-                {renderSection(identity)}
-                {!student && (
-                    <RecordFields
-                        options={options}
-                        data={form.data}
-                        errors={form.errors}
-                        setData={(key, value) => form.setData(key, value)}
-                    />
-                )}
-                {sections.map(renderSection)}
-                <FormActions
-                    processing={form.processing}
-                    submitLabel={
+            <PageBody className="pb-0 md:pb-0 lg:pb-0">
+                <PageHeader
+                    icon={student ? UserRoundPen : UserPlus}
+                    title={
                         student
-                            ? 'Enregistrer les modifications'
-                            : 'Ajouter l’étudiant'
+                            ? `Modifier l’identité — ${fullName}`
+                            : 'Ajouter un étudiant'
                     }
-                    cancelHref={
-                        student ? `/students/${student.uuid}` : '/students'
+                    description={
+                        student
+                            ? 'Les modifications sont tracées dans l’audit. La déclaration annuelle se modifie depuis la fiche.'
+                            : 'Déclarez un étudiant déjà régulièrement inscrit dans votre établissement : identité, puis situation de l’année.'
                     }
                 />
-            </form>
-        </div>
+                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
+                    <form
+                        onSubmit={submit}
+                        className="min-w-0 space-y-6"
+                        noValidate
+                    >
+                        <ErrorSummary errors={errors} labels={labels} />
+                        {renderSection(identity)}
+                        {!student && (
+                            <div id="section-record" className="scroll-mt-24">
+                                <RecordFields
+                                    options={options}
+                                    data={form.data}
+                                    errors={form.errors}
+                                    setData={(key, value) =>
+                                        form.setData(key, value)
+                                    }
+                                />
+                            </div>
+                        )}
+                        {sections.map(renderSection)}
+                        <FormActions
+                            processing={form.processing}
+                            submitIcon={student ? Save : UserPlus}
+                            submitLabel={
+                                student
+                                    ? 'Enregistrer les modifications'
+                                    : 'Ajouter l’étudiant'
+                            }
+                            cancelHref={
+                                student
+                                    ? `/students/${student.uuid}`
+                                    : '/students'
+                            }
+                        />
+                    </form>
+                    <aside className="hidden space-y-4 xl:sticky xl:top-20 xl:block">
+                        <nav
+                            aria-label="Sections du formulaire"
+                            className="surface p-4"
+                        >
+                            <p className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wide text-muted-foreground uppercase">
+                                <ListChecks
+                                    className="size-4"
+                                    aria-hidden="true"
+                                />
+                                Sections
+                            </p>
+                            <ol className="space-y-0.5">
+                                {summary.map((item) => (
+                                    <li key={item.id}>
+                                        <a
+                                            href={`#${item.id}`}
+                                            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
+                                            <item.icon
+                                                className="size-4 text-muted-foreground"
+                                                aria-hidden="true"
+                                            />
+                                            {item.title}
+                                        </a>
+                                    </li>
+                                ))}
+                            </ol>
+                        </nav>
+                        <div className="flex gap-3 rounded-xl border border-info/30 bg-info-soft p-4 text-xs text-info-foreground">
+                            <Info
+                                className="size-4 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <p>
+                                L’inscription se fait dans l’établissement, hors
+                                plateforme : cette fiche déclare un étudiant
+                                déjà régulièrement inscrit.
+                            </p>
+                        </div>
+                    </aside>
+                </div>
+            </PageBody>
+        </>
     );
 }
 StudentForm.layout = {
