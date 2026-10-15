@@ -31,9 +31,10 @@ import {
 import { ImportStepper } from './import-ui';
 
 const tips = [
-    'Partez du modèle : les colonnes sont reconnues automatiquement.',
-    'Enregistrez matricules, CIN et numéros BAC comme du texte pour garder les zéros initiaux.',
-    'Pas de formules ni de cellules fusionnées.',
+    'Partez du modèle établissement officiel : déposez-le tel quel, ses colonnes sont reconnues automatiquement.',
+    'La ligne de repères « [ 1 ] [ 2 ]… » et le bloc final « Arrêté au nombre de… » sont ignorés.',
+    'Les colonnes BOURSIER et TAUX DE BOURSE (formules) ne sont pas importées : la plateforme applique elle-même la règle.',
+    'Un téléphone saisi comme nombre retrouve son 0 initial ; un CIN autre que 12 chiffres est accepté mais signalé.',
     'Le fichier déclare des étudiants déjà inscrits : aucune inscription n’est effectuée.',
 ];
 
@@ -185,7 +186,7 @@ export default function ImportCreate({
                         <FormSection
                             icon={FileUp}
                             title="Fichier"
-                            description={`Une seule feuille, en-têtes en première ligne, ${maxRows.toLocaleString('fr-FR')} lignes au plus.`}
+                            description={`Le modèle établissement, ou une feuille avec ses en-têtes ; ${maxRows.toLocaleString('fr-FR')} lignes au plus.`}
                             columns={1}
                         >
                             <div className="relative overflow-hidden rounded-xl bg-accent/50 p-4 sm:p-5">
