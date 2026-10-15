@@ -19,6 +19,9 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
 
     private int $count = 0;
 
+    /** The summary block of the template has started: nothing below is a student. */
+    private bool $summary = false;
+
     public function __construct(private StudentImport $import) {}
 
     public function chunkSize(): int
@@ -41,7 +44,12 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
 
             return;
         }
-        if (count(array_filter($raw, fn ($v) => $v !== null && $v !== '')) === 0) {
+        if ($this->summary || count(array_filter($raw, fn ($v) => $v !== null && $v !== '')) === 0 || StudentImportColumns::isLegendRow($raw)) {
+            return;
+        }
+        if (StudentImportColumns::isSummaryStart($raw)) {
+            $this->summary = true;
+
             return;
         }
         if (++$this->count > (int) config('student_imports.max_rows')) {
