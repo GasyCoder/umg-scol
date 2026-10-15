@@ -11,6 +11,7 @@ use App\Models\StudentImport;
 use App\Models\User;
 use App\Support\Audit\AuditPresenter;
 use App\Support\Branding;
+use App\Support\NotificationInbox;
 use App\Support\PendingTasks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -75,6 +76,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // Lazy: evaluated per response only, within each module's Policy and perimeter.
             'tasks' => fn () => $request->user() === null ? ['total' => 0, 'items' => []] : PendingTasks::forUser($request->user()),
+            // Latest notifications of the bell (own ones only), with the unread count.
+            'notifications' => fn () => NotificationInbox::feed($request->user()),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             // Width chosen with the sidebar splitter; same bounds as the client (sidebar-resizer.tsx).
             'sidebarWidth' => max(224, min(400, filter_var($request->cookie('sidebar_width'), FILTER_VALIDATE_INT) ?: 256)),
