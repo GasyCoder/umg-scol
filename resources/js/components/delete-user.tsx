@@ -1,7 +1,7 @@
 import { Form } from '@inertiajs/react';
+import { AlertTriangle, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -15,36 +15,53 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { SettingsSection } from '@/layouts/settings/layout';
 
 export default function DeleteUser() {
     const passwordInput = useRef<HTMLInputElement>(null);
 
     return (
-        <div className="space-y-6">
-            <Heading
-                variant="small"
-                title="Supprimer le compte"
-                description="Supprimez votre compte et toutes les ressources associées"
-            />
-            <div className="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10">
-                <div className="relative space-y-0.5 text-red-600 dark:text-red-100">
-                    <p className="font-medium">Attention</p>
-                    <p className="text-sm">
-                        Veuillez procéder avec prudence : cette action est
-                        irréversible.
-                    </p>
+        <SettingsSection
+            icon={Trash2}
+            tone="danger"
+            title="Supprimer le compte"
+            description="Supprimez votre compte et toutes les ressources associées"
+        >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3 text-sm">
+                    <AlertTriangle
+                        className="mt-0.5 size-4 shrink-0 text-danger"
+                        aria-hidden="true"
+                    />
+                    <div className="space-y-0.5">
+                        <p className="font-semibold text-foreground">
+                            Attention
+                        </p>
+                        <p className="text-muted-foreground">
+                            Veuillez procéder avec prudence : cette action est
+                            irréversible.
+                        </p>
+                    </div>
                 </div>
 
                 <Dialog>
                     <DialogTrigger asChild>
                         <Button
                             variant="destructive"
+                            className="shrink-0"
                             data-test="delete-user-button"
                         >
+                            <Trash2 aria-hidden="true" />
                             Supprimer le compte
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
+                        <span
+                            className="flex size-11 items-center justify-center rounded-xl bg-danger-soft text-danger-foreground"
+                            aria-hidden="true"
+                        >
+                            <AlertTriangle className="size-5" />
+                        </span>
                         <DialogTitle>
                             Voulez-vous vraiment supprimer votre compte ?
                         </DialogTitle>
@@ -81,6 +98,7 @@ export default function DeleteUser() {
                                             ref={passwordInput}
                                             placeholder="Mot de passe"
                                             autoComplete="current-password"
+                                            className="h-10"
                                         />
 
                                         <InputError message={errors.password} />
@@ -117,6 +135,6 @@ export default function DeleteUser() {
                     </DialogContent>
                 </Dialog>
             </div>
-        </div>
+        </SettingsSection>
     );
 }
