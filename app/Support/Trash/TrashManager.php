@@ -92,8 +92,8 @@ class TrashManager
     {
         if ($target instanceof Student) {
             StudentIdentityLocks::acquire(StudentIdentityLocks::keys($target->attributesToArray()));
-            foreach (['student_number', 'cin', 'bac_registration_number'] as $field) {
-                if (filled($target->getAttribute($field)) && Student::query()->where($field, $target->getAttribute($field))->whereKeyNot($target->id)->lockForUpdate()->first() !== null) {
+            foreach (StudentIdentityLocks::uniqueValues($target->attributesToArray()) as $field => $value) {
+                if (Student::query()->where($field, $value)->whereKeyNot($target->id)->lockForUpdate()->first() !== null) {
                     $this->fail('Une identité correspondante existe déjà. Résolvez le doublon avant la restauration.');
                 }
             }
