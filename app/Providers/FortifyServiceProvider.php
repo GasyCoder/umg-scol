@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
@@ -39,8 +40,15 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::authenticateUsing(function (Request $request) {
             $user = User::query()->where('email', $request->input('email'))->first();
+            if ($user === null || ! Hash::check($request->input('password'), $user->password)) {
+                return null;
+            }
+            // Only someone holding the right password learns that the account is suspended.
+            if (StudentPortalAccess::internalAccount($user) && ! $user->is_active) {
+                throw ValidationException::withMessages([Fortify::username() => 'Ce compte est suspendu. Contactez un administrateur.']);
+            }
 
-            return $user !== null && StudentPortalAccess::internal($user) && Hash::check($request->input('password'), $user->password) ? $user : null;
+            return StudentPortalAccess::internal($user) ? $user : null;
         });
         Sanctum::getAccessTokenFromRequestUsing(fn () => '');
         Passkeys::authorizeLoginUsing(fn (Request $request, PasskeyUser $user) => $user instanceof User && StudentPortalAccess::internal($user));
