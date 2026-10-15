@@ -17,6 +17,8 @@ export type Auth = {
     canViewImports: boolean;
     canViewCorrections: boolean;
     canViewReports: boolean;
+    canManageUsers: boolean;
+    canManageBranding: boolean;
     canManagePermissions: boolean;
     canManageTrash: boolean;
     /** Label of the account's role, shown in the top bar. */
@@ -57,4 +59,14 @@ export type PendingTask = {
 export type PendingTasks = {
     total: number;
     items: PendingTask[];
+};
+
+/** Platform identity (settings → Plateforme), shared with every internal page. */
+export type Branding = {
+    institution_name: string;
+    scol_name: string;
+    bourse_name: string;
+    support_email: string | null;
+    logo_url: string | null;
+    favicon_url: string | null;
 };
