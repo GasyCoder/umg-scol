@@ -32,7 +32,7 @@ class ScholarshipApplicationFilters
                     ->orWhereRaw("ddb_key LIKE ? ESCAPE '!'", [$ddb.'%'])
                     ->orWhereHas('student', function ($s) use ($search) {
                         $term = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
-                        $s->whereRaw("student_number LIKE ? ESCAPE '!'", [$term.'%'])->orWhereRaw("last_name LIKE ? ESCAPE '!'", ['%'.$term.'%'])->orWhereRaw("first_names LIKE ? ESCAPE '!'", ['%'.$term.'%']);
+                        $s->whereRaw("cin LIKE ? ESCAPE '!'", [preg_replace('/[\s.]+/u', '', $term).'%'])->orWhereRaw("last_name LIKE ? ESCAPE '!'", ['%'.$term.'%'])->orWhereRaw("first_names LIKE ? ESCAPE '!'", ['%'.$term.'%']);
                     });
             });
         }
