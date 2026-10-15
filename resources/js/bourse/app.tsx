@@ -37,6 +37,13 @@ import { ToneBadge, toneFor } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
     Dialog,
@@ -91,31 +98,35 @@ type Correction = {
     created_at: string;
     reviewed_at: string | null;
 };
+type FieldOption = { value: string; label: string };
 type FieldRow = {
     label: string;
     value: string | number | null;
     field?: string;
     hidden?: boolean;
     input?: 'date' | 'number' | 'email' | 'tel';
+    /** Closed list of the establishment file: the proposed value is picked, not typed. */
+    options?: FieldOption[];
 };
 type Student = {
-    student_number: string | null;
     last_name: string;
     first_names: string | null;
+    sex: 'M' | 'F' | null;
     birth_date: string | null;
-    birth_place: string | null;
+    mother_name: string | null;
+    nationality: string | null;
     phone: string | null;
     email: string | null;
     address: string | null;
-    bac_registration_number: string | null;
     bac_series: string | null;
     bac_year: number | null;
-    bac_mention: string | null;
     records: {
         academic_year: string;
         establishment: string;
         level: string;
+        mention: string | null;
         program: string | null;
+        repeat_code: string | null;
         status: string;
     }[];
 };
@@ -130,18 +141,64 @@ type InfoSection = {
 const PORTAL_NOTICE =
     'Ce portail permet aux étudiants déjà déclarés par leur établissement de consulter leurs informations. La création d’un compte numérique ne constitue pas une inscription universitaire.';
 
+/** Same closed lists as StudentReferenceLists and the StudentSex enum (backend). */
+const SEX_OPTIONS: FieldOption[] = [
+    { value: 'M', label: 'Masculin' },
+    { value: 'F', label: 'Féminin' },
+];
+const listOptions = (values: string[]): FieldOption[] =>
+    values.map((value) => ({ value, label: value }));
+const NATIONALITY_OPTIONS = listOptions([
+    'Malagasy',
+    'Comorien',
+    'Africain',
+    'Européen',
+    'Asiatique',
+    'Mauricien',
+    'Autres',
+]);
+const BAC_SERIES_OPTIONS = listOptions([
+    'A1',
+    'A2',
+    'C',
+    'D',
+    'L',
+    'S',
+    'OSE',
+    'Tech. Génie civil',
+    'Tech. Industriel',
+    'Tech. Tertiaire',
+    'Tech. Agricole',
+    'Technologique',
+    'Autres',
+]);
+/** Fields whose stored code is shown through a label (sex M/F). */
+const FIELD_OPTIONS: Record<string, FieldOption[]> = { sex: SEX_OPTIONS };
+
+function optionLabel(field: string, value: string): string {
+    return (
+        FIELD_OPTIONS[field]?.find((option) => option.value === value)?.label ??
+        value
+    );
+}
+
 function infoSections(student: Student): InfoSection[] {
     return [
         {
             title: 'Identité',
             icon: UserRound,
             fields: [
-                { label: 'Matricule', value: student.student_number },
                 { label: 'Nom', value: student.last_name, field: 'last_name' },
                 {
                     label: 'Prénoms',
                     value: student.first_names,
                     field: 'first_names',
+                },
+                {
+                    label: 'Sexe',
+                    value: student.sex && optionLabel('sex', student.sex),
+                    field: 'sex',
+                    options: SEX_OPTIONS,
                 },
                 {
                     label: 'Date de naissance',
@@ -150,9 +207,15 @@ function infoSections(student: Student): InfoSection[] {
                     input: 'date',
                 },
                 {
-                    label: 'Lieu de naissance',
-                    value: student.birth_place,
-                    field: 'birth_place',
+                    label: 'Nom et prénoms de la mère',
+                    value: student.mother_name,
+                    field: 'mother_name',
+                },
+                {
+                    label: 'Nationalité',
+                    value: student.nationality,
+                    field: 'nationality',
+                    options: NATIONALITY_OPTIONS,
                 },
             ],
         },
@@ -206,25 +269,16 @@ function infoSections(student: Student): InfoSection[] {
             icon: GraduationCap,
             fields: [
                 {
-                    label: 'Numéro BAC',
-                    value: student.bac_registration_number,
-                    field: 'bac_registration_number',
-                },
-                {
                     label: 'Série',
                     value: student.bac_series,
                     field: 'bac_series',
+                    options: BAC_SERIES_OPTIONS,
                 },
                 {
                     label: 'Année',
                     value: student.bac_year,
                     field: 'bac_year',
                     input: 'number',
-                },
-                {
-                    label: 'Mention',
-                    value: student.bac_mention,
-                    field: 'bac_mention',
                 },
             ],
         },
@@ -332,8 +386,7 @@ function Portal() {
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
     const [challenge, setChallenge] = useState('');
-    const [type, setType] = useState('student_number');
-    const [identifier, setIdentifier] = useState('');
+    const [cin, setCin] = useState('');
     const [birth, setBirth] = useState('');
     const [corrections, setCorrections] = useState<Correction[]>([]);
     const [reporting, setReporting] = useState<FieldRow | null>(null);
@@ -414,10 +467,10 @@ function Portal() {
         void perform(async () => {
             const result = await api<{ linked: boolean; message: string }>(
                 'link',
-                { identifier_type: type, identifier, birth_date: birth },
+                { cin, birth_date: birth },
             );
             setMessage(result.message);
-            setIdentifier('');
+            setCin('');
             setBirth('');
             await refresh();
         });
@@ -804,53 +857,25 @@ function Portal() {
                                     nécessaire.
                                 </Notice>
                                 <form onSubmit={link} className="space-y-5">
-                                    <fieldset>
-                                        <legend className="mb-2 text-sm font-medium">
-                                            Identifiant officiel
-                                        </legend>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {[
-                                                ['student_number', 'Matricule'],
-                                                [
-                                                    'bac_registration_number',
-                                                    'Numéro BAC',
-                                                ],
-                                            ].map(([value, label]) => (
-                                                <Label
-                                                    key={value}
-                                                    className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-accent has-[:checked]:text-accent-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="identifier_type"
-                                                        value={value}
-                                                        checked={type === value}
-                                                        onChange={() =>
-                                                            setType(value)
-                                                        }
-                                                        className="size-4 accent-primary"
-                                                    />
-                                                    {label}
-                                                </Label>
-                                            ))}
-                                        </div>
-                                    </fieldset>
                                     <div className="space-y-2">
-                                        <Label htmlFor="identifier">
-                                            {type === 'student_number'
-                                                ? 'Matricule'
-                                                : 'Numéro BAC'}
-                                        </Label>
+                                        <Label htmlFor="cin">Numéro CIN</Label>
                                         <Input
-                                            id="identifier"
+                                            id="cin"
+                                            inputMode="numeric"
+                                            autoComplete="off"
                                             maxLength={100}
                                             required
                                             className={fieldClass}
-                                            value={identifier}
+                                            value={cin}
                                             onChange={(e) =>
-                                                setIdentifier(e.target.value)
+                                                setCin(e.target.value)
                                             }
                                         />
+                                        <p className="text-xs text-muted-foreground">
+                                            Le numéro figurant sur votre carte
+                                            d’identité nationale, tel que
+                                            déclaré par votre établissement.
+                                        </p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="birth">
@@ -926,25 +951,13 @@ function Portal() {
                                     <p className="max-w-xl text-sm text-muted-foreground">
                                         {PORTAL_NOTICE}
                                     </p>
-                                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                                        {student.student_number && (
-                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-medium text-foreground ring-1 ring-border">
-                                                <IdCard
-                                                    className="size-3.5 text-muted-foreground"
-                                                    aria-hidden="true"
-                                                />
-                                                Matricule{' '}
-                                                <span className="font-mono font-semibold">
-                                                    {student.student_number}
-                                                </span>
-                                            </span>
-                                        )}
-                                        {confirmation && (
+                                    {confirmation && (
+                                        <div className="flex flex-wrap items-center gap-2 pt-1">
                                             <ConfirmationBadge
                                                 status={confirmation.status}
                                             />
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <StudentsIllustration className="hidden h-36 w-auto shrink-0 sm:block md:h-40" />
                             </div>
@@ -1112,10 +1125,21 @@ function Portal() {
                                                         {record.establishment}
                                                     </p>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {record.level} —{' '}
-                                                        {record.program ??
-                                                            'Parcours non renseigné'}
+                                                        {[
+                                                            record.level,
+                                                            record.mention,
+                                                            record.program ??
+                                                                'Parcours non renseigné',
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' — ')}
                                                     </p>
+                                                    {record.repeat_code && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Code redoublement :{' '}
+                                                            {record.repeat_code}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <ToneBadge
@@ -1136,8 +1160,8 @@ function Portal() {
                                     aria-hidden="true"
                                 />
                                 Pour une erreur concernant votre niveau,
-                                parcours ou établissement, contactez votre
-                                établissement.
+                                mention, parcours ou établissement, contactez
+                                votre établissement.
                             </p>
                         </section>
 
@@ -1198,7 +1222,10 @@ function Portal() {
                                                         Valeur proposée :
                                                     </span>{' '}
                                                     <span className="font-medium text-foreground">
-                                                        {item.proposed_value}
+                                                        {optionLabel(
+                                                            item.field,
+                                                            item.proposed_value,
+                                                        )}
                                                     </span>
                                                 </p>
                                                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -1316,17 +1343,50 @@ function Portal() {
                                         <Label htmlFor="proposed">
                                             Valeur correcte
                                         </Label>
-                                        <Input
-                                            id="proposed"
-                                            type={reporting?.input ?? 'text'}
-                                            required
-                                            maxLength={2000}
-                                            className={fieldClass}
-                                            value={proposed}
-                                            onChange={(e) =>
-                                                setProposed(e.target.value)
-                                            }
-                                        />
+                                        {reporting?.options ? (
+                                            <Select
+                                                required
+                                                value={proposed}
+                                                onValueChange={setProposed}
+                                            >
+                                                <SelectTrigger
+                                                    id="proposed"
+                                                    className="h-11 w-full bg-card"
+                                                >
+                                                    <SelectValue placeholder="Choisir une valeur" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {reporting.options.map(
+                                                        (option) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    option.value
+                                                                }
+                                                                value={
+                                                                    option.value
+                                                                }
+                                                            >
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <Input
+                                                id="proposed"
+                                                type={
+                                                    reporting?.input ?? 'text'
+                                                }
+                                                required
+                                                maxLength={2000}
+                                                className={fieldClass}
+                                                value={proposed}
+                                                onChange={(e) =>
+                                                    setProposed(e.target.value)
+                                                }
+                                            />
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex items-baseline justify-between gap-2">
