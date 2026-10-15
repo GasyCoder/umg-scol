@@ -383,8 +383,10 @@ it('keeps preview and history relation queries bounded', function () {
     $this->get('/imports/'.$import->uuid)->assertOk();
     $queries = DB::getQueryLog();
     DB::disableQueryLog();
-    // 30 rows: an N+1 would add 30+ queries. The margin covers the fixed shared-prop cost (pending tasks: one COUNT query plus Policy checks).
-    expect(count($queries))->toBeLessThan(35);
+    // The notification feed has its own query bounds. Keep the same strict limit for the
+    // import preview and its relations: an N+1 on these 30 rows would add 30+ queries.
+    $previewQueries = array_filter($queries, fn ($query) => preg_match('/\bfrom\s+[`"]?notifications[`"]?/i', $query['query']) !== 1);
+    expect(count($previewQueries))->toBeLessThan(35);
 });
 it('chunks a multi-line file without persisting before confirmation', function () {
     config(['student_imports.chunk_size' => 100]);
