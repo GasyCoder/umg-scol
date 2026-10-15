@@ -38,7 +38,7 @@ beforeEach(function () {
     $declare = fn (Establishment $e, Level $l, ?Program $p, string $status = 'active', ?AcademicYear $y = null, array $identity = []) => StudentRecord::factory()->create([
         'student_id' => Student::factory()->create($identity)->id, 'academic_year_id' => ($y ?? $this->year)->id, 'establishment_id' => $e->id, 'level_id' => $l->id, 'program_id' => $p?->id, 'status' => $status,
     ]);
-    $declare($this->a, $this->l1, $this->gl, 'active', null, ['last_name' => 'RAKOTO', 'student_number' => 'GL-1']);
+    $declare($this->a, $this->l1, $this->gl, 'active', null, ['last_name' => 'RAKOTO', 'cin' => '777000111222']);
     $declare($this->a, $this->l1, $this->gl);
     $declare($this->a, $this->l1, $this->gl, 'inactive');
     $declare($this->a, $this->l1, $this->reseaux);
@@ -115,7 +115,7 @@ it('follows the chosen academic year and handles the absence of a current year',
 it('searches across years unless a year is requested', function () {
     expect(browse($this, $this->admin, ['search' => 'ANCIEN'])['records']['total'])->toBe(1)
         ->and(browse($this, $this->admin, ['search' => 'ANCIEN', 'academic_year_id' => $this->year->id])['records']['total'])->toBe(0)
-        ->and(browse($this, $this->admin, ['search' => 'GL-1', 'academic_year_id' => $this->year->id])['records']['total'])->toBe(1);
+        ->and(browse($this, $this->admin, ['search' => '777000111222', 'academic_year_id' => $this->year->id])['records']['total'])->toBe(1);
 });
 it('validates drill-down parameters and refuses students', function () {
     $this->actingAs($this->admin)->get('/students?mention_id=abc')->assertSessionHasErrors('mention_id');
