@@ -41,7 +41,8 @@ export default function Login({ status, canResetPassword }: Props) {
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="email"
-                                    placeholder="email@example.com"
+                                    placeholder="vous@exemple.mg"
+                                    className="h-11"
                                 />
                                 <InputError message={errors.email} />
                             </div>
@@ -67,7 +68,8 @@ export default function Login({ status, canResetPassword }: Props) {
                                     required
                                     tabIndex={2}
                                     autoComplete="current-password"
-                                    placeholder="Mot de passe"
+                                    placeholder="Votre mot de passe"
+                                    className="h-11"
                                 />
                                 <InputError message={errors.password} />
                             </div>
@@ -85,7 +87,7 @@ export default function Login({ status, canResetPassword }: Props) {
 
                             <Button
                                 type="submit"
-                                className="mt-4 w-full"
+                                className="mt-2 h-11 w-full text-base font-semibold"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"
@@ -99,7 +101,10 @@ export default function Login({ status, canResetPassword }: Props) {
             </Form>
 
             {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
+                <div
+                    role="status"
+                    className="mt-4 rounded-lg bg-success-soft px-4 py-3 text-center text-sm font-medium text-success-foreground"
+                >
                     {status}
                 </div>
             )}
@@ -108,6 +113,7 @@ export default function Login({ status, canResetPassword }: Props) {
 }
 
 Login.layout = {
-    title: 'Connexion au portail interne',
-    description: 'Saisissez votre adresse email et votre mot de passe.',
+    title: 'Connexion',
+    description:
+        'Bienvenue. Identifiez-vous avec votre adresse email professionnelle.',
 };
