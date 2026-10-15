@@ -27,11 +27,19 @@ import {
     FormSection,
 } from '@/components/forms/form-kit';
 import { PageBody, PageHeader } from '@/components/page-header';
+import { sectorOptions } from '@/components/references/definitions';
 import type { ReferenceRecord } from '@/components/references/definitions';
 import { LogoTile } from '@/components/references/logo-tile';
 import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 const OTHER = 'Autre';
@@ -54,6 +62,7 @@ const labels = {
     name: 'Nom complet',
     type: 'Type',
     type_other: 'Type',
+    sector: 'Institution',
     logo: 'Logo',
     address: 'Adresse',
     phone: 'Téléphone',
@@ -76,6 +85,7 @@ export default function EstablishmentForm({
         name: record?.name ?? '',
         type_choice: known ? record.type! : record?.type ? OTHER : '',
         type_other: !known && record?.type ? record.type : '',
+        sector: record?.sector ?? '',
         address: record?.address ?? '',
         phone: record?.phone ?? '',
         email: record?.email ?? '',
@@ -150,6 +160,7 @@ export default function EstablishmentForm({
             code: data.code,
             name: data.name,
             type: type || null,
+            sector: data.sector || null,
             address: data.address,
             phone: data.phone,
             email: data.email,
@@ -265,6 +276,45 @@ export default function EstablishmentForm({
                                         aria-invalid={Boolean(errors.name)}
                                         className={big}
                                     />
+                                </FormField>
+                                <FormField
+                                    id="sector"
+                                    label={labels.sector}
+                                    hint="Facultatif : publique ou privée."
+                                    error={errors.sector}
+                                >
+                                    <Select
+                                        value={form.data.sector || 'none'}
+                                        onValueChange={(value) =>
+                                            form.setData(
+                                                'sector',
+                                                value === 'none' ? '' : value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="sector"
+                                            className="h-12 w-full text-base"
+                                            aria-invalid={Boolean(
+                                                errors.sector,
+                                            )}
+                                        >
+                                            <SelectValue placeholder="Non précisée" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                Non précisée
+                                            </SelectItem>
+                                            {sectorOptions.map((option) => (
+                                                <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                >
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </FormField>
                             </div>
                         </FormSection>
