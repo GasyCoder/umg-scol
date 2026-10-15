@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\RepeatCode;
 use App\Enums\StudentRecordStatus;
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\Trashable;
+use Carbon\CarbonInterface;
 use Database\Factories\StudentRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -15,8 +17,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-/** @property StudentRecordStatus $status */
-#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'status', 'declared_by', 'declared_at'])]
+/**
+ * @property StudentRecordStatus $status
+ * @property RepeatCode|null $repeat_code
+ * @property CarbonInterface|null $scholarship_requested_at
+ */
+#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'declared_by', 'declared_at'])]
 #[Hidden(['active_academic_year_id', 'live_marker'])]
 class StudentRecord extends Model
 {
@@ -27,7 +33,7 @@ class StudentRecord extends Model
 
     protected function casts(): array
     {
-        return ['status' => StudentRecordStatus::class, 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
+        return ['status' => StudentRecordStatus::class, 'repeat_code' => RepeatCode::class, 'scholarship_requested_at' => 'date', 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
     }
 
     /** @return BelongsTo<Student, $this> */
@@ -87,6 +93,6 @@ class StudentRecord extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->useLogName('student_records')->logOnly(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'status', 'declared_by', 'declared_at'])->logOnlyDirty()->logEmptyChanges();
+        return LogOptions::defaults()->useLogName('student_records')->logOnly(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'declared_by', 'declared_at'])->logOnlyDirty()->logEmptyChanges();
     }
 }
