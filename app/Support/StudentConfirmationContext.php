@@ -86,7 +86,7 @@ final class StudentConfirmationContext
      */
     public static function recordRelations(bool $lock = false): array
     {
-        $columns = ['academicYear' => ['id', 'name', 'is_current', 'is_active'], 'establishment' => ['id', 'name'], 'level' => ['id', 'name'], 'program' => ['id', 'name']];
+        $columns = ['academicYear' => ['id', 'name', 'is_current', 'is_active'], 'establishment' => ['id', 'name'], 'level' => ['id', 'name'], 'program' => ['id', 'name', 'mention_id'], 'program.mention' => ['id', 'name']];
 
         return array_map(fn (array $select) => fn (Relation $query) => $query->select($select)->when($lock, fn ($q) => $q->sharedLock()), $columns);
     }
