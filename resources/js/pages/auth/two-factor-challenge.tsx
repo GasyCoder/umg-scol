@@ -1,15 +1,18 @@
 import { Form, Head, setLayoutProps } from '@inertiajs/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
+import { KeyRound, Smartphone } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     InputOTP,
     InputOTPGroup,
     InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
+import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/two-factor/login';
 
 export default function TwoFactorChallenge() {
@@ -53,81 +56,100 @@ export default function TwoFactorChallenge() {
         <>
             <Head title="Double authentification" />
 
-            <div className="space-y-6">
-                <Form
-                    {...store.form()}
-                    className="space-y-4"
-                    resetOnError
-                    resetOnSuccess={!showRecoveryInput}
+            <div className="mb-6 flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground shadow-card">
+                <span
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                    aria-hidden="true"
                 >
-                    {({ errors, processing, clearErrors }) => (
-                        <>
-                            {showRecoveryInput ? (
-                                <>
-                                    <Input
-                                        name="recovery_code"
-                                        type="text"
-                                        placeholder="Saisissez le code de récupération"
-                                        autoFocus={showRecoveryInput}
-                                        required
-                                    />
-                                    <InputError
-                                        message={errors.recovery_code}
-                                    />
-                                </>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center space-y-3 text-center">
-                                    <div className="flex w-full items-center justify-center">
-                                        <InputOTP
-                                            name="code"
-                                            maxLength={OTP_MAX_LENGTH}
-                                            value={code}
-                                            onChange={(value) => setCode(value)}
-                                            disabled={processing}
-                                            pattern={REGEXP_ONLY_DIGITS}
-                                            autoFocus
-                                        >
-                                            <InputOTPGroup>
-                                                {Array.from(
-                                                    { length: OTP_MAX_LENGTH },
-                                                    (_, index) => (
-                                                        <InputOTPSlot
-                                                            key={index}
-                                                            index={index}
-                                                        />
-                                                    ),
-                                                )}
-                                            </InputOTPGroup>
-                                        </InputOTP>
-                                    </div>
-                                    <InputError message={errors.code} />
-                                </div>
-                            )}
-
-                            <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={processing}
-                            >
-                                Continuer
-                            </Button>
-
-                            <div className="text-center text-sm text-muted-foreground">
-                                <span>ou vous pouvez </span>
-                                <button
-                                    type="button"
-                                    className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                    onClick={() =>
-                                        toggleRecoveryMode(clearErrors)
-                                    }
-                                >
-                                    {authConfigContent.toggleText}
-                                </button>
-                            </div>
-                        </>
+                    {showRecoveryInput ? (
+                        <KeyRound className="size-5" />
+                    ) : (
+                        <Smartphone className="size-5" />
                     )}
-                </Form>
+                </span>
+                <p>
+                    {showRecoveryInput
+                        ? 'Chaque code de récupération ne peut servir qu’une seule fois.'
+                        : 'Le code change toutes les 30 secondes dans votre application.'}
+                </p>
             </div>
+
+            <Form
+                {...store.form()}
+                className="grid gap-6"
+                resetOnError
+                resetOnSuccess={!showRecoveryInput}
+            >
+                {({ errors, processing, clearErrors }) => (
+                    <>
+                        {showRecoveryInput ? (
+                            <div className="grid gap-2">
+                                <Label htmlFor="recovery_code">
+                                    Code de récupération
+                                </Label>
+                                <Input
+                                    id="recovery_code"
+                                    name="recovery_code"
+                                    type="text"
+                                    placeholder="Saisissez le code de récupération"
+                                    autoFocus={showRecoveryInput}
+                                    autoComplete="one-time-code"
+                                    required
+                                    className="h-11 font-mono tracking-wide"
+                                />
+                                <InputError message={errors.recovery_code} />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center gap-3 text-center">
+                                <InputOTP
+                                    name="code"
+                                    maxLength={OTP_MAX_LENGTH}
+                                    value={code}
+                                    onChange={(value) => setCode(value)}
+                                    disabled={processing}
+                                    pattern={REGEXP_ONLY_DIGITS}
+                                    autoFocus
+                                    aria-label="Code d'authentification à six chiffres"
+                                >
+                                    <InputOTPGroup className="gap-2 sm:gap-2.5">
+                                        {Array.from(
+                                            { length: OTP_MAX_LENGTH },
+                                            (_, index) => (
+                                                <InputOTPSlot
+                                                    key={index}
+                                                    index={index}
+                                                    className="size-11 rounded-lg border bg-card font-heading text-lg font-bold shadow-card first:rounded-lg last:rounded-lg sm:size-12 sm:text-xl"
+                                                />
+                                            ),
+                                        )}
+                                    </InputOTPGroup>
+                                </InputOTP>
+                                <InputError message={errors.code} />
+                            </div>
+                        )}
+
+                        <Button
+                            type="submit"
+                            className="h-11 w-full text-base font-semibold"
+                            disabled={processing}
+                        >
+                            {processing && <Spinner />}
+                            Continuer
+                        </Button>
+
+                        <p className="text-center text-sm text-muted-foreground">
+                            <span>ou vous pouvez </span>
+                            <button
+                                type="button"
+                                className="cursor-pointer rounded-sm font-medium text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                onClick={() => toggleRecoveryMode(clearErrors)}
+                            >
+                                {authConfigContent.toggleText}
+                            </button>
+                        </p>
+                    </>
+                )}
+            </Form>
         </>
     );
 }
