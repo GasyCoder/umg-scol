@@ -18,7 +18,7 @@ class LinkReviewController extends Controller
     {
         Gate::authorize('viewAny', StudentLinkRequest::class);
 
-        return Inertia::render('student-links/index', ['requests' => StudentLinkRequest::query()->visibleTo($request->user())->where('status', 'pending')->with(['user:id,name,email', 'student:id,last_name,first_names,student_number'])->latest('id')->paginate(20)->through(fn ($row) => ['id' => $row->id, 'uuid' => $row->uuid, 'requested_at' => $row->requested_at, 'user' => $row->user->only(['name', 'email']), 'student' => $row->student->only(['last_name', 'first_names', 'student_number'])])]);
+        return Inertia::render('student-links/index', ['requests' => StudentLinkRequest::query()->visibleTo($request->user())->where('status', 'pending')->with(['user:id,name,email', 'student:id,last_name,first_names,birth_date'])->latest('id')->paginate(20)->through(fn ($row) => ['id' => $row->id, 'uuid' => $row->uuid, 'requested_at' => $row->requested_at, 'user' => $row->user->only(['name', 'email']), 'student' => [...$row->student->only(['last_name', 'first_names']), 'birth_date' => $row->student->birth_date?->format('Y-m-d')]])]);
     }
 
     public function review(ReviewLinkRequest $request, StudentLinkRequest $studentLinkRequest, ReviewStudentLink $action): RedirectResponse
