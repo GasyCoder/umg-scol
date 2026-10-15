@@ -1,7 +1,9 @@
 <?php
 
 use App\Actions\Students\CreateDeclaredStudent;
+use App\Enums\RepeatCode;
 use App\Enums\StudentRecordStatus;
+use App\Enums\StudentSex;
 use App\Models\AcademicYear;
 use App\Models\Activity;
 use App\Models\Establishment;
@@ -33,20 +35,21 @@ beforeEach(function () {
     $this->actor->assignRole('establishment');
     $this->admin = User::factory()->create()->assignRole('superadmin');
     $this->central = User::factory()->create()->assignRole('central_scholarship_office');
-    $this->data = ['last_name' => ' Nom officiel ', 'first_names' => ' Prénom ', 'birth_date' => '2001-02-03',
-        'student_number' => ' TEST  001 ', 'cin' => ' 123 456 789 ', 'phone' => ' 034 12 345 67 ',
-        'email' => ' TEST@EXAMPLE.TEST ', 'bac_registration_number' => ' BAC  01 ', 'address' => ' Adresse privée ',
-        'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id];
+    $this->data = ['last_name' => ' Nom officiel ', 'first_names' => ' Prénom ', 'sex' => 'F', 'birth_date' => '2001-02-03',
+        'mother_name' => ' Mère  officielle ', 'cin' => ' 101 234 567 890 ', 'nationality' => 'malagasy', 'phone' => ' 034 12 345 67 ',
+        'email' => ' TEST@EXAMPLE.TEST ', 'address' => ' Adresse privée ', 'bac_series' => 'd', 'bac_year' => 2019,
+        'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'repeat_code' => 'N'];
 });
 
 it('creates and normalizes identity with a first annual declaration and server actor', function () {
-    $this->actingAs($this->actor)->post('/students', [...$this->data, 'declared_by' => $this->admin->id, 'declared_at' => '1990-01-01'])->assertSessionHasNoErrors()->assertRedirect();
+    $this->actingAs($this->actor)->post('/students', [...$this->data, 'repeat_code' => ' n (Nouveau) ', 'declared_by' => $this->admin->id, 'declared_at' => '1990-01-01'])->assertSessionHasNoErrors()->assertRedirect();
     $student = Student::sole();
     $record = StudentRecord::sole();
     expect($student->last_name)->toBe('Nom officiel')->and($student->first_names)->toBe('Prénom')
-        ->and($student->email)->toBe('test@example.test')->and($student->cin)->toBe('123456789')
-        ->and($student->phone)->toBe('0341234567')->and($student->student_number)->toBe('TEST 001')
-        ->and($student->bac_registration_number)->toBe('BAC 01')->and($record->establishment_id)->toBe($this->a->id)
+        ->and($student->email)->toBe('test@example.test')->and($student->cin)->toBe('101234567890')
+        ->and($student->phone)->toBe('0341234567')->and($student->sex)->toBe(StudentSex::Female)
+        ->and($student->mother_name)->toBe('Mère officielle')->and($student->nationality)->toBe('Malagasy')
+        ->and($student->bac_series)->toBe('D')->and($record->repeat_code)->toBe(RepeatCode::New)->and($record->establishment_id)->toBe($this->a->id)
         ->and($record->declared_by)->toBe($this->actor->id)->and($record->status)->toBe(StudentRecordStatus::Active)
         ->and($record->declared_at->isToday())->toBeTrue();
     expect($record->student->is($student))->toBeTrue()->and($record->academicYear->is($this->year))->toBeTrue()
@@ -57,8 +60,8 @@ it('creates and normalizes identity with a first annual declaration and server a
 
 it('normalizes without damaging official names and Malagasy telephone formats', function () {
     expect(StudentNormalization::value('last_name', '  d’Andria-Rakoto  '))->toBe('d’Andria-Rakoto')
-        ->and(StudentNormalization::value('phone', ' +261 (34) 12-345-67 '))->toBe('+261341234567')
-        ->and(StudentNormalization::value('student_number', ' a/01- b '))->toBe('a/01- b')
+        ->and(StudentNormalization::value('phone', ' +261 (34) 12-345-67 '))->toBe('0341234567')
+        ->and(StudentNormalization::value('cin', ' 101 234.567 890 '))->toBe('101234567890')
         ->and(StudentNormalization::value('first_names', '   '))->toBeNull();
 });
 
@@ -86,14 +89,17 @@ it('rejects obvious identifier duplicates without exposing an existing student',
     StudentRecord::factory()->create(['student_id' => $other->id, 'establishment_id' => $this->b->id]);
     $this->actingAs($this->actor)->post('/students', $this->data)->assertSessionHasErrors($field);
     expect(Student::count())->toBe(1);
-})->with(['student_number', 'cin', 'bac_registration_number']);
+})->with(['cin', 'phone', 'email']);
 
-it('rejects exact identity and birthdate matches but not shared contact details', function () {
+it('rejects exact identity and birthdate matches and reused contact details but not a shared non-standard CIN', function () {
     Student::factory()->create(['last_name' => 'Nom officiel', 'first_names' => 'Prénom', 'birth_date' => '2001-02-03']);
     $this->actingAs($this->actor)->post('/students', $this->data)->assertSessionHasErrors('last_name');
     $this->post('/students', [...$this->data, 'last_name' => 'Autre nom'])->assertSessionHasNoErrors()->assertRedirect();
-    $this->post('/students', [...$this->data, 'last_name' => 'Encore autre', 'student_number' => null, 'cin' => null, 'bac_registration_number' => null])->assertSessionHasNoErrors()->assertRedirect();
-    expect(Student::count())->toBe(3);
+    $this->post('/students', [...$this->data, 'last_name' => 'Encore autre', 'cin' => null])->assertSessionHasErrors('phone');
+    $this->post('/students', [...$this->data, 'last_name' => 'Encore autre', 'cin' => null, 'phone' => null])->assertSessionHasErrors('email');
+    $this->post('/students', [...$this->data, 'last_name' => 'Encore autre', 'cin' => 'RECU 123', 'phone' => null, 'email' => null])->assertSessionHasNoErrors()->assertRedirect();
+    $this->post('/students', [...$this->data, 'last_name' => 'Dernier autre', 'cin' => 'RECU 123', 'phone' => null, 'email' => null])->assertSessionHasNoErrors()->assertRedirect();
+    expect(Student::count())->toBe(4)->and(Student::where('cin', 'RECU123')->count())->toBe(2);
 });
 
 it('rejects foreign establishment and program payloads', function () {
@@ -128,7 +134,7 @@ it('creates later years without overwriting previous years or attribution', func
     $student = Student::sole();
     $old = StudentRecord::sole();
     $next = AcademicYear::factory()->create();
-    $payload = ['academic_year_id' => $next->id, 'level_id' => $this->level->id, 'program_id' => null];
+    $payload = ['academic_year_id' => $next->id, 'level_id' => $this->level->id, 'program_id' => null, 'repeat_code' => 'R'];
     $this->get('/students/'.$student->uuid.'/records/create')->assertOk();
     $this->post('/students/'.$student->uuid.'/records', $payload)->assertSessionHasNoErrors()->assertRedirect();
     expect($student->studentRecords()->count())->toBe(2)->and($old->fresh()->academic_year_id)->toBe($this->year->id);
@@ -145,7 +151,7 @@ it('creates later years without overwriting previous years or attribution', func
 it('does not silently replace an annual establishment or year', function () {
     $record = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id]);
     $next = AcademicYear::factory()->create();
-    $this->actingAs($this->admin)->put('/student-records/'.$record->uuid, ['establishment_id' => $this->b->id, 'academic_year_id' => $next->id, 'level_id' => $this->level->id])->assertSessionHasErrors('academic_year_id');
+    $this->actingAs($this->admin)->put('/student-records/'.$record->uuid, ['establishment_id' => $this->b->id, 'academic_year_id' => $next->id, 'level_id' => $this->level->id, 'repeat_code' => 'N'])->assertSessionHasErrors('academic_year_id');
     expect($record->fresh()->establishment_id)->toBe($this->a->id);
 });
 
@@ -229,7 +235,7 @@ it('audits changes without personal values in attributes or metadata', function 
     expect($logs->count())->toBe(5);
     foreach ($logs as $log) {
         expect($log->causer_id)->toBe($this->actor->id);
-        foreach (['Correction sensible', 'Nom officiel', 'Prénom', 'test@example.test', 'new-private@example.test', '123456789', '0341234567', 'Adresse privée', '2001-02-03', 'BAC 01', 'TEST 001'] as $sensitive) {
+        foreach (['Correction sensible', 'Nom officiel', 'Prénom', 'test@example.test', 'new-private@example.test', '101234567890', '0341234567', 'Adresse privée', '2001-02-03', 'Mère officielle'] as $sensitive) {
             expect($log->toJson())->not->toContain($sensitive);
         }
     }
@@ -240,8 +246,8 @@ it('audits changes without personal values in attributes or metadata', function 
 it('searches all supported identity columns and hides sensitive list columns', function (string $field, string $term) {
     $student = Student::factory()->create([$field => $term]);
     StudentRecord::factory()->create(['student_id' => $student->id, 'establishment_id' => $this->a->id]);
-    $this->actingAs($this->actor)->get('/students?'.http_build_query(['search' => $term]))->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->missing('records.data.0.student.cin')->missing('records.data.0.student.email')->missing('records.data.0.student.birth_date')->missing('records.data.0.student.address'));
-})->with([['student_number', 'LOOKUP-001'], ['last_name', 'Lookupnom'], ['first_names', 'Lookupprénom'], ['cin', '87654321'], ['bac_registration_number', 'BAC-LOOKUP'], ['phone', '0349999999'], ['email', 'lookup@example.test']]);
+    $this->actingAs($this->actor)->get('/students?'.http_build_query(['search' => $term]))->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->missing('records.data.0.student.cin')->missing('records.data.0.student.email')->missing('records.data.0.student.phone')->missing('records.data.0.student.mother_name')->missing('records.data.0.student.address'));
+})->with([['last_name', 'Lookupnom'], ['first_names', 'Lookupprénom'], ['cin', '876543210123'], ['cin', 'RECU-LOOKUP'], ['phone', '0349999999'], ['email', 'lookup@example.test']]);
 
 it('paginates on the server and bounds relation queries independently of row count', function () {
     StudentRecord::factory()->count(25)->create(['establishment_id' => $this->a->id]);
@@ -270,7 +276,7 @@ it('protects historical program and declaration actor references in existing for
 it('rejects student-record alteration to a foreign program or establishment', function () {
     $own = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id]);
     $foreign = Program::factory()->create(['establishment_id' => $this->b->id]);
-    $data = ['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id];
+    $data = ['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'repeat_code' => 'N'];
     $this->actingAs($this->actor)->put('/student-records/'.$own->uuid, [...$data, 'program_id' => $foreign->id])->assertSessionHasErrors('program_id');
     $this->put('/student-records/'.$own->uuid, [...$data, 'establishment_id' => $this->b->id])->assertForbidden();
 });
@@ -278,11 +284,11 @@ it('rejects student-record alteration to a foreign program or establishment', fu
 it('does not create a declaration for inactive identities', function () {
     $record = StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $record->student->update(['is_active' => false]);
-    $this->actingAs($this->actor)->post('/students/'.$record->student->uuid.'/records', ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id])->assertSessionHasErrors('status');
+    $this->actingAs($this->actor)->post('/students/'.$record->student->uuid.'/records', ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'repeat_code' => 'N'])->assertSessionHasErrors('status');
 });
 
 it('escapes search wildcards consistently across database engines', function () {
-    $student = Student::factory()->create(['student_number' => 'SPEC%001']);
+    $student = Student::factory()->create(['cin' => 'SPEC%001']);
     StudentRecord::factory()->create(['student_id' => $student->id, 'establishment_id' => $this->a->id]);
     StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $this->actingAs($this->actor)->get('/students?'.http_build_query(['search' => 'SPEC%']))->assertInertia(fn (Assert $page) => $page->has('records.data', 1));
