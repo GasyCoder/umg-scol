@@ -20,10 +20,11 @@ final class AuditPresenter
         'campaign_id', 'application_id', 'confirmation_id', 'correction_id', 'request_id', 'import_id', 'declared_by', 'ids',
         'status', 'from_status', 'is_active', 'is_current', 'field', 'check_key', 'check_status', 'changed_fields', 'filters', 'guard',
         'total_rows', 'valid_rows', 'warning_rows', 'rejected_rows', 'duplicate_rows', 'created_rows', 'updated_rows', 'declared_rows', 'skipped_rows',
-        'type', 'sort_order', 'report', 'kind', 'role_name', 'previous_role', 'granted_permissions', 'revoked_permissions', 'denied_permissions', 'restored_permissions', 'trash_batch',
+        'type', 'sort_order', 'report', 'kind', 'role_name', 'previous_role', 'granted_permissions', 'revoked_permissions', 'denied_permissions', 'restored_permissions', 'trash_batch', 'disabled_types',
     ];
 
     public const MODULES = [
+        'notifications' => 'Notifications',
         'authentication' => 'Connexions', 'identity' => 'Comptes internes', 'access' => 'Rôles et permissions', 'references' => 'Référentiels',
         'students' => 'Identités étudiantes', 'student_records' => 'Déclarations annuelles', 'student_imports' => 'Imports',
         'student_portal' => 'Portail étudiant', 'student_corrections' => 'Corrections', 'student_confirmations' => 'Confirmations étudiantes',
@@ -31,6 +32,7 @@ final class AuditPresenter
     ];
 
     public const EVENTS = [
+        'notification_preferences_updated' => 'Préférences de notification modifiées',
         'created' => 'Création', 'updated' => 'Modification', 'deleted' => 'Suppression', 'login' => 'Connexion', 'logout' => 'Déconnexion',
         'uploaded' => 'Fichier importé', 'analyzed' => 'Import analysé', 'committed' => 'Import confirmé', 'failed' => 'Échec d’import',
         'correction_requested' => 'Correction demandée', 'correction_cancelled' => 'Correction annulée', 'correction_approved' => 'Correction approuvée', 'correction_rejected' => 'Correction rejetée',
