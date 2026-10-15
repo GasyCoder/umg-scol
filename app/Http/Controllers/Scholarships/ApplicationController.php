@@ -24,7 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ApplicationController extends Controller
 {
-    private const LIST_RELATIONS = ['campaign:id,name', 'student:id,student_number,last_name,first_names', 'studentRecord:id,establishment_id,level_id,program_id', 'studentRecord.establishment:id,name', 'studentRecord.level:id,name', 'studentRecord.program:id,name'];
+    private const LIST_RELATIONS = ['campaign:id,name', 'student:id,birth_date,last_name,first_names', 'studentRecord:id,establishment_id,level_id,program_id', 'studentRecord.establishment:id,name', 'studentRecord.level:id,name', 'studentRecord.program:id,name'];
 
     public function index(ApplicationListRequest $request): Response
     {
@@ -37,7 +37,7 @@ class ApplicationController extends Controller
         return Inertia::render('scholarships/applications/index', [
             'applications' => $query->orderByDesc('received_at')->orderByDesc('id')->paginate(25)->withQueryString()->through(fn (ScholarshipApplication $a) => [
                 'id' => $a->id, 'uuid' => $a->uuid, 'application_number' => $a->application_number, 'ddb_number' => $a->ddb_number, 'campaign' => $a->campaign->name,
-                'student' => $a->student->only(['student_number', 'last_name', 'first_names']), 'establishment' => $a->studentRecord->establishment->name,
+                'student' => [...$a->student->only(['last_name', 'first_names']), 'birth_date' => $a->student->birth_date?->format('Y-m-d')], 'establishment' => $a->studentRecord->establishment->name,
                 'level' => $a->studentRecord->level->name, 'status' => $a->status->value, 'status_label' => $a->status->label(), 'received_at' => $a->received_at->toIso8601String(),
             ]),
             'filters' => $filters,
@@ -57,7 +57,7 @@ class ApplicationController extends Controller
     {
         Gate::authorize('view', $application);
         $application->load([
-            'campaign.academicYear:id,name', 'student:id,uuid,student_number,last_name,first_names,birth_date,birth_place,is_active',
+            'campaign.academicYear:id,name', 'student:id,uuid,last_name,first_names,sex,birth_date,nationality,bac_year,is_active',
             'studentRecord.establishment:id,name', 'studentRecord.level:id,name', 'studentRecord.program:id,name', 'studentRecord.academicYear:id,name',
             'checks' => fn ($q) => $q->orderBy('id')->with('checker:id,name'), 'history' => fn ($q) => $q->orderBy('id')->with('actor:id,name'), 'receiver:id,name', 'reviewStarter:id,name', 'decider:id,name',
         ]);
@@ -73,7 +73,7 @@ class ApplicationController extends Controller
                 'review_started' => $application->review_started_at ? ['at' => $application->review_started_at->toIso8601String(), 'by' => $application->reviewStarter?->name] : null,
                 'decided' => $application->decided_at ? ['at' => $application->decided_at->toIso8601String(), 'by' => $application->decider?->name] : null,
                 'student' => [
-                    ...$application->student->only(['uuid', 'student_number', 'last_name', 'first_names', 'birth_place', 'is_active']), 'birth_date' => $application->student->birth_date?->format('Y-m-d'),
+                    ...$application->student->only(['uuid', 'last_name', 'first_names', 'nationality', 'bac_year', 'is_active']), 'sex' => $application->student->sex?->value, 'birth_date' => $application->student->birth_date?->format('Y-m-d'),
                     'academic_year' => $record->academicYear->name, 'establishment' => $record->establishment->name, 'level' => $record->level->name, 'program' => $record->program?->name, 'record_status' => $record->status->value,
                 ],
                 'checks' => $application->checks->map(fn ($check) => [
@@ -116,11 +116,11 @@ class ApplicationController extends Controller
                 return;
             }
             fwrite($stream, "\xEF\xBB\xBF");
-            fputcsv($stream, ['N° dossier', 'N° DDB', 'Matricule', 'Nom', 'Prénoms', 'Établissement', 'Niveau', 'Parcours', 'Campagne', 'Statut', 'Date de réception', 'Date de décision'], ';', '"', '');
+            fputcsv($stream, ['N° dossier', 'N° DDB', 'Date de naissance', 'Nom', 'Prénoms', 'Établissement', 'Niveau', 'Parcours', 'Campagne', 'Statut', 'Date de réception', 'Date de décision'], ';', '"', '');
             ScholarshipApplicationFilters::apply(ScholarshipApplication::query()->with(self::LIST_RELATIONS), $filters)->chunkById(500, function ($applications) use ($stream) {
                 foreach ($applications as $a) {
                     $cells = [
-                        $a->application_number, $a->ddb_number, $a->student->student_number, $a->student->last_name, $a->student->first_names, $a->studentRecord->establishment->name,
+                        $a->application_number, $a->ddb_number, $a->student->birth_date?->format('Y-m-d'), $a->student->last_name, $a->student->first_names, $a->studentRecord->establishment->name,
                         $a->studentRecord->level->name, $a->studentRecord->program?->name, $a->campaign->name, $a->status->label(), $a->received_at->format('Y-m-d H:i'), $a->decided_at?->format('Y-m-d H:i'),
                     ];
                     // Spreadsheet formula injection guard, as for import error exports.
