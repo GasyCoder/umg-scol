@@ -9,7 +9,11 @@ import SettingsLayout from '@/layouts/settings/layout';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 void createInertiaApp({
-    title: (title) => (title ? `${title} - ${appName}` : appName),
+    // The configured portal name (settings → Plateforme), falling back to the build-time name.
+    title: (title, page) => {
+        const name = (page.props.name as string | undefined) || appName;
+        return title ? `${title} - ${name}` : name;
+    },
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
