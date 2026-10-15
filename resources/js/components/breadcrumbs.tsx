@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { Home } from 'lucide-react';
 import { Fragment } from 'react';
 import {
     Breadcrumb,
@@ -27,12 +28,27 @@ export function Breadcrumbs({
                                 <Fragment key={index}>
                                     <BreadcrumbItem>
                                         {isLast ? (
-                                            <BreadcrumbPage>
+                                            <BreadcrumbPage className="flex items-center gap-1.5 font-semibold">
+                                                {index === 0 && (
+                                                    <Home
+                                                        className="size-4 text-primary"
+                                                        aria-hidden="true"
+                                                    />
+                                                )}
                                                 {item.title}
                                             </BreadcrumbPage>
                                         ) : (
                                             <BreadcrumbLink asChild>
-                                                <Link href={item.href}>
+                                                <Link
+                                                    href={item.href}
+                                                    className="flex items-center gap-1.5 hover:text-primary"
+                                                >
+                                                    {index === 0 && (
+                                                        <Home
+                                                            className="size-4"
+                                                            aria-hidden="true"
+                                                        />
+                                                    )}
                                                     {item.title}
                                                 </Link>
                                             </BreadcrumbLink>
