@@ -18,7 +18,7 @@ beforeEach(function () {
 it('creates exactly the five documented roles and the complete permission catalogue', function () {
     expect(Role::query()->pluck('name')->sort()->values()->all())
         ->toBe(['central_scholarship_office', 'developer', 'establishment', 'student', 'superadmin']);
-    expect(Permission::query()->count())->toBe(36);
+    expect(Permission::query()->count())->toBe(37);
 
     foreach (config('access.permissions') as $permission) {
         expect(Permission::findByName($permission, 'web'))->not->toBeNull();
@@ -38,7 +38,7 @@ it('restricts operational roles from global administration', function (string $r
     $user = User::factory()->create();
     $user->assignRole($role);
 
-    foreach (['users.manage', 'roles.manage', 'permissions.manage', 'establishments.manage', 'audits.export'] as $permission) {
+    foreach (['users.manage', 'roles.manage', 'permissions.manage', 'branding.manage', 'establishments.manage', 'audits.export'] as $permission) {
         expect($user->can($permission))->toBeFalse();
     }
 })->with(['establishment', 'student', 'central_scholarship_office']);
