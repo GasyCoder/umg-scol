@@ -1,17 +1,61 @@
 import { Head } from '@inertiajs/react';
-import Heading from '@/components/heading';
 import {
+    Building2,
+    ChartColumn,
+    Download,
+    FilePenLine,
+    FileUp,
+    FolderOpen,
+    Table2,
+    Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { PageBody, PageHeader } from '@/components/page-header';
+import {
+    applicationStatusLabels,
+    BarList,
     correctionStatusLabels,
     formatNumber,
+    KpiCard,
     Panel,
     YearLine,
     YearSelect,
 } from '@/components/reporting/shared';
-import type { Scope, Year } from '@/components/reporting/shared';
+import type { BarItem, Scope, Year } from '@/components/reporting/shared';
+import { toneFor } from '@/components/tone-badge';
+import type { Tone } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
+
+const correctionTones: Record<string, Tone> = {
+    pending: 'warning',
+    approved: 'success',
+    rejected: 'danger',
+    cancelled: 'neutral',
+};
 
 type Row = Record<string, string | number>;
 type ReportKey = 'students' | 'imports' | 'scholarships';
+
+const reportLabels: Record<ReportKey, string> = {
+    students: 'Étudiants',
+    imports: 'Imports',
+    scholarships: 'Dossiers de bourse',
+};
+
+const sum = (rows: Row[] | null, key: string) =>
+    (rows ?? []).reduce((total, row) => total + Number(row[key] ?? 0), 0);
+
+/** Aggregates a numeric column by a label column, largest first. */
+const groupBy = (rows: Row[], label: string, value: string): BarItem[] =>
+    Object.entries(
+        rows.reduce<Record<string, number>>((acc, row) => {
+            const key = String(row[label] ?? '—');
+            acc[key] = (acc[key] ?? 0) + Number(row[value] ?? 0);
+            return acc;
+        }, {}),
+    )
+        .map(([name, total]) => ({ label: name, value: total }))
+        .sort((a, b) => b.value - a.value);
 
 function ReportTable({
     columns,
@@ -25,38 +69,46 @@ function ReportTable({
     caption: string;
 }) {
     if (rows.length === 0)
-        return <p className="text-sm text-muted-foreground">{empty}</p>;
+        return (
+            <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                {empty}
+            </p>
+        );
     const keys = Object.keys(columns);
     const numeric = (key: string) => typeof rows[0][key] === 'number';
     const totals = keys.map((key) =>
         numeric(key)
-            ? rows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0)
+            ? rows.reduce((total, row) => total + Number(row[key] ?? 0), 0)
             : null,
     );
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-sm">
+        <div className="-mx-5 overflow-x-auto border-t sm:-mx-6">
+            <table className="data-table min-w-[40rem]">
                 <caption className="sr-only">{caption}</caption>
-                <thead className="text-left text-muted-foreground">
+                <thead>
                     <tr>
                         {keys.map((key) => (
                             <th
                                 key={key}
                                 scope="col"
-                                className={`py-2 pr-3 font-medium ${numeric(key) ? 'text-right' : ''}`}
+                                className={numeric(key) ? 'text-right' : ''}
                             >
                                 {columns[key]}
                             </th>
                         ))}
                     </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody>
                     {rows.map((row, index) => (
                         <tr key={index}>
                             {keys.map((key) => (
                                 <td
                                     key={key}
-                                    className={`py-2 pr-3 ${numeric(key) ? 'text-right tabular-nums' : ''}`}
+                                    className={
+                                        numeric(key)
+                                            ? `text-right tabular-nums ${key === 'total' ? 'font-semibold text-foreground' : ''}`
+                                            : 'text-foreground'
+                                    }
                                 >
                                     {typeof row[key] === 'number'
                                         ? formatNumber(row[key])
@@ -66,12 +118,12 @@ function ReportTable({
                         </tr>
                     ))}
                 </tbody>
-                <tfoot className="border-t font-medium">
-                    <tr>
+                <tfoot>
+                    <tr className="border-t-2 bg-muted/60 font-semibold text-foreground">
                         {keys.map((key, index) => (
                             <td
                                 key={key}
-                                className={`py-2 pr-3 ${totals[index] !== null ? 'text-right tabular-nums' : ''}`}
+                                className={`px-4 py-3 ${totals[index] !== null ? 'text-right tabular-nums' : ''}`}
                             >
                                 {index === 0
                                     ? 'Total'
@@ -106,95 +158,258 @@ export default function ReportsIndex({
     scholarships: Row[] | null;
     exports: Record<ReportKey, boolean>;
 }) {
-    const exportButton = (report: ReportKey) =>
-        exports[report] ? (
-            <Button variant="outline" size="sm" asChild>
-                <a
-                    href={`/reports/${report}/export${scope.year ? `?year=${scope.year.id}` : ''}`}
-                >
-                    Exporter (CSV)
-                </a>
-            </Button>
-        ) : undefined;
+    const exportHref = (report: ReportKey) =>
+        `/reports/${report}/export${scope.year ? `?year=${scope.year.id}` : ''}`;
+    const exportable = (Object.keys(reportLabels) as ReportKey[]).filter(
+        (report) =>
+            exports[report] &&
+            { students, imports, scholarships }[report] !== null,
+    );
+
+    const kpis: {
+        key: string;
+        label: string;
+        value: number;
+        hint: string;
+        icon: LucideIcon;
+        tone: Tone;
+    }[] = [];
+    if (students) {
+        kpis.push({
+            key: 'students',
+            label: 'Déclarations actives',
+            value: sum(students, 'active'),
+            hint: `${formatNumber(sum(students, 'total'))} déclaration(s) au total`,
+            icon: Users,
+            tone: 'primary',
+        });
+    }
+    if (imports) {
+        kpis.push({
+            key: 'imports',
+            label: 'Imports',
+            value: sum(imports, 'imports'),
+            hint: `${formatNumber(sum(imports, 'failed'))} en échec · ${formatNumber(sum(imports, 'rejected_rows'))} ligne(s) rejetée(s)`,
+            icon: FileUp,
+            tone: sum(imports, 'failed') > 0 ? 'danger' : 'info',
+        });
+    }
+    if (scholarships) {
+        kpis.push({
+            key: 'scholarships',
+            label: 'Dossiers de bourse',
+            value: sum(scholarships, 'total'),
+            hint: `${formatNumber(sum(scholarships, 'validated'))} validé(s)`,
+            icon: FolderOpen,
+            tone: 'success',
+        });
+    }
+    if (corrections) {
+        kpis.push({
+            key: 'corrections',
+            label: 'Corrections en attente',
+            value: corrections.pending ?? 0,
+            hint: `${formatNumber(Object.values(corrections).reduce((a, b) => a + b, 0))} demande(s), toutes périodes`,
+            icon: FilePenLine,
+            tone: 'warning',
+        });
+    }
+
+    const scholarshipStatuses: BarItem[] = scholarships
+        ? Object.keys(applicationStatusLabels)
+              .filter((status) => status in columns.scholarships)
+              .map((status) => ({
+                  label: applicationStatusLabels[status],
+                  value: sum(scholarships, status),
+                  tone: toneFor(status),
+              }))
+        : [];
+    const correctionItems: BarItem[] = corrections
+        ? Object.entries(corrections).map(([status, value]) => ({
+              label: correctionStatusLabels[status] ?? status,
+              value,
+              tone: correctionTones[status] ?? 'neutral',
+          }))
+        : [];
+    const studentsByEstablishment =
+        students && scope.global
+            ? groupBy(students, 'establishment', 'active')
+            : null;
+    const hasScholarshipTotal =
+        scholarshipStatuses.reduce((total, item) => total + item.value, 0) > 0;
+
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <>
             <Head title="Rapports" />
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                    <Heading
-                        title="Rapports"
-                        description="Effectifs agrégés de votre périmètre, sans donnée individuelle."
-                    />
-                    <YearLine scope={scope} />
-                </div>
-                <YearSelect
-                    years={years}
-                    value={scope.year?.id ?? null}
-                    path="/reports"
+            <PageBody>
+                <PageHeader
+                    icon={ChartColumn}
+                    title="Rapports"
+                    description="Effectifs agrégés de votre périmètre, sans donnée individuelle."
+                    meta={<YearLine scope={scope} />}
+                    actions={
+                        <YearSelect
+                            years={years}
+                            value={scope.year?.id ?? null}
+                            path="/reports"
+                        />
+                    }
                 />
-            </div>
-            {students && (
-                <Panel
-                    title="Étudiants déclarés"
-                    description="Déclarations de l’année par établissement, niveau et parcours"
-                    action={exportButton('students')}
-                >
-                    <ReportTable
-                        caption="Étudiants déclarés par établissement, niveau et parcours"
-                        columns={columns.students}
-                        rows={students}
-                        empty="Aucune déclaration pour cette année."
-                    />
-                </Panel>
-            )}
-            {imports && (
-                <Panel
-                    title="Imports"
-                    description="Imports de l’année par établissement"
-                    action={exportButton('imports')}
-                >
-                    <ReportTable
-                        caption="Imports par établissement"
-                        columns={columns.imports}
-                        rows={imports}
-                        empty="Aucun import pour cette année."
-                    />
-                </Panel>
-            )}
-            {corrections && (
-                <Panel
-                    title="Demandes de correction"
-                    description="Toutes périodes, dans votre périmètre de revue"
-                >
-                    <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        {Object.entries(corrections).map(([status, value]) => (
-                            <div key={status} className="rounded-lg border p-4">
-                                <dt className="text-sm text-muted-foreground">
-                                    {correctionStatusLabels[status] ?? status}
-                                </dt>
-                                <dd className="text-2xl font-semibold tabular-nums">
-                                    {formatNumber(value)}
-                                </dd>
+
+                {exportable.length > 0 && (
+                    <div className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <span
+                                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                                aria-hidden="true"
+                            >
+                                <Download className="size-[18px]" />
+                            </span>
+                            <div>
+                                <p className="text-sm font-semibold text-foreground">
+                                    Exports CSV
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {scope.year
+                                        ? `Année ${scope.year.name}, dans votre périmètre`
+                                        : 'Dans votre périmètre'}
+                                </p>
                             </div>
+                        </div>
+                        <div
+                            role="group"
+                            aria-label="Exports CSV"
+                            className="flex flex-wrap gap-2"
+                        >
+                            {exportable.map((report) => (
+                                <Button
+                                    key={report}
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                >
+                                    <a href={exportHref(report)}>
+                                        <Download aria-hidden="true" />
+                                        {reportLabels[report]}
+                                        <span className="sr-only">
+                                            {' '}
+                                            — exporter (CSV)
+                                        </span>
+                                    </a>
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {kpis.length > 0 && (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {kpis.map((kpi) => (
+                            <KpiCard
+                                key={kpi.key}
+                                label={kpi.label}
+                                value={kpi.value}
+                                hint={kpi.hint}
+                                href={null}
+                                icon={kpi.icon}
+                                tone={kpi.tone}
+                            />
                         ))}
-                    </dl>
-                </Panel>
-            )}
-            {scholarships && (
-                <Panel
-                    title="Dossiers de bourse"
-                    description="Campagnes de l’année par établissement, niveau et statut"
-                    action={exportButton('scholarships')}
-                >
-                    <ReportTable
-                        caption="Dossiers de bourse par campagne, établissement, niveau et statut"
-                        columns={columns.scholarships}
-                        rows={scholarships}
-                        empty="Aucun dossier pour les campagnes de cette année."
-                    />
-                </Panel>
-            )}
-        </div>
+                    </div>
+                )}
+
+                {(scholarships || corrections || studentsByEstablishment) && (
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        {scholarships && (
+                            <Panel
+                                icon={FolderOpen}
+                                title="Dossiers de bourse par statut"
+                                description="Campagnes de l’année"
+                            >
+                                <BarList
+                                    label="Dossiers de bourse par statut"
+                                    items={
+                                        hasScholarshipTotal
+                                            ? scholarshipStatuses
+                                            : []
+                                    }
+                                    empty="Aucun dossier pour les campagnes de cette année."
+                                />
+                            </Panel>
+                        )}
+                        {corrections && (
+                            <Panel
+                                icon={FilePenLine}
+                                title="Demandes de correction"
+                                description="Toutes périodes, dans votre périmètre de revue"
+                            >
+                                <BarList
+                                    label="Demandes de correction par statut"
+                                    items={correctionItems}
+                                    empty="Aucune demande de correction."
+                                />
+                            </Panel>
+                        )}
+                        {studentsByEstablishment && (
+                            <Panel
+                                icon={Building2}
+                                title="Déclarations actives par établissement"
+                                description="Année sélectionnée"
+                            >
+                                <BarList
+                                    label="Déclarations actives par établissement"
+                                    items={studentsByEstablishment}
+                                    empty="Aucune déclaration pour cette année."
+                                />
+                            </Panel>
+                        )}
+                    </div>
+                )}
+
+                {students && (
+                    <Panel
+                        icon={Table2}
+                        title="Étudiants déclarés"
+                        description="Déclarations de l’année par établissement, niveau et parcours"
+                    >
+                        <ReportTable
+                            caption="Étudiants déclarés par établissement, niveau et parcours"
+                            columns={columns.students}
+                            rows={students}
+                            empty="Aucune déclaration pour cette année."
+                        />
+                    </Panel>
+                )}
+                {imports && (
+                    <Panel
+                        icon={FileUp}
+                        title="Imports"
+                        description="Imports de l’année par établissement"
+                    >
+                        <ReportTable
+                            caption="Imports par établissement"
+                            columns={columns.imports}
+                            rows={imports}
+                            empty="Aucun import pour cette année."
+                        />
+                    </Panel>
+                )}
+                {scholarships && (
+                    <Panel
+                        icon={FolderOpen}
+                        title="Dossiers de bourse"
+                        description="Campagnes de l’année par établissement, niveau et statut"
+                    >
+                        <ReportTable
+                            caption="Dossiers de bourse par campagne, établissement, niveau et statut"
+                            columns={columns.scholarships}
+                            rows={scholarships}
+                            empty="Aucun dossier pour les campagnes de cette année."
+                        />
+                    </Panel>
+                )}
+            </PageBody>
+        </>
     );
 }
 
