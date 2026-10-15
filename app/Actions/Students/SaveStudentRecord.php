@@ -72,6 +72,10 @@ class SaveStudentRecord
                     throw ValidationException::withMessages(['program_id' => 'Le parcours doit appartenir à l’établissement déclaré.']);
                 }
             }
+            if (filled($target->scholarship_request_reference) && StudentRecord::query()->where('academic_year_id', $target->academic_year_id)->where('establishment_id', $target->establishment_id)
+                ->where('scholarship_request_reference', $target->scholarship_request_reference)->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id))->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['scholarship_request_reference' => 'Cette référence de demande de bourse est déjà attribuée dans l’établissement pour cette année.']);
+            }
             $others = StudentRecord::query()->where('student_id', $student->id)->where('academic_year_id', $target->academic_year_id)->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id));
             if ((clone $others)->where('establishment_id', $target->establishment_id)->exists() || ($target->status === StudentRecordStatus::Active && (clone $others)->where('status', 'active')->exists())) {
                 throw ValidationException::withMessages(['academic_year_id' => 'Une déclaration existe déjà pour cette année. Aucun remplacement automatique n’est autorisé.']);
