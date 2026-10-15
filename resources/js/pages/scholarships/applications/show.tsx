@@ -27,6 +27,8 @@ import { useState } from 'react';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatDate, StatusBadge } from '@/components/scholarships/shared';
 import type { Option } from '@/components/scholarships/shared';
+import { SEX_LABELS } from '@/components/students/types';
+import type { StudentSex } from '@/components/students/types';
 import { ToneBadge } from '@/components/tone-badge';
 import type { Tone } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
@@ -67,11 +69,12 @@ type Application = {
     decided: Stamp;
     student: {
         uuid: string;
-        student_number: string | null;
         last_name: string;
         first_names: string | null;
+        sex: StudentSex | null;
         birth_date: string | null;
-        birth_place: string | null;
+        nationality: string | null;
+        bac_year: number | null;
         is_active: boolean;
         academic_year: string;
         establishment: string;
@@ -485,8 +488,8 @@ export default function ApplicationShow({
                                 <p className="font-heading text-lg leading-tight font-bold break-words text-foreground">
                                     {fullName}
                                 </p>
-                                <p className="font-mono text-sm text-muted-foreground">
-                                    {student.student_number ?? '—'}
+                                <p className="text-sm text-muted-foreground">
+                                    Né(e) le {formatDate(student.birth_date)}
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                     <ToneBadge
@@ -517,11 +520,24 @@ export default function ApplicationShow({
                         </div>
                         <Rows
                             rows={[
-                                ['Matricule', student.student_number],
                                 ['Nom et prénoms', fullName],
                                 [
-                                    'Naissance',
-                                    `${formatDate(student.birth_date)}${student.birth_place ? ` à ${student.birth_place}` : ''}`,
+                                    'Sexe',
+                                    student.sex
+                                        ? SEX_LABELS[student.sex]
+                                        : 'Non renseigné',
+                                ],
+                                [
+                                    'Date de naissance',
+                                    formatDate(student.birth_date),
+                                ],
+                                [
+                                    'Nationalité',
+                                    student.nationality ?? 'Non renseignée',
+                                ],
+                                [
+                                    'Année du BAC',
+                                    student.bac_year ?? 'Non renseignée',
                                 ],
                                 ['Année universitaire', student.academic_year],
                                 ['Établissement', student.establishment],
