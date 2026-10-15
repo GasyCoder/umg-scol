@@ -70,7 +70,7 @@ final class ReferenceTransfer
     public static function listQuery(string $kind, User $user, array $filters): Builder
     {
         return $kind === 'mentions'
-            ? self::filter(Mention::query()->with('establishment:id,code,name'), $user, $filters)
+            ? self::filter(Mention::query()->with(['establishment:id,code,name', 'domain:id,code,name']), $user, $filters)
             : self::filter(Program::query()->with(['establishment:id,code,name', 'mention:id,code,name']), $user, $filters);
     }
 
