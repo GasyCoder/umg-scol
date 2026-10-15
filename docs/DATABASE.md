@@ -48,7 +48,7 @@ Les migrations techniques sont complétées par `roles`, `permissions`, `model_h
 
 ## Référentiels institutionnels implémentés
 
-- `establishments` : code obligatoire unique (30 caractères), nom, type et contacts optionnels, statut actif, timestamps. Codes normalisés en majuscules et sans espaces périphériques. Les contacts restent visibles aux administrateurs autorisés mais leurs valeurs ne sont pas dupliquées dans l'audit.
+- `establishments` : code obligatoire unique (30 caractères, présenté comme « sigle »), nom, type optionnel (Faculté, Institut, École ou texte libre « Autre », 100 caractères), contacts optionnels, `logo_path` optionnel (migration `2026_10_16_110000_add_logo_to_establishments`), statut actif, timestamps. Codes normalisés en majuscules et sans espaces périphériques. Les contacts restent visibles aux administrateurs autorisés mais leurs valeurs ne sont pas dupliquées dans l'audit.
 - `academic_years` : nom unique (30 caractères), dates optionnelles, `is_current`, `is_active`, timestamps. `current_marker` est une colonne virtuelle technique valant 1 pour l'année courante et NULL sinon ; son index unique impose au plus une année courante, y compris hors interface. Cette colonne est masquée dans la sérialisation.
 - `levels` : code obligatoire unique (30 caractères), nom, ordre entier positif ou nul, statut actif et timestamps. Affichage stable par `sort_order`, puis code et id ; les niveaux ne sont pas codés en dur.
 - `programs` : FK restrictive `establishment_id`, code optionnel (30 caractères), nom, statut actif, timestamps. Unicité du code par établissement ; plusieurs codes NULL sont admis. Aucune unicité globale du nom, aucune relation imposée à un niveau.
@@ -219,3 +219,9 @@ Purge : uniquement après mise en corbeille et contrôle des dépendances. Une i
 Migration `130200_create_pending_file_deletions` : table technique privée disk/path uniques, attempts, classe d'erreur éventuelle et dates. Une purge planifie la suppression de fichier dans sa transaction ; la tentative réelle commence après commit. Un échec stockage reste réessayable par `trash:cleanup-files` (horaire), sans contenu personnel dans les logs. La corbeille affiche le nombre de fichiers en attente. La rétention de staging à 30 jours s'applique aussi aux imports en corbeille ; restaurer un import expiré ne recrée pas le fichier ni ses données purgées.
 
 Le rollback du schéma vers les anciennes unicités nécessite de résoudre préalablement les conflits permis dans la corbeille (années courantes/déclarations supprimées). Aucun rollback destructif n'a été exécuté sur les données locales. Contrôles MySQL reproductibles : `php tests/MySql/TrashPermissionsChecks.php`, transaction externe et rollback intégral des données temporaires.
+
+Migration `2026_10_16_100000_add_internal_user_management` : `users.uuid` (UUID v7 public, unique, rempli pour l'existant), `users.is_active` (défaut vrai) et table `user_denied_permissions` (`user_id`, `permission_id`, `created_at`, clé primaire composite, suppression en cascade) pour les droits du rôle retirés à un compte.
+
+Migration `2026_10_16_110000_add_logo_to_establishments` : `establishments.logo_path` nullable, chemin sur le disque privé `local` (`establishment-logos/{uuid7}.{ext}`).
+
+Migration `2026_10_16_120000_create_platform_settings` : table clé/valeur `platform_settings` (`key` clé primaire, `value` texte nullable, timestamps) pour l'identité de la plateforme : `institution_name`, `scol_name`, `bourse_name`, `support_email`, `logo_path`, `favicon_path` (fichiers sur le disque privé `local`, dossier `branding/`).
