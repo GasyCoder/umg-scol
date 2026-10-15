@@ -12,6 +12,7 @@ import {
     KeyRound,
     LayoutGrid,
     Layers,
+    Library,
     Route,
     ShieldCheck,
     Trash2,
@@ -29,6 +30,7 @@ const referenceIcons: Record<ReferenceKind, LucideIcon> = {
     establishments: Building2,
     'academic-years': CalendarDays,
     levels: Layers,
+    domains: Library,
     mentions: BookMarked,
     programs: Route,
 };
