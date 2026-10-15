@@ -1,6 +1,11 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ChevronRight, FilePenLine, RotateCcw, Search } from 'lucide-react';
 import type { FormEvent } from 'react';
-import Heading from '@/components/heading';
+import { CorrectionStatusBadge } from '@/components/corrections/status-badge';
+import { EmptyState } from '@/components/empty-state';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { Pagination } from '@/components/scholarships/shared';
+import type { PageLink } from '@/components/scholarships/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { CorrectionStatusBadge } from '@/components/corrections/status-badge';
+import { cn } from '@/lib/utils';
 
 type Row = {
     id: number;
@@ -36,7 +41,7 @@ export default function CorrectionsIndex({
     corrections: {
         data: Row[];
         total: number;
-        links: { url: string | null; label: string; active: boolean }[];
+        links: PageLink[];
     };
     filters: Record<string, string | undefined>;
     options: {
@@ -55,13 +60,15 @@ export default function CorrectionsIndex({
         event.preventDefault();
         form.get('/corrections', { preserveState: true });
     };
+    const selectStatus = (status: string) => {
+        form.setData('status', status);
+        router.get(
+            '/corrections',
+            { ...form.data, status },
+            { preserveState: true },
+        );
+    };
     const selects = [
-        {
-            key: 'status',
-            label: 'Statut',
-            all: 'Tous les statuts',
-            items: options.statuses,
-        },
         {
             key: 'field',
             label: 'Information',
@@ -82,24 +89,76 @@ export default function CorrectionsIndex({
               ]
             : []),
     ];
+    const tabs: Option[] = [
+        { value: 'all', label: 'Toutes' },
+        ...options.statuses,
+    ];
+    const currentStatus = filters.status ?? 'pending';
+    const narrowed = Boolean(
+        filters.search || filters.field || filters.establishment_id,
+    );
+
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <>
             <Head title="Demandes de correction" />
-            <Heading
-                title="Demandes de correction"
-                description="Corrections d’informations proposées par les étudiants. La fiche officielle n’est modifiée qu’après approbation."
-            />
-            <form onSubmit={submit} className="space-y-3">
-                <Input
-                    aria-label="Recherche étudiant"
-                    placeholder="Matricule, nom ou prénom"
-                    maxLength={100}
-                    value={form.data.search}
-                    onChange={(event) =>
-                        form.setData('search', event.target.value)
+            <PageBody>
+                <PageHeader
+                    icon={FilePenLine}
+                    title="Demandes de correction"
+                    description="Corrections d’informations proposées par les étudiants. La fiche officielle n’est modifiée qu’après approbation."
+                    meta={
+                        <span className="inline-flex items-center rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground tabular-nums">
+                            {corrections.total} demande(s)
+                        </span>
                     }
                 />
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+                <nav aria-label="Filtrer par statut" className="-mx-1 px-1">
+                    <ul className="flex w-full gap-1 overflow-x-auto rounded-xl border bg-muted/60 p-1 sm:w-fit">
+                        {tabs.map((tab) => {
+                            const active = currentStatus === tab.value;
+                            return (
+                                <li key={tab.value} className="shrink-0">
+                                    <button
+                                        type="button"
+                                        aria-pressed={active}
+                                        disabled={form.processing}
+                                        onClick={() => selectStatus(tab.value)}
+                                        className={cn(
+                                            'inline-flex h-9 items-center rounded-lg px-4 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                            active
+                                                ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
+                                                : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
+                                        )}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </nav>
+
+                <form
+                    onSubmit={submit}
+                    className="surface grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] lg:items-center"
+                >
+                    <div className="relative sm:col-span-2 lg:col-span-1">
+                        <Search
+                            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <Input
+                            aria-label="Recherche étudiant"
+                            placeholder="Matricule, nom ou prénom"
+                            maxLength={100}
+                            className="pl-9"
+                            value={form.data.search}
+                            onChange={(event) =>
+                                form.setData('search', event.target.value)
+                            }
+                        />
+                    </div>
                     {selects.map((select) => (
                         <Select
                             key={select.key}
@@ -107,9 +166,7 @@ export default function CorrectionsIndex({
                             onValueChange={(value) =>
                                 form.setData(
                                     select.key,
-                                    value === 'all' && select.key !== 'status'
-                                        ? ''
-                                        : value,
+                                    value === 'all' ? '' : value,
                                 )
                             }
                         >
@@ -134,78 +191,152 @@ export default function CorrectionsIndex({
                             </SelectContent>
                         </Select>
                     ))}
-                    <Button disabled={form.processing}>Filtrer</Button>
-                </div>
-            </form>
-            <p className="text-sm text-muted-foreground">
-                {corrections.total} demande(s)
-            </p>
-            {corrections.data.length === 0 ? (
-                <p>
-                    Aucune demande ne correspond à ces critères dans votre
-                    périmètre.
-                </p>
-            ) : (
-                <div className="divide-y rounded-md border">
-                    {corrections.data.map((item) => (
-                        <article
-                            key={item.id}
-                            className="flex flex-wrap items-center justify-between gap-3 p-4"
-                        >
-                            <div className="space-y-1">
-                                <p className="font-medium">
-                                    {item.student.last_name}{' '}
-                                    {item.student.first_names} —{' '}
-                                    {item.student.student_number ??
-                                        'Sans matricule'}
-                                </p>
-                                <p className="text-sm">
-                                    Information : {item.field_label}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Demandée le{' '}
-                                    {new Date(
-                                        item.created_at,
-                                    ).toLocaleDateString('fr-FR')}
-                                    {item.establishments.length > 0 &&
-                                        ` · ${item.establishments.join(', ')}`}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <CorrectionStatusBadge
-                                    status={item.status}
-                                    label={item.status_label}
-                                />
-                                <Button variant="outline" asChild>
-                                    <Link href={`/corrections/${item.uuid}`}>
-                                        Examiner
-                                    </Link>
-                                </Button>
-                            </div>
-                        </article>
-                    ))}
-                </div>
-            )}
-            <nav aria-label="Pagination" className="flex flex-wrap gap-2">
-                {corrections.links.map((link, i) =>
-                    link.url ? (
-                        <Button
-                            key={i}
-                            variant={link.active ? 'default' : 'outline'}
-                            asChild
-                        >
-                            <Link href={link.url} preserveState>
-                                {i === 0
-                                    ? 'Précédent'
-                                    : i === corrections.links.length - 1
-                                      ? 'Suivant'
-                                      : link.label}
-                            </Link>
+                    <div className="flex gap-2">
+                        <Button className="flex-1" disabled={form.processing}>
+                            Filtrer
                         </Button>
-                    ) : null,
+                        {narrowed && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                asChild
+                                aria-label="Réinitialiser les filtres"
+                            >
+                                <Link href="/corrections">
+                                    <RotateCcw aria-hidden="true" />
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
+                </form>
+
+                {corrections.data.length === 0 ? (
+                    <div className="surface">
+                        {narrowed ? (
+                            <EmptyState
+                                illustration="search"
+                                title="Aucun résultat"
+                                description="Aucune demande ne correspond à ces critères dans votre périmètre."
+                                action={
+                                    <Button variant="outline" asChild>
+                                        <Link href="/corrections">
+                                            Réinitialiser les filtres
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        ) : currentStatus === 'pending' ? (
+                            <EmptyState
+                                illustration="done"
+                                title="Aucune demande en attente"
+                                description="Toutes les demandes de votre périmètre ont été traitées."
+                            />
+                        ) : (
+                            <EmptyState
+                                illustration="inbox"
+                                title="Aucune demande"
+                                description="Aucune demande ne correspond à ce statut dans votre périmètre."
+                            />
+                        )}
+                    </div>
+                ) : (
+                    <div className="surface overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="data-table min-w-[40rem]">
+                                <caption className="sr-only">
+                                    Demandes de correction
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Étudiant</th>
+                                        <th scope="col">Information</th>
+                                        <th
+                                            scope="col"
+                                            className="hidden lg:table-cell"
+                                        >
+                                            Établissement
+                                        </th>
+                                        <th scope="col">Demandée le</th>
+                                        <th scope="col">Statut</th>
+                                        <th scope="col">
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {corrections.data.map((item) => (
+                                        <tr key={item.id}>
+                                            <td className="max-w-64">
+                                                <Link
+                                                    href={`/corrections/${item.uuid}`}
+                                                    className="block truncate font-semibold text-foreground hover:text-primary"
+                                                >
+                                                    {item.student.last_name}{' '}
+                                                    {item.student.first_names}
+                                                </Link>
+                                                <span className="block font-mono text-xs text-muted-foreground">
+                                                    {item.student
+                                                        .student_number ??
+                                                        'Sans matricule'}
+                                                </span>
+                                                {item.establishments.length >
+                                                    0 && (
+                                                    <span className="block truncate text-xs text-muted-foreground lg:hidden">
+                                                        {item.establishments.join(
+                                                            ', ',
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                                                    {item.field_label}
+                                                </span>
+                                            </td>
+                                            <td className="hidden max-w-56 truncate text-muted-foreground lg:table-cell">
+                                                {item.establishments.length > 0
+                                                    ? item.establishments.join(
+                                                          ', ',
+                                                      )
+                                                    : '—'}
+                                            </td>
+                                            <td className="whitespace-nowrap text-muted-foreground tabular-nums">
+                                                {new Date(
+                                                    item.created_at,
+                                                ).toLocaleDateString('fr-FR')}
+                                            </td>
+                                            <td>
+                                                <CorrectionStatusBadge
+                                                    status={item.status}
+                                                    label={item.status_label}
+                                                />
+                                            </td>
+                                            <td className="text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/corrections/${item.uuid}`}
+                                                    >
+                                                        Examiner
+                                                        <ChevronRight aria-hidden="true" />
+                                                    </Link>
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 )}
-            </nav>
-        </div>
+                <Pagination links={corrections.links} />
+            </PageBody>
+        </>
     );
 }
 CorrectionsIndex.layout = {
