@@ -1,13 +1,14 @@
 import { Link } from '@inertiajs/react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 
 /**
- * DashWind-style form building blocks shared by every internal form:
+ * Form building blocks shared by every internal form:
  * a titled card per section, labelled fields with hints and errors, an error summary and a sticky action bar.
  */
 export function FormSection({
@@ -16,12 +17,20 @@ export function FormSection({
     description,
     children,
     columns = 2,
+    id,
+    action,
+    className,
 }: {
     icon?: LucideIcon;
     title: string;
     description?: string;
     children: ReactNode;
     columns?: 1 | 2 | 3;
+    /** Optional anchor, so a summary can link to the section. */
+    id?: string;
+    /** Optional element shown on the right of the section header. */
+    action?: ReactNode;
+    className?: string;
 }) {
     const grid =
         columns === 3
@@ -30,28 +39,34 @@ export function FormSection({
               ? 'sm:grid-cols-2'
               : '';
     return (
-        <section className="rounded-lg border bg-card">
-            <header className="flex items-start gap-3 border-b px-5 py-4 sm:px-6">
-                {Icon && (
-                    <span
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-primary"
-                        aria-hidden="true"
-                    >
-                        <Icon className="size-4" />
-                    </span>
-                )}
-                <div className="min-w-0">
-                    <h2 className="text-base font-bold text-foreground">
-                        {title}
-                    </h2>
-                    {description && (
-                        <p className="text-sm text-muted-foreground">
-                            {description}
-                        </p>
+        <section
+            id={id}
+            className={cn('surface scroll-mt-24 overflow-hidden', className)}
+        >
+            <header className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/30 px-5 py-4 sm:px-6">
+                <div className="flex min-w-0 items-start gap-3">
+                    {Icon && (
+                        <span
+                            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary ring-1 ring-primary/10"
+                            aria-hidden="true"
+                        >
+                            <Icon className="size-[18px]" />
+                        </span>
                     )}
+                    <div className="min-w-0 pt-0.5">
+                        <h2 className="text-base leading-tight font-bold text-foreground">
+                            {title}
+                        </h2>
+                        {description && (
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                                {description}
+                            </p>
+                        )}
+                    </div>
                 </div>
+                {action}
             </header>
-            <div className={`grid gap-x-6 gap-y-5 p-5 sm:p-6 ${grid}`}>
+            <div className={cn('grid gap-x-6 gap-y-5 p-5 sm:p-6', grid)}>
                 {children}
             </div>
         </section>
@@ -77,9 +92,15 @@ export function FormField({
 }) {
     return (
         <div
-            className={`grid content-start gap-1.5 ${wide ? 'sm:col-span-full' : ''}`}
+            className={cn(
+                'grid content-start gap-1.5',
+                wide && 'sm:col-span-full',
+            )}
         >
-            <Label htmlFor={id} className="flex items-center gap-1">
+            <Label
+                htmlFor={id}
+                className="flex items-center gap-1 text-sm font-semibold text-foreground"
+            >
                 {label}
                 {required ? (
                     <span className="text-destructive" aria-hidden="true">
@@ -96,7 +117,7 @@ export function FormField({
                 <p
                     id={`${id}-error`}
                     role="alert"
-                    className="flex items-center gap-1 text-xs text-destructive"
+                    className="flex items-center gap-1 text-xs font-medium text-destructive"
                 >
                     <AlertCircle
                         className="size-3.5 shrink-0"
@@ -108,8 +129,12 @@ export function FormField({
                 hint && (
                     <p
                         id={`${id}-hint`}
-                        className="text-xs text-muted-foreground"
+                        className="flex items-start gap-1 text-xs text-muted-foreground"
                     >
+                        <Info
+                            className="mt-px size-3.5 shrink-0 opacity-70"
+                            aria-hidden="true"
+                        />
                         {hint}
                     </p>
                 )
@@ -133,54 +158,82 @@ export function ErrorSummary({
     return (
         <div
             role="alert"
-            className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm"
+            className="flex gap-3 rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm"
         >
-            <p className="flex items-center gap-2 font-bold text-destructive">
-                <AlertCircle className="size-4" aria-hidden="true" />
-                {entries.length > 1
-                    ? `${entries.length} champs sont à corriger`
-                    : 'Un champ est à corriger'}
-            </p>
-            <ul className="mt-2 list-disc space-y-1 pl-6 text-foreground">
-                {entries.map(([key, message]) => (
-                    <li key={key}>
-                        <a
-                            href={`#${key}`}
-                            className="underline-offset-4 hover:underline"
-                        >
-                            {labels[key] ? `${labels[key]} : ` : ''}
-                            {message}
-                        </a>
-                    </li>
-                ))}
-            </ul>
+            <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/15 text-danger"
+                aria-hidden="true"
+            >
+                <AlertCircle className="size-[18px]" />
+            </span>
+            <div className="min-w-0">
+                <p className="font-bold text-danger-foreground">
+                    {entries.length > 1
+                        ? `${entries.length} champs sont à corriger`
+                        : 'Un champ est à corriger'}
+                </p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-5 text-foreground marker:text-danger">
+                    {entries.map(([key, message]) => (
+                        <li key={key}>
+                            <a
+                                href={`#${key}`}
+                                className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                {labels[key] && (
+                                    <span className="font-semibold">
+                                        {labels[key]} :{' '}
+                                    </span>
+                                )}
+                                {message}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
     );
 }
 
-/** Sticky footer with the primary action; stays visible at the bottom of long forms. */
+/**
+ * Floating sticky bar with the primary action: stays visible at the bottom of long forms
+ * and works whatever the page padding.
+ */
 export function FormActions({
     processing,
     submitLabel,
     cancelHref,
     note = 'Les champs marqués * sont obligatoires.',
+    cancelLabel = 'Annuler',
+    submitIcon: SubmitIcon,
 }: {
     processing: boolean;
     submitLabel: string;
     cancelHref: string;
     note?: string;
+    cancelLabel?: string;
+    /** Optional icon shown before the submit label when idle. */
+    submitIcon?: LucideIcon;
 }) {
     return (
-        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-card/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
-            <p className="text-xs text-muted-foreground">{note}</p>
-            <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                    <Link href={cancelHref}>Annuler</Link>
-                </Button>
-                <Button type="submit" disabled={processing}>
-                    {processing && <Spinner />}
-                    {processing ? 'Enregistrement…' : submitLabel}
-                </Button>
+        <div className="sticky bottom-0 z-20 pt-2 pb-3 md:pb-4">
+            <div className="flex flex-col gap-3 rounded-xl border bg-card/85 px-4 py-3 shadow-elevated backdrop-blur-md supports-[backdrop-filter]:bg-card/75 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Info className="size-3.5 shrink-0" aria-hidden="true" />
+                    {note}
+                </p>
+                <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
+                    <Button variant="outline" asChild>
+                        <Link href={cancelHref}>{cancelLabel}</Link>
+                    </Button>
+                    <Button type="submit" disabled={processing}>
+                        {processing ? (
+                            <Spinner />
+                        ) : (
+                            SubmitIcon && <SubmitIcon aria-hidden="true" />
+                        )}
+                        {processing ? 'Enregistrement…' : submitLabel}
+                    </Button>
+                </div>
             </div>
         </div>
     );
