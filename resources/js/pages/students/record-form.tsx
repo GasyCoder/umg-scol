@@ -40,6 +40,11 @@ export default function AnnualRecordForm({
         ),
         level_id: String(record?.level_id ?? ''),
         program_id: String(record?.program_id ?? ''),
+        repeat_code: record?.repeat_code ?? '',
+        scholarship_requested_at:
+            record?.scholarship_requested_at?.slice(0, 10) ?? '',
+        scholarship_request_reference:
+            record?.scholarship_request_reference ?? '',
     });
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -58,7 +63,7 @@ export default function AnnualRecordForm({
                             ? 'Modifier la déclaration annuelle'
                             : 'Ajouter une déclaration annuelle'
                     }
-                    description={`${fullName} — ${record ? 'l’établissement et l’année ne changent pas ; niveau et parcours peuvent être corrigés.' : 'nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
+                    description={`${fullName} — ${record ? 'l’établissement et l’année ne changent pas ; niveau, parcours, code de redoublement et demande de bourse peuvent être corrigés.' : 'nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
                 />
                 <div className="space-y-6">
                     <Link
@@ -99,6 +104,11 @@ export default function AnnualRecordForm({
                                 academic_year_id: 'Année universitaire',
                                 level_id: 'Niveau',
                                 program_id: 'Parcours',
+                                repeat_code: 'Code de redoublement',
+                                scholarship_requested_at:
+                                    'Date de dépôt de la demande de bourse',
+                                scholarship_request_reference:
+                                    'Référence demande de bourse',
                             }}
                         />
                         <RecordFields
