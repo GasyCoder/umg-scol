@@ -7,6 +7,7 @@ import {
     CalendarDays,
     CalendarRange,
     GraduationCap,
+    HandCoins,
     IdCard,
     Layers,
     Mail,
@@ -14,6 +15,7 @@ import {
     Phone,
     Plus,
     Power,
+    RotateCcw,
     Route,
     ShieldCheck,
     UserRound,
@@ -36,12 +38,22 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import type { AnnualRecord, Student } from '@/components/students/types';
+import { REPEAT_CODE_LABELS, SEX_LABELS } from '@/components/students/types';
+import type {
+    AnnualRecord,
+    Eligibility,
+    Student,
+} from '@/components/students/types';
 import { cn } from '@/lib/utils';
 
 type DeclarationRow = AnnualRecord & {
     uuid: string;
-    academic_year?: { id: number; name: string; is_current?: boolean };
+    academic_year?: {
+        id: number;
+        name: string;
+        is_current?: boolean;
+        scholarship_max_bac_year?: number | null;
+    };
     program?: {
         id: number;
         name: string;
@@ -77,6 +89,17 @@ const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
 ];
 const date = (value: string | null | undefined) =>
     value ? new Date(value).toLocaleDateString('fr-FR') : null;
+const eligibilityTones: Record<Eligibility['status'], Tone> = {
+    eligible: 'success',
+    not_eligible: 'danger',
+    undetermined: 'neutral',
+};
+const eligibilityLabel = (eligibility: Eligibility) =>
+    eligibility.status === 'eligible'
+        ? `Éligible — taux ${eligibility.rate}`
+        : eligibility.status === 'not_eligible'
+          ? 'Non éligible'
+          : 'Indéterminé';
 const initials = (student: Student) =>
     [student.last_name, student.first_names]
         .filter(Boolean)
@@ -90,10 +113,13 @@ function Field({
     label,
     value,
     wide = false,
+    extra,
 }: {
     label: string;
     value: string | number | null | undefined;
     wide?: boolean;
+    /** Optional marker shown after a filled value (e.g. « CIN non standard »). */
+    extra?: ReactNode;
 }) {
     const empty = value === null || value === undefined || value === '';
     return (
@@ -109,7 +135,14 @@ function Field({
                         : 'font-semibold text-foreground',
                 )}
             >
-                {empty ? 'Non renseigné' : value}
+                {empty ? (
+                    'Non renseigné'
+                ) : (
+                    <>
+                        {value}
+                        {extra && <span className="ml-2">{extra}</span>}
+                    </>
+                )}
             </dd>
         </div>
     );
@@ -146,10 +179,12 @@ function SideRow({
     icon: Icon,
     label,
     value,
+    extra,
 }: {
     icon: LucideIcon;
     label: string;
     value: string | null | undefined;
+    extra?: ReactNode;
 }) {
     return (
         <div className="flex items-start gap-3 py-2.5">
@@ -162,13 +197,36 @@ function SideRow({
             <div className="min-w-0">
                 <dt className="text-xs text-muted-foreground">{label}</dt>
                 <dd className="text-sm font-semibold break-words text-foreground">
-                    {value || (
+                    {value ? (
+                        <>
+                            {value}
+                            {extra && <span className="ml-2">{extra}</span>}
+                        </>
+                    ) : (
                         <span className="font-normal text-muted-foreground/80 italic">
                             Non renseigné
                         </span>
                     )}
                 </dd>
             </div>
+        </div>
+    );
+}
+
+/** Indicative scholarship rule of a declaration, with the reasons when it is not granted. */
+function EligibilityCell({ eligibility }: { eligibility: Eligibility }) {
+    return (
+        <div className="max-w-[16rem] space-y-1">
+            <ToneBadge tone={eligibilityTones[eligibility.status]}>
+                {eligibilityLabel(eligibility)}
+            </ToneBadge>
+            {eligibility.reasons.length > 0 && (
+                <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+                    {eligibility.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                    ))}
+                </ul>
+            )}
         </div>
     );
 }
@@ -182,7 +240,7 @@ export default function StudentShow({
     canDeactivate,
     canCreateRecord,
 }: {
-    student: Student;
+    student: Student & { cin_is_standard: boolean };
     records: DeclarationRow[];
     confirmation: StudentConfirmation;
     portalLinked: boolean;
@@ -217,6 +275,20 @@ export default function StudentShow({
     const activeCount = records.filter(
         (record) => record.status === 'active',
     ).length;
+    const birth = [
+        student.sex ? SEX_LABELS[student.sex] : null,
+        student.birth_date
+            ? `${student.sex === 'F' ? 'née' : 'né'} le ${date(student.birth_date)}`
+            : null,
+        student.nationality,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    // A CIN other than 12 digits is accepted but flagged for the agent.
+    const cinFlag =
+        student.cin && !student.cin_is_standard ? (
+            <ToneBadge tone="warning">CIN non standard</ToneBadge>
+        ) : undefined;
     const join = (...parts: (string | null | undefined)[]) =>
         parts.filter(Boolean).join(' à ');
     const moveTab = (index: number) => {
@@ -233,12 +305,7 @@ export default function StudentShow({
                     icon={UserRound}
                     title={fullName}
                     description={
-                        <>
-                            Fiche étudiant · Matricule{' '}
-                            <span className="font-mono font-semibold text-foreground">
-                                {student.student_number ?? 'non attribué'}
-                            </span>
-                        </>
+                        birth ? `Fiche étudiant · ${birth}` : 'Fiche étudiant'
                     }
                     meta={
                         <div className="flex flex-wrap gap-2">
@@ -342,10 +409,11 @@ export default function StudentShow({
                                 <p className="mt-3 font-heading text-lg leading-tight font-bold text-foreground">
                                     {fullName}
                                 </p>
-                                <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                                    {student.student_number ??
-                                        'Matricule non attribué'}
-                                </p>
+                                {birth && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {birth}
+                                    </p>
+                                )}
                                 <dl className="mt-3 divide-y border-t">
                                     <SideRow
                                         icon={Mail}
@@ -361,6 +429,7 @@ export default function StudentShow({
                                         icon={IdCard}
                                         label="CIN"
                                         value={student.cin}
+                                        extra={cinFlag}
                                     />
                                 </dl>
                             </div>
@@ -439,6 +508,47 @@ export default function StudentShow({
                                             'Sans parcours'
                                         }
                                     />
+                                    <SideRow
+                                        icon={RotateCcw}
+                                        label="Code de redoublement"
+                                        value={
+                                            current.repeat_code
+                                                ? REPEAT_CODE_LABELS[
+                                                      current.repeat_code
+                                                  ]
+                                                : null
+                                        }
+                                    />
+                                    {current.eligibility && (
+                                        <div className="flex items-start gap-3 py-2.5">
+                                            <span
+                                                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
+                                                aria-hidden="true"
+                                            >
+                                                <HandCoins className="size-3.5" />
+                                            </span>
+                                            <div className="min-w-0">
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Bourse (indicatif)
+                                                </dt>
+                                                <dd className="mt-0.5">
+                                                    <ToneBadge
+                                                        tone={
+                                                            eligibilityTones[
+                                                                current
+                                                                    .eligibility
+                                                                    .status
+                                                            ]
+                                                        }
+                                                    >
+                                                        {eligibilityLabel(
+                                                            current.eligibility,
+                                                        )}
+                                                    </ToneBadge>
+                                                </dd>
+                                            </div>
+                                        </div>
+                                    )}
                                 </dl>
                             ) : (
                                 <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
@@ -535,12 +645,24 @@ export default function StudentShow({
                                             value={student.first_names}
                                         />
                                         <Field
+                                            label="Sexe"
+                                            value={
+                                                student.sex
+                                                    ? SEX_LABELS[student.sex]
+                                                    : null
+                                            }
+                                        />
+                                        <Field
                                             label="Date de naissance"
                                             value={date(student.birth_date)}
                                         />
                                         <Field
-                                            label="Lieu de naissance"
-                                            value={student.birth_place}
+                                            label="Nom et prénoms de la mère"
+                                            value={student.mother_name}
+                                        />
+                                        <Field
+                                            label="Nationalité"
+                                            value={student.nationality}
                                         />
                                     </Section>
                                     <Section title="Contact" icon={Phone}>
@@ -553,7 +675,7 @@ export default function StudentShow({
                                             value={student.email}
                                         />
                                         <Field
-                                            label="Adresse"
+                                            label="Adresse exacte"
                                             value={student.address}
                                             wide
                                         />
@@ -565,6 +687,7 @@ export default function StudentShow({
                                         <Field
                                             label="Numéro"
                                             value={student.cin}
+                                            extra={cinFlag}
                                         />
                                         <Field
                                             label="Délivrance"
@@ -579,22 +702,12 @@ export default function StudentShow({
                                         icon={GraduationCap}
                                     >
                                         <Field
-                                            label="Numéro d’inscription"
-                                            value={
-                                                student.bac_registration_number
-                                            }
+                                            label="Année d’obtention"
+                                            value={student.bac_year}
                                         />
                                         <Field
                                             label="Série"
                                             value={student.bac_series}
-                                        />
-                                        <Field
-                                            label="Année"
-                                            value={student.bac_year}
-                                        />
-                                        <Field
-                                            label="Mention"
-                                            value={student.bac_mention}
                                         />
                                     </Section>
                                 </div>
@@ -615,6 +728,9 @@ export default function StudentShow({
                                         <p className="text-sm text-muted-foreground">
                                             Une déclaration active ne constitue
                                             pas une inscription universitaire.
+                                            L’éligibilité affichée est
+                                            indicative : le dossier papier reste
+                                            décidé par la Scolarité Centrale.
                                         </p>
                                     </div>
                                     {canCreateRecord && student.is_active && (
@@ -638,7 +754,7 @@ export default function StudentShow({
                                     />
                                 ) : (
                                     <div className="overflow-x-auto border-t">
-                                        <table className="data-table min-w-[48rem]">
+                                        <table className="data-table min-w-[64rem]">
                                             <caption className="sr-only">
                                                 Déclarations annuelles de
                                                 l’étudiant
@@ -650,6 +766,9 @@ export default function StudentShow({
                                                         'Établissement',
                                                         'Niveau',
                                                         'Mention · parcours',
+                                                        'Redoublement',
+                                                        'Demande de bourse',
+                                                        'Bourse (indicatif)',
                                                         'Statut',
                                                     ].map((label) => (
                                                         <th
@@ -734,6 +853,50 @@ export default function StudentShow({
                                                                     Sans
                                                                     parcours
                                                                 </span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            {record.repeat_code ? (
+                                                                REPEAT_CODE_LABELS[
+                                                                    record
+                                                                        .repeat_code
+                                                                ]
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    Non
+                                                                    renseigné
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            {record.scholarship_request_reference ? (
+                                                                <>
+                                                                    <span className="block font-mono text-sm font-semibold text-foreground">
+                                                                        {
+                                                                            record.scholarship_request_reference
+                                                                        }
+                                                                    </span>
+                                                                    <span className="block text-xs text-muted-foreground">
+                                                                        {record.scholarship_requested_at
+                                                                            ? `déposée le ${date(record.scholarship_requested_at)}`
+                                                                            : 'Date non renseignée'}
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    Aucune
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            {record.eligibility ? (
+                                                                <EligibilityCell
+                                                                    eligibility={
+                                                                        record.eligibility
+                                                                    }
+                                                                />
+                                                            ) : (
+                                                                '—'
                                                             )}
                                                         </td>
                                                         <td>
