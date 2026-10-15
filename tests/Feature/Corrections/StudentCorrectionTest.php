@@ -32,8 +32,8 @@ beforeEach(function () {
     $this->b = Establishment::factory()->create(['name' => 'Établissement B']);
     $this->year = AcademicYear::factory()->create(['is_current' => true, 'is_active' => true]);
     $this->student = Student::factory()->create([
-        'student_number' => 'MAT100', 'last_name' => 'RAKOTO', 'first_names' => 'Jean', 'birth_date' => '2001-02-03', 'birth_place' => 'Mahajanga',
-        'cin' => '401011012345', 'phone' => '0341234567', 'email' => 'officiel@example.test', 'address' => 'Lot II A 12', 'bac_registration_number' => 'BAC100', 'bac_year' => 2019,
+        'last_name' => 'RAKOTO', 'first_names' => 'Jean', 'sex' => 'M', 'birth_date' => '2001-02-03', 'mother_name' => 'RASOA Marie',
+        'cin' => '401011012345', 'nationality' => 'Malagasy', 'phone' => '0341234567', 'email' => 'officiel@example.test', 'address' => 'Lot II A 12', 'bac_year' => 2019,
     ]);
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'status' => 'active']);
     $this->studentUser = User::factory()->create(['email' => 'login@example.test'])->assignRole('student');
@@ -87,17 +87,17 @@ it('refuses unlinked, inactive, unauthenticated and internal accounts', function
 it('rejects fields outside the whitelist', function (string $field) {
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => $field, 'value' => 'X'])->assertUnprocessable()->assertJsonValidationErrors('field');
     expect(StudentCorrectionRequest::count())->toBe(0);
-})->with(['student_number', 'is_active', 'establishment_id', 'level_id', 'status', 'id', 'password']);
+})->with(['student_number', 'birth_place', 'bac_registration_number', 'repeat_code', 'scholarship_request_reference', 'is_active', 'establishment_id', 'level_id', 'status', 'id', 'password']);
 it('validates the proposed value with the manual-entry rules', function (string $field, string $value) {
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => $field, 'value' => $value])->assertUnprocessable()->assertJsonValidationErrors('value');
     expect(StudentCorrectionRequest::count())->toBe(0);
 })->with([
     ['phone', '034-ABC'], ['email', 'not-an-email'], ['birth_date', '03/02/2001'], ['birth_date', '2999-01-01'], ['bac_year', '1800'], ['bac_year', 'deux-mille'],
-    ['cin_issued_at', 'hier'], ['last_name', '   '], ['address', str_repeat('a', 2001)],
+    ['cin_issued_at', 'hier'], ['last_name', '   '], ['address', str_repeat('a', 2001)], ['sex', 'X'], ['nationality', 'Martienne'], ['bac_series', 'Z9'],
 ]);
 it('rejects a value identical to the official one after normalization', function (string $field, string $value) {
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => $field, 'value' => $value])->assertUnprocessable()->assertJsonValidationErrors('value');
-})->with([['phone', '034 12 345 67'], ['email', 'OFFICIEL@example.test'], ['cin', '4010 1101 2345'], ['birth_date', '2001-02-03'], ['bac_year', '2019'], ['last_name', ' RAKOTO ']]);
+})->with([['phone', '034 12 345 67'], ['phone', '+261 34 12 345 67'], ['email', 'OFFICIEL@example.test'], ['cin', '4010 1101 2345'], ['birth_date', '2001-02-03'], ['bac_year', '2019'], ['last_name', ' RAKOTO '], ['sex', 'masculin'], ['nationality', 'MALAGASY'], ['mother_name', ' RASOA  Marie ']]);
 it('always targets the linked student and ignores any student id in the payload', function () {
     [$other] = otherLinkedStudent($this);
     asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => 'phone', 'value' => '0381234567', 'student_id' => $other->id])->assertCreated();
@@ -143,10 +143,10 @@ it('lists only the student own requests without internal data', function () {
     expect($response->getContent())->not->toContain('SECRET OTHER ADDRESS')->not->toContain($this->staffA->name)->not->toContain('401011099999');
 });
 it('rate limits correction requests per account', function () {
-    $fields = ['last_name', 'first_names', 'birth_place', 'cin_issued_place', 'address', 'bac_series', 'bac_mention', 'phone', 'email', 'bac_registration_number'];
+    $fields = ['last_name', 'first_names', 'mother_name', 'cin_issued_place', 'address', 'bac_series', 'nationality', 'phone', 'email', 'sex'];
     foreach ($fields as $i => $field) {
         $value = match ($field) {
-            'phone' => '0389999999', 'email' => 'nouveau@example.test', default => 'Valeur '.$i
+            'phone' => '0389999999', 'email' => 'nouveau@example.test', 'bac_series' => 'C', 'nationality' => 'Comorien', 'sex' => 'F', default => 'Valeur '.$i
         };
         asCorrectionStudent($this)->postJson($this->bourse.'/api/student/corrections', ['field' => $field, 'value' => $value])->assertCreated();
     }
@@ -159,7 +159,8 @@ it('scopes the internal list and review to the current active declaration of the
     [, $otherUser] = otherLinkedStudent($this);
     $foreign = makeCorrection($this, user: $otherUser);
     $this->actingAs($this->staffA, 'web')->get('/corrections')->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('corrections/index')->has('corrections.data', 1)->where('corrections.data.0.id', $mine->id)->where('corrections.data.0.establishments.0', 'Établissement A'));
+        ->assertInertia(fn (Assert $page) => $page->component('corrections/index')->has('corrections.data', 1)->where('corrections.data.0.id', $mine->id)->where('corrections.data.0.establishments.0', 'Établissement A')
+            ->where('corrections.data.0.student.birth_date', '2001-02-03')->missing('corrections.data.0.student.cin'));
     $this->get('/corrections/'.$foreign->uuid)->assertForbidden();
     $this->post('/corrections/'.$foreign->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
     $this->get('/corrections?establishment_id='.$this->b->id)->assertForbidden();
@@ -244,11 +245,11 @@ it('makes a repeated approval a safe no-op', function () {
     expect(Activity::where('event', 'correction_approved')->count())->toBe(1);
 });
 it('refuses a correction that would duplicate another identity', function (string $field, string $value) {
-    Student::factory()->create(['cin' => '401011077777', 'bac_registration_number' => 'BAC777']);
+    Student::factory()->create(['cin' => '401011077777', 'phone' => '0341077777', 'email' => 'autre@example.test']);
     $correction = makeCorrection($this, StudentCorrectionField::from($field), $value);
     expect(fn () => app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, true, null))->toThrow(ValidationException::class);
     expect($correction->fresh()->status)->toBe(StudentCorrectionStatus::Pending)->and($this->student->fresh()->getAttribute($field))->not->toBe($value);
-})->with([['cin', '401011077777'], ['bac_registration_number', 'BAC777']]);
+})->with([['cin', '401011077777'], ['phone', '0341077777'], ['email', 'autre@example.test']]);
 it('refuses a CIN issue date earlier than the birth date', function () {
     $correction = makeCorrection($this, StudentCorrectionField::CinIssuedAt, '1999-01-01');
     expect(fn () => app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, true, null))->toThrow(ValidationException::class);
