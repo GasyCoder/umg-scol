@@ -250,3 +250,7 @@ Migration `2026_10_17_100000_align_students_with_establishment_template`. Le fic
 Règle de bourse indicative (`ScholarshipEligibility`, reprise des formules du modèle) : éligible si nationalité Malagasy, année du BAC ≤ `academic_years.scholarship_max_bac_year`, référence de demande présente et code `N` (taux 1) ou `R` (taux 1/4) ; `T+` n'est pas boursier. Sans année limite définie, le résultat est « indéterminé ». La règle est affichée sur la fiche interne ; elle ne remplace pas la vérification du dossier papier par la Scolarité Centrale.
 
 Suppression des colonnes `student_number`, `birth_place`, `bac_registration_number`, `bac_mention` : leurs valeurs sont perdues, ainsi que les demandes de correction portant sur ces champs (supprimées par la migration, faute de champ cible). Le `down()` recrée les colonnes vides.
+
+## Notifications du personnel
+
+Migration `2026_10_17_170000_create_notifications_table` : table Laravel `notifications` (UUID primaire, type, destinataire polymorphe, données JSON encodées en texte, `read_at`, timestamps), index destinataire + état de lecture ; `users.notification_preferences` JSON nullable (`off` = types désactivés, aucun par défaut). Données stockées : type, titre, message bref avec le nom, UUID étudiant et UUID du sujet. Aucune valeur corrigée, CIN, contact, empreinte ou note étudiante. La lecture expose uniquement les champs de présentation, après contrôle des droits et du périmètre courant. Notifications et action métier appartiennent à la même transaction.
