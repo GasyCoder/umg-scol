@@ -1,11 +1,12 @@
 import { Form } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, ShieldOff, Smartphone } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import Heading from '@/components/heading';
+import { ToneBadge } from '@/components/tone-badge';
 import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
 import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
+import { SettingsSection } from '@/layouts/settings/layout';
 import { disable, enable } from '@/routes/two-factor';
 
 export type Props = {
@@ -45,29 +46,43 @@ export default function ManageTwoFactor(props: Props) {
     }
 
     return (
-        <div className="space-y-6">
-            <Heading
-                variant="small"
-                title="Double authentification"
-                description="Gérez les paramètres de la double authentification"
-            />
+        <SettingsSection
+            icon={ShieldCheck}
+            title="Double authentification"
+            description="Gérez les paramètres de la double authentification"
+            meta={
+                twoFactorEnabled ? (
+                    <ToneBadge tone="success">Activée</ToneBadge>
+                ) : (
+                    <ToneBadge tone="neutral">Désactivée</ToneBadge>
+                )
+            }
+        >
             {twoFactorEnabled ? (
-                <div className="flex flex-col items-start justify-start space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                        Un code sécurisé et aléatoire vous sera demandé lors de
-                        la connexion. Vous pourrez l'obtenir depuis
-                        l'application compatible TOTP installée sur votre
-                        téléphone.
-                    </p>
+                <div className="space-y-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <Smartphone
+                                className="mt-0.5 size-4 shrink-0 text-success"
+                                aria-hidden="true"
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                Un code sécurisé et aléatoire vous sera demandé
+                                lors de la connexion. Vous pourrez l'obtenir
+                                depuis l'application compatible TOTP installée
+                                sur votre téléphone.
+                            </p>
+                        </div>
 
-                    <div className="relative inline">
-                        <Form {...disable.form()}>
+                        <Form {...disable.form()} className="shrink-0">
                             {({ processing }) => (
                                 <Button
-                                    variant="destructive"
+                                    variant="outline"
                                     type="submit"
                                     disabled={processing}
+                                    className="border-danger/40 text-danger-foreground hover:bg-danger-soft hover:text-danger-foreground"
                                 >
+                                    <ShieldOff aria-hidden="true" />
                                     Désactiver la 2FA
                                 </Button>
                             )}
@@ -81,18 +96,24 @@ export default function ManageTwoFactor(props: Props) {
                     />
                 </div>
             ) : (
-                <div className="flex flex-col items-start justify-start space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                        Lorsque vous activez la double authentification, un code
-                        sécurisé vous est demandé lors de la connexion. Ce code
-                        peut être obtenu depuis une application compatible TOTP
-                        installée sur votre téléphone.
-                    </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <Smartphone
+                            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                            Lorsque vous activez la double authentification, un
+                            code sécurisé vous est demandé lors de la connexion.
+                            Ce code peut être obtenu depuis une application
+                            compatible TOTP installée sur votre téléphone.
+                        </p>
+                    </div>
 
-                    <div>
+                    <div className="shrink-0">
                         {hasSetupData ? (
                             <Button onClick={() => setShowSetupModal(true)}>
-                                <ShieldCheck />
+                                <ShieldCheck aria-hidden="true" />
                                 Poursuivre la configuration
                             </Button>
                         ) : (
@@ -102,6 +123,7 @@ export default function ManageTwoFactor(props: Props) {
                             >
                                 {({ processing }) => (
                                     <Button type="submit" disabled={processing}>
+                                        <ShieldCheck aria-hidden="true" />
                                         Activer la 2FA
                                     </Button>
                                 )}
@@ -122,6 +144,6 @@ export default function ManageTwoFactor(props: Props) {
                 fetchSetupData={fetchSetupData}
                 errors={errors}
             />
-        </div>
+        </SettingsSection>
     );
 }
