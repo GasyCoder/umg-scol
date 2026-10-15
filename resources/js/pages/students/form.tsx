@@ -21,8 +21,24 @@ import {
 } from '@/components/forms/form-kit';
 import { PageBody, PageHeader } from '@/components/page-header';
 import RecordFields from '@/components/students/record-fields';
-import type { Options, Student } from '@/components/students/types';
+import {
+    BAC_SERIES_CHOICES,
+    NATIONALITY_CHOICES,
+    SEX_CHOICES,
+} from '@/components/students/types';
+import type {
+    Options,
+    SelectChoice,
+    Student,
+} from '@/components/students/types';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type FieldKey = Exclude<keyof Student, 'id' | 'uuid' | 'is_active'>;
 type Field = {
@@ -36,6 +52,8 @@ type Field = {
     autoComplete?: string;
     inputMode?: 'numeric' | 'tel' | 'email' | 'text';
     wide?: boolean;
+    /** Closed list of the official template: rendered as a select. */
+    choices?: SelectChoice[];
 };
 type Section = {
     id: string;
@@ -69,59 +87,34 @@ const identity: Section = {
             autoComplete: 'given-name',
         },
         {
-            key: 'student_number',
-            label: 'Matricule',
-            max: 100,
-            placeholder: 'Attribué par l’établissement',
-            hint: 'Identifiant institutionnel ; il doit être unique.',
+            key: 'sex',
+            label: 'Sexe',
+            required: true,
+            choices: SEX_CHOICES,
+            placeholder: 'Choisir le sexe',
         },
         {
             key: 'birth_date',
             label: 'Date de naissance',
+            required: true,
             type: 'date',
         },
         {
-            key: 'birth_place',
-            label: 'Lieu de naissance',
+            key: 'mother_name',
+            label: 'Nom et prénoms de la mère',
             max: 255,
-            placeholder: 'Mahajanga',
+            placeholder: 'RASOA Marie',
+        },
+        {
+            key: 'nationality',
+            label: 'Nationalité',
+            required: true,
+            choices: NATIONALITY_CHOICES,
+            placeholder: 'Choisir la nationalité',
         },
     ],
 };
 const sections: Section[] = [
-    {
-        id: 'section-bac',
-        title: 'Baccalauréat',
-        description: 'Informations du diplôme d’accès à l’université.',
-        icon: BookOpenCheck,
-        fields: [
-            {
-                key: 'bac_registration_number',
-                label: 'Numéro d’inscription BAC',
-                max: 100,
-                placeholder: 'Numéro figurant sur le relevé',
-            },
-            {
-                key: 'bac_series',
-                label: 'Série',
-                max: 50,
-                placeholder: 'A, C, D…',
-            },
-            {
-                key: 'bac_year',
-                label: 'Année d’obtention',
-                type: 'number',
-                inputMode: 'numeric',
-                placeholder: String(currentYear - 1),
-            },
-            {
-                key: 'bac_mention',
-                label: 'Mention',
-                max: 100,
-                placeholder: 'Passable, Assez bien…',
-            },
-        ],
-    },
     {
         id: 'section-cin',
         title: 'Pièce d’identité (CIN)',
@@ -133,9 +126,8 @@ const sections: Section[] = [
                 key: 'cin',
                 label: 'Numéro CIN',
                 max: 100,
-                inputMode: 'numeric',
                 placeholder: '12 chiffres',
-                hint: 'Les espaces sont retirés automatiquement.',
+                hint: 'Les espaces sont retirés ; un numéro autre que 12 chiffres est accepté mais signalé « non standard ».',
             },
             {
                 key: 'cin_issued_at',
@@ -163,7 +155,7 @@ const sections: Section[] = [
                 max: 30,
                 inputMode: 'tel',
                 placeholder: '034 12 345 67',
-                hint: 'Format malgache ; le préfixe +261 est accepté.',
+                hint: 'Format malgache ; le préfixe +261 est accepté. Un même numéro ne peut appartenir qu’à un seul étudiant.',
                 autoComplete: 'tel',
             },
             {
@@ -173,16 +165,37 @@ const sections: Section[] = [
                 max: 255,
                 inputMode: 'email',
                 placeholder: 'prenom.nom@exemple.mg',
-                hint: 'Email officiel de contact, distinct du compte de connexion.',
+                hint: 'Email officiel de contact, distinct du compte de connexion ; unique par étudiant.',
                 autoComplete: 'email',
             },
             {
                 key: 'address',
-                label: 'Adresse',
+                label: 'Adresse exacte',
                 max: 2000,
                 placeholder: 'Lot, quartier, ville',
                 autoComplete: 'street-address',
                 wide: true,
+            },
+        ],
+    },
+    {
+        id: 'section-bac',
+        title: 'Baccalauréat',
+        description: 'Informations du diplôme d’accès à l’université.',
+        icon: BookOpenCheck,
+        fields: [
+            {
+                key: 'bac_year',
+                label: 'Année d’obtention',
+                type: 'number',
+                inputMode: 'numeric',
+                placeholder: String(currentYear - 1),
+            },
+            {
+                key: 'bac_series',
+                label: 'Série',
+                choices: BAC_SERIES_CHOICES,
+                placeholder: 'Choisir la série',
             },
         ],
     },
@@ -196,6 +209,15 @@ labels.establishment_id = 'Établissement';
 labels.academic_year_id = 'Année universitaire';
 labels.level_id = 'Niveau';
 labels.program_id = 'Parcours';
+labels.repeat_code = 'Code de redoublement';
+labels.scholarship_requested_at = 'Date de dépôt de la demande de bourse';
+labels.scholarship_request_reference = 'Référence demande de bourse';
+
+/** Keeps a legacy value outside the template list selectable, so editing never silently drops it. */
+const withCurrent = (choices: SelectChoice[], current: string) =>
+    current === '' || choices.some((choice) => choice.value === current)
+        ? choices
+        : [...choices, { value: current, label: `${current} (hors liste)` }];
 
 export default function StudentForm({
     student,
@@ -223,6 +245,9 @@ export default function StudentForm({
             ),
             level_id: '',
             program_id: '',
+            repeat_code: '',
+            scholarship_requested_at: '',
+            scholarship_request_reference: '',
         });
     const form = useForm(initial);
     const errors = form.errors as Record<string, string | undefined>;
@@ -249,41 +274,89 @@ export default function StudentForm({
                     error={errors[field.key]}
                     wide={field.wide}
                 >
-                    <Input
-                        id={field.key}
-                        type={field.type ?? 'text'}
-                        value={form.data[field.key]}
-                        onChange={(event) =>
-                            form.setData(field.key, event.target.value)
-                        }
-                        required={field.required}
-                        maxLength={field.max}
-                        min={
-                            field.key === 'bac_year'
-                                ? 1950
-                                : field.type === 'date'
-                                  ? '1900-01-01'
-                                  : undefined
-                        }
-                        max={
-                            field.key === 'bac_year'
-                                ? currentYear
-                                : field.key === 'birth_date'
-                                  ? new Date().toISOString().slice(0, 10)
-                                  : undefined
-                        }
-                        placeholder={field.placeholder}
-                        autoComplete={field.autoComplete ?? 'off'}
-                        inputMode={field.inputMode}
-                        aria-invalid={errors[field.key] ? true : undefined}
-                        aria-describedby={
-                            errors[field.key]
-                                ? `${field.key}-error`
-                                : field.hint
-                                  ? `${field.key}-hint`
-                                  : undefined
-                        }
-                    />
+                    {field.choices ? (
+                        <Select
+                            value={
+                                form.data[field.key] ||
+                                (field.required ? undefined : 'none')
+                            }
+                            onValueChange={(value) =>
+                                form.setData(
+                                    field.key,
+                                    value === 'none' ? '' : value,
+                                )
+                            }
+                        >
+                            <SelectTrigger
+                                id={field.key}
+                                className="w-full"
+                                aria-invalid={
+                                    errors[field.key] ? true : undefined
+                                }
+                                aria-describedby={
+                                    errors[field.key]
+                                        ? `${field.key}-error`
+                                        : undefined
+                                }
+                            >
+                                <SelectValue placeholder={field.placeholder} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {!field.required && (
+                                    <SelectItem value="none">
+                                        Non renseignée
+                                    </SelectItem>
+                                )}
+                                {withCurrent(
+                                    field.choices,
+                                    form.data[field.key],
+                                ).map((choice) => (
+                                    <SelectItem
+                                        key={choice.value}
+                                        value={choice.value}
+                                    >
+                                        {choice.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input
+                            id={field.key}
+                            type={field.type ?? 'text'}
+                            value={form.data[field.key]}
+                            onChange={(event) =>
+                                form.setData(field.key, event.target.value)
+                            }
+                            required={field.required}
+                            maxLength={field.max}
+                            min={
+                                field.key === 'bac_year'
+                                    ? 1950
+                                    : field.type === 'date'
+                                      ? '1900-01-01'
+                                      : undefined
+                            }
+                            max={
+                                field.key === 'bac_year'
+                                    ? currentYear
+                                    : field.key === 'birth_date'
+                                      ? new Date().toISOString().slice(0, 10)
+                                      : undefined
+                            }
+                            placeholder={field.placeholder}
+                            autoComplete={field.autoComplete ?? 'off'}
+                            inputMode={field.inputMode}
+                            aria-invalid={errors[field.key] ? true : undefined}
+                            aria-describedby={
+                                errors[field.key]
+                                    ? `${field.key}-error`
+                                    : field.hint
+                                      ? `${field.key}-hint`
+                                      : undefined
+                            }
+                        />
+                    )}
                 </FormField>
             ))}
         </FormSection>
