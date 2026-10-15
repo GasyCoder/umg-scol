@@ -4,7 +4,6 @@ import { usePasskeyVerify } from '@laravel/passkeys/react';
 import { KeyRound } from 'lucide-react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 
 type Props = {
@@ -45,11 +44,15 @@ export default function PasskeyVerify({
                 <Button
                     type="button"
                     variant="outline"
-                    className="w-full"
+                    className="h-11 w-full font-semibold"
                     onClick={verify}
                     disabled={isLoading}
                 >
-                    {isLoading ? <Spinner /> : <KeyRound className="h-4 w-4" />}
+                    {isLoading ? (
+                        <Spinner />
+                    ) : (
+                        <KeyRound className="size-4" aria-hidden="true" />
+                    )}
                     {isLoading
                         ? (loadingLabel ?? 'Authentification...')
                         : (label ?? "Se connecter avec une clé d'accès")}
@@ -59,15 +62,12 @@ export default function PasskeyVerify({
                 )}
             </div>
 
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                        {separator ?? 'Ou continuer avec votre adresse email'}
-                    </span>
-                </div>
+            <div className="my-6 flex items-center gap-3">
+                <span className="h-px flex-1 bg-border" aria-hidden="true" />
+                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {separator ?? 'Ou continuer avec votre adresse email'}
+                </span>
+                <span className="h-px flex-1 bg-border" aria-hidden="true" />
             </div>
         </>
     );
