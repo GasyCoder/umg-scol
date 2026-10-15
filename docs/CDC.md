@@ -51,8 +51,11 @@ Support/maintenance avec privilèges élevés. Peut être exclu des listes opér
 
 ## Données étudiant
 
-Identité : matricule, nom, prénoms, naissance, CIN, téléphone, email, adresse, informations BAC.
-Situation annuelle : année universitaire, établissement, niveau, parcours, statut déclaré.
+Champs définis par le fichier modèle des établissements.
+
+Identité : nom, prénoms, sexe, date de naissance, nom et prénoms de la mère, CIN (date et lieu de délivrance), nationalité, année et série du BAC, adresse exacte, téléphone, email (téléphone et email uniques).
+Situation annuelle : année universitaire, établissement, niveau, mention/parcours, code de redoublement (N, R, T+), date de dépôt et référence de la demande de bourse, statut déclaré.
+Référentiels associés : domaine de la mention, type de formation du parcours, institution (publique/privée) de l'établissement, année limite du BAC pour la règle de bourse.
 
 ## Import
 
