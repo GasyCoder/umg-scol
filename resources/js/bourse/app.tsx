@@ -1,11 +1,43 @@
+import {
+    AlertCircle,
+    ArrowLeft,
+    BadgeCheck,
+    CalendarCheck,
+    CheckCircle2,
+    Contact,
+    EyeOff,
+    FilePenLine,
+    Flag,
+    GraduationCap,
+    IdCard,
+    Info,
+    Link2,
+    Lock,
+    LogOut,
+    Mail,
+    School,
+    Send,
+    ShieldCheck,
+    UserRound,
+    XCircle,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 import AppLogoIcon from '@/components/app-logo-icon';
+import { EmptyState } from '@/components/empty-state';
+import {
+    ScholarshipIllustration,
+    StudentsIllustration,
+} from '@/components/illustrations';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { ToneBadge, toneFor } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import {
     Dialog,
     DialogContent,
@@ -14,8 +46,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { initializeTheme } from '@/hooks/use-appearance';
+import { cn } from '@/lib/utils';
 import { api } from './api';
-import { ConfirmationSection } from './confirmation';
+import { ConfirmationBadge, ConfirmationSection } from './confirmation';
 import type { ConfirmationState } from './confirmation';
 import type { Session } from './api';
 type Correction = {
@@ -36,15 +70,6 @@ type FieldRow = {
     field?: string;
     hidden?: boolean;
     input?: 'date' | 'number' | 'email' | 'tel';
-};
-const statusVariant: Record<
-    Correction['status'],
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'default',
-    approved: 'secondary',
-    rejected: 'destructive',
-    cancelled: 'outline',
 };
 type Student = {
     student_number: string | null;
@@ -67,6 +92,203 @@ type Student = {
         status: string;
     }[];
 };
+type InfoSection = {
+    title: string;
+    icon: LucideIcon;
+    note?: string;
+    fields: FieldRow[];
+};
+
+/** Legal reminder shown on every screen: the portal is not a registration service. */
+const PORTAL_NOTICE =
+    'Ce portail permet aux étudiants déjà déclarés par leur établissement de consulter leurs informations. La création d’un compte numérique ne constitue pas une inscription universitaire.';
+
+function infoSections(student: Student): InfoSection[] {
+    return [
+        {
+            title: 'Identité',
+            icon: UserRound,
+            fields: [
+                { label: 'Matricule', value: student.student_number },
+                { label: 'Nom', value: student.last_name, field: 'last_name' },
+                {
+                    label: 'Prénoms',
+                    value: student.first_names,
+                    field: 'first_names',
+                },
+                {
+                    label: 'Date de naissance',
+                    value: student.birth_date,
+                    field: 'birth_date',
+                    input: 'date',
+                },
+                {
+                    label: 'Lieu de naissance',
+                    value: student.birth_place,
+                    field: 'birth_place',
+                },
+            ],
+        },
+        {
+            title: 'Carte d’identité (CIN)',
+            icon: IdCard,
+            note: 'Pour votre sécurité, les données CIN ne sont pas affichées. Vous pouvez signaler une valeur à corriger.',
+            fields: [
+                {
+                    label: 'Numéro CIN',
+                    value: null,
+                    field: 'cin',
+                    hidden: true,
+                },
+                {
+                    label: 'Date de délivrance',
+                    value: null,
+                    field: 'cin_issued_at',
+                    hidden: true,
+                    input: 'date',
+                },
+                {
+                    label: 'Lieu de délivrance',
+                    value: null,
+                    field: 'cin_issued_place',
+                    hidden: true,
+                },
+            ],
+        },
+        {
+            title: 'Contact',
+            icon: Contact,
+            fields: [
+                {
+                    label: 'Téléphone',
+                    value: student.phone,
+                    field: 'phone',
+                    input: 'tel',
+                },
+                {
+                    label: 'Email de contact',
+                    value: student.email,
+                    field: 'email',
+                    input: 'email',
+                },
+                { label: 'Adresse', value: student.address, field: 'address' },
+            ],
+        },
+        {
+            title: 'Baccalauréat',
+            icon: GraduationCap,
+            fields: [
+                {
+                    label: 'Numéro BAC',
+                    value: student.bac_registration_number,
+                    field: 'bac_registration_number',
+                },
+                {
+                    label: 'Série',
+                    value: student.bac_series,
+                    field: 'bac_series',
+                },
+                {
+                    label: 'Année',
+                    value: student.bac_year,
+                    field: 'bac_year',
+                    input: 'number',
+                },
+                {
+                    label: 'Mention',
+                    value: student.bac_mention,
+                    field: 'bac_mention',
+                },
+            ],
+        },
+    ];
+}
+
+function formatDate(value: string): string {
+    return new Date(value).toLocaleDateString('fr-FR');
+}
+
+const noticeTones = {
+    danger: 'border-danger/30 bg-danger-soft text-danger-foreground',
+    success: 'border-success/30 bg-success-soft text-success-foreground',
+    info: 'border-info/30 bg-info-soft text-info-foreground',
+};
+
+/** Inline message on a soft tone surface, with an icon (never colour alone). */
+function Notice({
+    tone,
+    icon: Icon,
+    role,
+    children,
+    className,
+}: {
+    tone: keyof typeof noticeTones;
+    icon: LucideIcon;
+    role?: 'alert' | 'status';
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <div
+            role={role}
+            className={cn(
+                'flex items-start gap-3 rounded-xl border px-4 py-3 text-sm',
+                noticeTones[tone],
+                className,
+            )}
+        >
+            <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <div className="min-w-0 flex-1">{children}</div>
+        </div>
+    );
+}
+
+/** Card header used by every portal section: icon tile, title, optional description and meta. */
+function SectionHeader({
+    id,
+    icon: Icon,
+    title,
+    description,
+    meta,
+}: {
+    id: string;
+    icon: LucideIcon;
+    title: string;
+    description?: string;
+    meta?: ReactNode;
+}) {
+    return (
+        <header className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b bg-muted/30 px-5 py-4 sm:px-6">
+            <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                aria-hidden="true"
+            >
+                <Icon className="size-[18px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+                <h2
+                    id={id}
+                    className="font-heading text-base leading-9 font-bold text-foreground"
+                >
+                    {title}
+                </h2>
+                {description && (
+                    <p className="-mt-1 text-sm text-muted-foreground">
+                        {description}
+                    </p>
+                )}
+            </div>
+            {meta && (
+                <div className="order-last basis-full pl-12 sm:order-none sm:basis-auto sm:pt-1.5 sm:pl-0">
+                    {meta}
+                </div>
+            )}
+        </header>
+    );
+}
+
+const fieldClass = 'h-11 bg-card';
+
 function Portal() {
     const [session, setSession] = useState<Session | null>(null);
     const [student, setStudent] = useState<Student | null>(null);
@@ -217,363 +439,605 @@ function Portal() {
             setMessage(result.message);
             await refresh();
         });
+    const notices = (
+        <>
+            {error && (
+                <Notice tone="danger" icon={AlertCircle} role="alert">
+                    {error}
+                </Notice>
+            )}
+            {message && (
+                <Notice tone="success" icon={CheckCircle2} role="status">
+                    {message}
+                </Notice>
+            )}
+        </>
+    );
+    const firstName = student
+        ? (student.first_names ?? student.last_name).split(' ')[0]
+        : '';
+
     return (
-        <div className="min-h-screen">
-            <header className="border-b">
-                <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-5">
-                    <div className="flex items-center gap-3">
-                        <AppLogoIcon
-                            className="size-10 shrink-0 fill-current text-foreground"
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <p className="font-semibold">
-                                Université de Mahajanga
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                Portail étudiant
-                            </p>
-                        </div>
+        <div className="flex min-h-dvh flex-col">
+            <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/75">
+                <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
+                    <a
+                        href="/"
+                        className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sidebar shadow-sm ring-1 ring-sidebar-border">
+                            <AppLogoIcon
+                                className="size-7 fill-current text-brand-gold"
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <span className="min-w-0 leading-tight">
+                            <span className="block font-heading text-base font-extrabold tracking-tight text-foreground">
+                                UMG Bourse
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                                Portail étudiant · Université de Mahajanga
+                            </span>
+                        </span>
+                    </a>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                        <ThemeToggle />
+                        {session?.authenticated && (
+                            <Button
+                                variant="outline"
+                                className="h-10 rounded-full px-3 sm:px-4"
+                                disabled={busy}
+                                aria-label="Se déconnecter"
+                                onClick={() =>
+                                    void perform(async () => {
+                                        await api('logout', {});
+                                        setStudent(null);
+                                        setMessage('');
+                                        await refresh();
+                                    })
+                                }
+                            >
+                                <LogOut aria-hidden="true" />
+                                <span className="hidden sm:inline">
+                                    Se déconnecter
+                                </span>
+                            </Button>
+                        )}
                     </div>
-                    {session?.authenticated && (
-                        <Button
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() =>
-                                void perform(async () => {
-                                    await api('logout', {});
-                                    setStudent(null);
-                                    setMessage('');
-                                    await refresh();
-                                })
-                            }
-                        >
-                            Se déconnecter
-                        </Button>
-                    )}
                 </div>
             </header>
-            <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-                <h1 className="text-2xl font-semibold">
-                    {student
-                        ? 'Mes informations'
-                        : session?.authenticated
-                          ? 'Rattacher mon compte'
-                          : 'Bienvenue sur le portail étudiant'}
-                </h1>
-                <p className="text-muted-foreground">
-                    Ce portail permet aux étudiants déjà déclarés par leur
-                    établissement de consulter leurs informations. La création
-                    d’un compte numérique ne constitue pas une inscription
-                    universitaire.
-                </p>
-                {error && (
-                    <p
-                        role="alert"
-                        className="rounded-md border border-destructive p-3 text-destructive"
-                    >
-                        {error}
-                    </p>
+
+            <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-16 sm:px-6 sm:pt-10">
+                {!session && (
+                    <div className="mx-auto max-w-md space-y-4">
+                        {notices}
+                        {!error && (
+                            <div
+                                role="status"
+                                className="surface flex flex-col items-center gap-3 px-6 py-12 text-sm text-muted-foreground"
+                            >
+                                <Spinner className="size-6 text-primary" />
+                                Chargement…
+                            </div>
+                        )}
+                    </div>
                 )}
-                {message && (
-                    <p role="status" className="rounded-md border p-3">
-                        {message}
-                    </p>
-                )}
-                {!session && !error && <p>Chargement…</p>}
+
                 {session && !session.authenticated && (
-                    <section className="max-w-md space-y-5 rounded-lg border p-5">
-                        <h2 className="text-lg font-semibold">
-                            Connexion par email
-                        </h2>
-                        {!challenge ? (
-                            <form onSubmit={requestCode} className="space-y-4">
-                                <Label htmlFor="email">
-                                    Votre adresse email
-                                </Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    required
-                                    maxLength={255}
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                    <div className="mx-auto max-w-md space-y-4">
+                        <div className="surface overflow-hidden rounded-2xl">
+                            <div className="relative border-b bg-muted/40 px-6 pt-6 pb-5 text-center">
+                                <div
+                                    className="bg-grid absolute inset-0 text-primary opacity-60"
+                                    aria-hidden="true"
                                 />
-                                <Button disabled={busy}>
-                                    {busy ? 'Envoi…' : 'Recevoir un code'}
-                                </Button>
-                            </form>
-                        ) : (
-                            <form onSubmit={verify} className="space-y-4">
-                                <p className="text-sm">
-                                    Saisissez le code reçu par email. Il expire
-                                    après dix minutes.
+                                <ScholarshipIllustration className="relative mx-auto h-28 w-auto" />
+                                <h1 className="relative mt-2 font-heading text-2xl font-extrabold tracking-tight text-foreground">
+                                    Bienvenue sur le portail étudiant
+                                </h1>
+                                <p className="relative mt-1 text-sm text-muted-foreground">
+                                    Consultez vos informations et signalez une
+                                    erreur en quelques minutes.
                                 </p>
-                                <Label htmlFor="code">
-                                    Code à six chiffres
-                                </Label>
-                                <Input
-                                    id="code"
-                                    inputMode="numeric"
-                                    autoComplete="one-time-code"
-                                    pattern="[0-9]{6}"
-                                    minLength={6}
-                                    maxLength={6}
-                                    required
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
-                                />
-                                <div className="flex flex-wrap gap-3">
-                                    <Button disabled={busy}>
+                            </div>
+
+                            <div className="space-y-5 p-6">
+                                <ol
+                                    className="flex items-center gap-2 text-xs font-semibold"
+                                    aria-label="Étapes de connexion"
+                                >
+                                    {['Email', 'Code reçu'].map(
+                                        (label, index) => {
+                                            const current =
+                                                index === (challenge ? 1 : 0);
+                                            const done =
+                                                index === 0 && !!challenge;
+
+                                            return (
+                                                <li
+                                                    key={label}
+                                                    aria-current={
+                                                        current
+                                                            ? 'step'
+                                                            : undefined
+                                                    }
+                                                    className={cn(
+                                                        'flex flex-1 items-center gap-2 rounded-full px-1 py-1 pr-3',
+                                                        current
+                                                            ? 'bg-accent text-accent-foreground'
+                                                            : 'text-muted-foreground',
+                                                    )}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            'flex size-6 shrink-0 items-center justify-center rounded-full',
+                                                            current || done
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'bg-muted',
+                                                        )}
+                                                        aria-hidden="true"
+                                                    >
+                                                        {done ? (
+                                                            <CheckCircle2 className="size-3.5" />
+                                                        ) : (
+                                                            index + 1
+                                                        )}
+                                                    </span>
+                                                    {label}
+                                                </li>
+                                            );
+                                        },
+                                    )}
+                                </ol>
+
+                                {notices}
+
+                                <h2 className="sr-only">Connexion par email</h2>
+                                {!challenge ? (
+                                    <form
+                                        onSubmit={requestCode}
+                                        className="space-y-4"
+                                    >
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email">
+                                                Votre adresse email
+                                            </Label>
+                                            <div className="relative">
+                                                <Mail
+                                                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                                                    aria-hidden="true"
+                                                />
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    autoComplete="email"
+                                                    required
+                                                    maxLength={255}
+                                                    placeholder="vous@exemple.mg"
+                                                    className={cn(
+                                                        fieldClass,
+                                                        'pl-9',
+                                                    )}
+                                                    value={email}
+                                                    onChange={(e) =>
+                                                        setEmail(e.target.value)
+                                                    }
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Nous vous envoyons un code de
+                                                connexion à usage unique.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            disabled={busy}
+                                            className="h-11 w-full text-base font-semibold"
+                                        >
+                                            {busy ? (
+                                                <Spinner />
+                                            ) : (
+                                                <Send aria-hidden="true" />
+                                            )}
+                                            {busy
+                                                ? 'Envoi…'
+                                                : 'Recevoir un code'}
+                                        </Button>
+                                    </form>
+                                ) : (
+                                    <form
+                                        onSubmit={verify}
+                                        className="space-y-4"
+                                    >
+                                        <p className="text-sm text-muted-foreground">
+                                            Saisissez le code reçu par email
+                                            {email && (
+                                                <>
+                                                    {' '}
+                                                    à{' '}
+                                                    <span className="font-semibold break-words text-foreground">
+                                                        {email}
+                                                    </span>
+                                                </>
+                                            )}
+                                            . Il expire après dix minutes.
+                                        </p>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="code">
+                                                Code à six chiffres
+                                            </Label>
+                                            <Input
+                                                id="code"
+                                                inputMode="numeric"
+                                                autoComplete="one-time-code"
+                                                pattern="[0-9]{6}"
+                                                minLength={6}
+                                                maxLength={6}
+                                                required
+                                                autoFocus
+                                                placeholder="••••••"
+                                                className="h-14 bg-card text-center font-heading text-2xl font-bold tracking-[0.5em] placeholder:tracking-[0.5em] md:text-2xl"
+                                                value={code}
+                                                onChange={(e) =>
+                                                    setCode(e.target.value)
+                                                }
+                                            />
+                                        </div>
+                                        <Button
+                                            disabled={busy}
+                                            className="h-11 w-full text-base font-semibold"
+                                        >
+                                            {busy && <Spinner />}
+                                            {busy
+                                                ? 'Vérification…'
+                                                : 'Se connecter'}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            type="button"
+                                            className="h-10 w-full text-muted-foreground"
+                                            disabled={busy}
+                                            onClick={() => {
+                                                setChallenge('');
+                                                setCode('');
+                                                setMessage('');
+                                            }}
+                                        >
+                                            <ArrowLeft aria-hidden="true" />
+                                            Demander un nouveau code
+                                        </Button>
+                                    </form>
+                                )}
+
+                                {session.google_enabled && (
+                                    <>
+                                        <div className="flex items-center gap-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                            <span
+                                                className="h-px flex-1 bg-border"
+                                                aria-hidden="true"
+                                            />
+                                            ou
+                                            <span
+                                                className="h-px flex-1 bg-border"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            className="h-11 w-full font-semibold"
+                                            asChild
+                                        >
+                                            <a href="/api/student/auth/google/redirect">
+                                                Continuer avec Google
+                                            </a>
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+                            <Info
+                                className="mt-0.5 size-3.5 shrink-0"
+                                aria-hidden="true"
+                            />
+                            {PORTAL_NOTICE}
+                        </p>
+                    </div>
+                )}
+
+                {session?.authenticated && !session.linked && (
+                    <div className="mx-auto max-w-lg space-y-4">
+                        {notices}
+                        <div className="surface overflow-hidden rounded-2xl">
+                            <div className="flex items-start gap-4 border-b bg-muted/40 px-6 py-5">
+                                <span
+                                    className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-4 ring-accent"
+                                    aria-hidden="true"
+                                >
+                                    <Link2 className="size-6" />
+                                </span>
+                                <div className="min-w-0">
+                                    <h1 className="font-heading text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+                                        Rattacher mon compte
+                                    </h1>
+                                    <p className="mt-0.5 text-sm text-muted-foreground">
+                                        Retrouvez la fiche transmise par votre
+                                        établissement.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="space-y-5 p-6">
+                                <Notice tone="info" icon={ShieldCheck}>
+                                    La vérification de votre email ne suffit pas
+                                    à prouver votre identité administrative.
+                                    Fournissez les informations ci-dessous. Une
+                                    vérification par le personnel peut être
+                                    nécessaire.
+                                </Notice>
+                                <form onSubmit={link} className="space-y-5">
+                                    <fieldset>
+                                        <legend className="mb-2 text-sm font-medium">
+                                            Identifiant officiel
+                                        </legend>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[
+                                                ['student_number', 'Matricule'],
+                                                [
+                                                    'bac_registration_number',
+                                                    'Numéro BAC',
+                                                ],
+                                            ].map(([value, label]) => (
+                                                <Label
+                                                    key={value}
+                                                    className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:border-primary/40 has-[:checked]:border-primary has-[:checked]:bg-accent has-[:checked]:text-accent-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="identifier_type"
+                                                        value={value}
+                                                        checked={type === value}
+                                                        onChange={() =>
+                                                            setType(value)
+                                                        }
+                                                        className="size-4 accent-primary"
+                                                    />
+                                                    {label}
+                                                </Label>
+                                            ))}
+                                        </div>
+                                    </fieldset>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="identifier">
+                                            {type === 'student_number'
+                                                ? 'Matricule'
+                                                : 'Numéro BAC'}
+                                        </Label>
+                                        <Input
+                                            id="identifier"
+                                            maxLength={100}
+                                            required
+                                            className={fieldClass}
+                                            value={identifier}
+                                            onChange={(e) =>
+                                                setIdentifier(e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="birth">
+                                            Date de naissance
+                                        </Label>
+                                        <Input
+                                            id="birth"
+                                            type="date"
+                                            required
+                                            className={fieldClass}
+                                            value={birth}
+                                            onChange={(e) =>
+                                                setBirth(e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                    <Button
+                                        disabled={busy}
+                                        className="h-11 w-full text-base font-semibold"
+                                    >
+                                        {busy ? (
+                                            <Spinner />
+                                        ) : (
+                                            <Link2 aria-hidden="true" />
+                                        )}
                                         {busy
                                             ? 'Vérification…'
-                                            : 'Se connecter'}
+                                            : 'Demander le rattachement'}
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        type="button"
-                                        disabled={busy}
-                                        onClick={() => {
-                                            setChallenge('');
-                                            setCode('');
-                                            setMessage('');
-                                        }}
-                                    >
-                                        Demander un nouveau code
-                                    </Button>
-                                </div>
-                            </form>
-                        )}
+                                </form>
+                            </div>
+                        </div>
+                        <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-muted-foreground">
+                            <Info
+                                className="mt-0.5 size-3.5 shrink-0"
+                                aria-hidden="true"
+                            />
+                            {PORTAL_NOTICE}
+                        </p>
                         {session.google_enabled && (
-                            <Button variant="outline" asChild>
+                            <Button
+                                variant="outline"
+                                className="h-11 w-full"
+                                asChild
+                            >
                                 <a href="/api/student/auth/google/redirect">
-                                    Continuer avec Google
+                                    Associer ou utiliser Google
                                 </a>
                             </Button>
                         )}
-                    </section>
+                    </div>
                 )}
-                {session?.authenticated && !session.linked && (
-                    <section className="max-w-lg space-y-5 rounded-lg border p-5">
-                        <p>
-                            La vérification de votre email ne suffit pas à
-                            prouver votre identité administrative. Fournissez
-                            les informations ci-dessous. Une vérification par le
-                            personnel peut être nécessaire.
-                        </p>
-                        <form onSubmit={link} className="space-y-4">
-                            <fieldset className="flex flex-wrap gap-4">
-                                <legend className="mb-2 font-medium">
-                                    Identifiant officiel
-                                </legend>
-                                {[
-                                    ['student_number', 'Matricule'],
-                                    ['bac_registration_number', 'Numéro BAC'],
-                                ].map(([value, label]) => (
-                                    <Label
-                                        key={value}
-                                        className="flex items-center gap-2"
+
+                {student && (
+                    <div className="space-y-6">
+                        <section className="surface relative overflow-hidden rounded-2xl">
+                            <div
+                                className="bg-grid absolute inset-0 text-primary opacity-50"
+                                aria-hidden="true"
+                            />
+                            <div
+                                className="absolute -top-24 -right-16 size-72 rounded-full bg-primary/10 blur-3xl"
+                                aria-hidden="true"
+                            />
+                            <div className="relative flex items-center gap-6 p-5 sm:p-8">
+                                <div className="min-w-0 flex-1 space-y-3">
+                                    <p className="text-sm font-semibold text-primary">
+                                        Bonjour {firstName}
+                                    </p>
+                                    <h1 className="font-heading text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                                        Mes informations
+                                    </h1>
+                                    <p className="max-w-xl text-sm text-muted-foreground">
+                                        {PORTAL_NOTICE}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                        {student.student_number && (
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-medium text-foreground ring-1 ring-border">
+                                                <IdCard
+                                                    className="size-3.5 text-muted-foreground"
+                                                    aria-hidden="true"
+                                                />
+                                                Matricule{' '}
+                                                <span className="font-mono font-semibold">
+                                                    {student.student_number}
+                                                </span>
+                                            </span>
+                                        )}
+                                        {confirmation && (
+                                            <ConfirmationBadge
+                                                status={confirmation.status}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                                <StudentsIllustration className="hidden h-36 w-auto shrink-0 sm:block md:h-40" />
+                            </div>
+                            <nav
+                                aria-label="Sections du portail"
+                                className="relative flex gap-1 overflow-x-auto border-t bg-card/70 px-3 py-2"
+                            >
+                                {(
+                                    [
+                                        ['#infos', 'Informations', UserRound],
+                                        ['#situation', 'Situation', School],
+                                        [
+                                            '#verification',
+                                            'Vérification',
+                                            BadgeCheck,
+                                        ],
+                                        [
+                                            '#mes-demandes',
+                                            'Mes demandes',
+                                            FilePenLine,
+                                        ],
+                                    ] as [string, string, LucideIcon][]
+                                ).map(([href, label, Icon]) => (
+                                    <a
+                                        key={href}
+                                        href={href}
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                     >
-                                        <input
-                                            type="radio"
-                                            name="identifier_type"
-                                            value={value}
-                                            checked={type === value}
-                                            onChange={() => setType(value)}
+                                        <Icon
+                                            className="size-4"
+                                            aria-hidden="true"
                                         />
                                         {label}
-                                    </Label>
+                                    </a>
                                 ))}
-                            </fieldset>
-                            <Label htmlFor="identifier">
-                                {type === 'student_number'
-                                    ? 'Matricule'
-                                    : 'Numéro BAC'}
-                            </Label>
-                            <Input
-                                id="identifier"
-                                maxLength={100}
-                                required
-                                value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
-                            />
-                            <Label htmlFor="birth">Date de naissance</Label>
-                            <Input
-                                id="birth"
-                                type="date"
-                                required
-                                value={birth}
-                                onChange={(e) => setBirth(e.target.value)}
-                            />
-                            <Button disabled={busy}>
-                                {busy
-                                    ? 'Vérification…'
-                                    : 'Demander le rattachement'}
-                            </Button>
-                        </form>
-                    </section>
-                )}
-                {student && (
-                    <>
-                        <div className="grid gap-5 md:grid-cols-2">
-                            {(
-                                [
-                                    {
-                                        title: 'Identité',
-                                        fields: [
-                                            {
-                                                label: 'Matricule',
-                                                value: student.student_number,
-                                            },
-                                            {
-                                                label: 'Nom',
-                                                value: student.last_name,
-                                                field: 'last_name',
-                                            },
-                                            {
-                                                label: 'Prénoms',
-                                                value: student.first_names,
-                                                field: 'first_names',
-                                            },
-                                            {
-                                                label: 'Date de naissance',
-                                                value: student.birth_date,
-                                                field: 'birth_date',
-                                                input: 'date',
-                                            },
-                                            {
-                                                label: 'Lieu de naissance',
-                                                value: student.birth_place,
-                                                field: 'birth_place',
-                                            },
-                                        ],
-                                    },
-                                    {
-                                        title: 'Carte d’identité (CIN)',
-                                        note: 'Pour votre sécurité, les données CIN ne sont pas affichées. Vous pouvez signaler une valeur à corriger.',
-                                        fields: [
-                                            {
-                                                label: 'Numéro CIN',
-                                                value: null,
-                                                field: 'cin',
-                                                hidden: true,
-                                            },
-                                            {
-                                                label: 'Date de délivrance',
-                                                value: null,
-                                                field: 'cin_issued_at',
-                                                hidden: true,
-                                                input: 'date',
-                                            },
-                                            {
-                                                label: 'Lieu de délivrance',
-                                                value: null,
-                                                field: 'cin_issued_place',
-                                                hidden: true,
-                                            },
-                                        ],
-                                    },
-                                    {
-                                        title: 'Contact',
-                                        fields: [
-                                            {
-                                                label: 'Téléphone',
-                                                value: student.phone,
-                                                field: 'phone',
-                                                input: 'tel',
-                                            },
-                                            {
-                                                label: 'Email de contact',
-                                                value: student.email,
-                                                field: 'email',
-                                                input: 'email',
-                                            },
-                                            {
-                                                label: 'Adresse',
-                                                value: student.address,
-                                                field: 'address',
-                                            },
-                                        ],
-                                    },
-                                    {
-                                        title: 'Baccalauréat',
-                                        fields: [
-                                            {
-                                                label: 'Numéro BAC',
-                                                value: student.bac_registration_number,
-                                                field: 'bac_registration_number',
-                                            },
-                                            {
-                                                label: 'Série',
-                                                value: student.bac_series,
-                                                field: 'bac_series',
-                                            },
-                                            {
-                                                label: 'Année',
-                                                value: student.bac_year,
-                                                field: 'bac_year',
-                                                input: 'number',
-                                            },
-                                            {
-                                                label: 'Mention',
-                                                value: student.bac_mention,
-                                                field: 'bac_mention',
-                                            },
-                                        ],
-                                    },
-                                ] as {
-                                    title: string;
-                                    note?: string;
-                                    fields: FieldRow[];
-                                }[]
-                            ).map((section) => (
+                            </nav>
+                        </section>
+
+                        {(error || message) && (
+                            <div className="space-y-3">{notices}</div>
+                        )}
+
+                        <div
+                            id="infos"
+                            className="grid scroll-mt-24 gap-4 md:grid-cols-2 md:gap-5"
+                        >
+                            {infoSections(student).map((section, index) => (
                                 <section
                                     key={section.title}
-                                    className="space-y-3 rounded-lg border p-5"
+                                    aria-labelledby={`info-${index}`}
+                                    className="surface overflow-hidden"
                                 >
-                                    <h2 className="font-semibold">
-                                        {section.title}
-                                    </h2>
+                                    <SectionHeader
+                                        id={`info-${index}`}
+                                        icon={section.icon}
+                                        title={section.title}
+                                    />
                                     {section.note && (
-                                        <p className="text-sm text-muted-foreground">
+                                        <p className="flex items-start gap-2 border-b bg-info-soft/60 px-5 py-2.5 text-xs text-info-foreground sm:px-6">
+                                            <Lock
+                                                className="mt-0.5 size-3.5 shrink-0"
+                                                aria-hidden="true"
+                                            />
                                             {section.note}
                                         </p>
                                     )}
-                                    <dl className="space-y-3">
+                                    <dl className="divide-y">
                                         {section.fields.map((row) => (
                                             <div
                                                 key={row.label}
-                                                className="grid grid-cols-2 items-start gap-3"
+                                                className="px-5 py-3 sm:px-6"
                                             >
-                                                <dt className="text-muted-foreground">
+                                                <dt className="text-xs font-medium text-muted-foreground">
                                                     {row.label}
                                                 </dt>
-                                                <dd className="space-y-1 break-words">
-                                                    <span className="block">
-                                                        {row.hidden
-                                                            ? 'Non affiché'
-                                                            : (row.value ??
-                                                              'Non renseigné')}
+                                                <dd className="mt-0.5 flex min-h-7 items-center justify-between gap-3">
+                                                    <span className="min-w-0 break-words">
+                                                        {row.hidden ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                                <EyeOff
+                                                                    className="size-3.5"
+                                                                    aria-hidden="true"
+                                                                />
+                                                                Non affiché
+                                                            </span>
+                                                        ) : row.value ===
+                                                              null ||
+                                                          row.value === '' ? (
+                                                            <span className="text-sm text-muted-foreground italic">
+                                                                Non renseigné
+                                                            </span>
+                                                        ) : (
+                                                            <span className="font-medium text-foreground">
+                                                                {row.value}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     {row.field &&
                                                         (pendingFields.has(
                                                             row.field,
                                                         ) ? (
-                                                            <span className="text-xs text-muted-foreground">
+                                                            <ToneBadge
+                                                                tone="warning"
+                                                                className="shrink-0"
+                                                            >
                                                                 Demande en
                                                                 attente
-                                                            </span>
+                                                            </ToneBadge>
                                                         ) : (
                                                             <button
                                                                 type="button"
-                                                                className="text-xs underline underline-offset-4"
+                                                                aria-label={`Signaler une erreur : ${row.label}`}
+                                                                className="-my-1 -mr-2 inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                                                 onClick={() =>
                                                                     openReport(
                                                                         row,
                                                                     )
                                                                 }
                                                             >
+                                                                <Flag
+                                                                    className="size-3.5"
+                                                                    aria-hidden="true"
+                                                                />
                                                                 Signaler une
                                                                 erreur
                                                             </button>
@@ -585,42 +1049,68 @@ function Portal() {
                                 </section>
                             ))}
                         </div>
-                        <section className="space-y-4">
-                            <h2 className="text-lg font-semibold">
-                                Situation universitaire
-                            </h2>
+
+                        <section
+                            id="situation"
+                            aria-labelledby="situation-title"
+                            className="surface scroll-mt-24 overflow-hidden"
+                        >
+                            <SectionHeader
+                                id="situation-title"
+                                icon={School}
+                                title="Situation universitaire"
+                            />
                             {student.records.length === 0 ? (
-                                <p>Aucune déclaration annuelle disponible.</p>
+                                <EmptyState
+                                    compact
+                                    illustration="students"
+                                    title="Aucune déclaration annuelle disponible."
+                                />
                             ) : (
-                                student.records.map((record, index) => (
-                                    <article
-                                        key={index}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
-                                    >
-                                        <div>
-                                            <p className="font-medium">
-                                                {record.academic_year} —{' '}
-                                                {record.establishment}
-                                            </p>
-                                            <p>
-                                                {record.level} —{' '}
-                                                {record.program ??
-                                                    'Parcours non renseigné'}
-                                            </p>
-                                        </div>
-                                        <Badge variant="secondary">
-                                            {record.status === 'active'
-                                                ? 'Déclaration active'
-                                                : 'Déclaration inactive'}
-                                        </Badge>
-                                    </article>
-                                ))
+                                <ul className="divide-y">
+                                    {student.records.map((record, index) => (
+                                        <li
+                                            key={index}
+                                            className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                                        >
+                                            <div className="flex min-w-0 items-start gap-3">
+                                                <span className="shrink-0 rounded-lg bg-accent px-2.5 py-1 font-heading text-xs font-bold text-accent-foreground">
+                                                    {record.academic_year}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-foreground">
+                                                        {record.establishment}
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {record.level} —{' '}
+                                                        {record.program ??
+                                                            'Parcours non renseigné'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ToneBadge
+                                                tone={toneFor(record.status)}
+                                                className="self-start sm:self-auto"
+                                            >
+                                                {record.status === 'active'
+                                                    ? 'Déclaration active'
+                                                    : 'Déclaration inactive'}
+                                            </ToneBadge>
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
+                            <p className="flex items-start gap-2 border-t bg-muted/30 px-5 py-3 text-xs text-muted-foreground sm:px-6">
+                                <Info
+                                    className="mt-0.5 size-3.5 shrink-0"
+                                    aria-hidden="true"
+                                />
+                                Pour une erreur concernant votre niveau,
+                                parcours ou établissement, contactez votre
+                                établissement.
+                            </p>
                         </section>
-                        <p className="text-sm text-muted-foreground">
-                            Pour une erreur concernant votre niveau, parcours ou
-                            établissement, contactez votre établissement.
-                        </p>
+
                         {confirmation && (
                             <ConfirmationSection
                                 state={confirmation}
@@ -630,79 +1120,147 @@ function Portal() {
                                 }}
                             />
                         )}
-                        <section id="mes-demandes" className="space-y-4">
-                            <h2 className="text-lg font-semibold">
-                                Mes demandes de correction
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                Vos informations officielles ne changent
-                                qu’après validation par le personnel autorisé.
-                            </p>
+
+                        <section
+                            id="mes-demandes"
+                            aria-labelledby="corrections-title"
+                            className="surface scroll-mt-24 overflow-hidden"
+                        >
+                            <SectionHeader
+                                id="corrections-title"
+                                icon={FilePenLine}
+                                title="Mes demandes de correction"
+                                description="Vos informations officielles ne changent qu’après validation par le personnel autorisé."
+                                meta={
+                                    corrections.length > 0 && (
+                                        <ToneBadge tone="neutral">
+                                            {corrections.length}
+                                        </ToneBadge>
+                                    )
+                                }
+                            />
                             {corrections.length === 0 ? (
-                                <p>Aucune demande pour le moment.</p>
+                                <EmptyState
+                                    compact
+                                    illustration="inbox"
+                                    title="Aucune demande pour le moment."
+                                    description="Utilisez « Signaler une erreur » à côté d’une information inexacte."
+                                />
                             ) : (
-                                corrections.map((item) => (
-                                    <article
-                                        key={item.uuid}
-                                        className="space-y-2 rounded-lg border p-4"
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <p className="font-medium">
-                                                {item.field_label}
-                                            </p>
-                                            <Badge
-                                                variant={
-                                                    statusVariant[item.status]
-                                                }
-                                            >
-                                                {item.status_label}
-                                            </Badge>
-                                        </div>
-                                        <p className="break-words">
-                                            Valeur proposée :{' '}
-                                            {item.proposed_value}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Envoyée le{' '}
-                                            {new Date(
-                                                item.created_at,
-                                            ).toLocaleDateString('fr-FR')}
-                                            {item.reviewed_at &&
-                                                ` · décision le ${new Date(item.reviewed_at).toLocaleDateString('fr-FR')}`}
-                                        </p>
-                                        {item.decision_reason && (
-                                            <p className="text-sm">
-                                                Motif : {item.decision_reason}
-                                            </p>
-                                        )}
-                                        {item.status === 'pending' && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={busy}
-                                                onClick={() =>
-                                                    cancelCorrection(item.uuid)
-                                                }
-                                            >
-                                                Annuler la demande
-                                            </Button>
-                                        )}
-                                    </article>
-                                ))
+                                <ul className="divide-y">
+                                    {corrections.map((item) => (
+                                        <li key={item.uuid}>
+                                            <article className="space-y-3 px-5 py-4 sm:px-6">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <h3 className="font-semibold text-foreground">
+                                                        {item.field_label}
+                                                    </h3>
+                                                    <ToneBadge
+                                                        tone={toneFor(
+                                                            item.status,
+                                                        )}
+                                                    >
+                                                        {item.status_label}
+                                                    </ToneBadge>
+                                                </div>
+                                                <p className="rounded-lg bg-muted px-3 py-2 text-sm break-words">
+                                                    <span className="text-muted-foreground">
+                                                        Valeur proposée :
+                                                    </span>{' '}
+                                                    <span className="font-medium text-foreground">
+                                                        {item.proposed_value}
+                                                    </span>
+                                                </p>
+                                                <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <Send
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Envoyée le{' '}
+                                                        {formatDate(
+                                                            item.created_at,
+                                                        )}
+                                                    </span>
+                                                    {item.reviewed_at && (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <CalendarCheck
+                                                                className="size-3.5"
+                                                                aria-hidden="true"
+                                                            />
+                                                            Décision le{' '}
+                                                            {formatDate(
+                                                                item.reviewed_at,
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {item.decision_reason && (
+                                                    <p className="border-l-2 border-border pl-3 text-sm text-foreground">
+                                                        <span className="font-medium">
+                                                            Motif :
+                                                        </span>{' '}
+                                                        {item.decision_reason}
+                                                    </p>
+                                                )}
+                                                {item.status === 'pending' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={busy}
+                                                        onClick={() =>
+                                                            cancelCorrection(
+                                                                item.uuid,
+                                                            )
+                                                        }
+                                                    >
+                                                        <XCircle aria-hidden="true" />
+                                                        Annuler la demande
+                                                    </Button>
+                                                )}
+                                            </article>
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
                         </section>
+
+                        {session?.google_enabled && (
+                            <div className="surface flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                                <p className="text-sm text-muted-foreground">
+                                    Connexion simplifiée avec votre compte
+                                    Google.
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    className="shrink-0"
+                                    asChild
+                                >
+                                    <a href="/api/student/auth/google/redirect">
+                                        Associer ou utiliser Google
+                                    </a>
+                                </Button>
+                            </div>
+                        )}
+
                         <Dialog
                             open={reporting !== null}
                             onOpenChange={(open) => {
                                 if (!open && !busy) setReporting(null);
                             }}
                         >
-                            <DialogContent>
+                            <DialogContent className="sm:max-w-md">
                                 <form
                                     onSubmit={submitCorrection}
                                     className="space-y-4"
                                 >
                                     <DialogHeader>
+                                        <span
+                                            className="mx-auto mb-2 flex size-11 items-center justify-center rounded-xl bg-accent text-primary sm:mx-0"
+                                            aria-hidden="true"
+                                        >
+                                            <Flag className="size-5" />
+                                        </span>
                                         <DialogTitle>
                                             Signaler une erreur :{' '}
                                             {reporting?.label}
@@ -714,10 +1272,14 @@ function Portal() {
                                         </DialogDescription>
                                     </DialogHeader>
                                     {reporting && !reporting.hidden && (
-                                        <p className="text-sm">
-                                            Valeur actuelle :{' '}
-                                            {reporting.value ??
-                                                'Non renseignée'}
+                                        <p className="rounded-lg bg-muted px-3 py-2 text-sm">
+                                            <span className="text-muted-foreground">
+                                                Valeur actuelle :
+                                            </span>{' '}
+                                            <span className="font-medium break-words">
+                                                {reporting.value ??
+                                                    'Non renseignée'}
+                                            </span>
                                         </p>
                                     )}
                                     <div className="space-y-2">
@@ -729,6 +1291,7 @@ function Portal() {
                                             type={reporting?.input ?? 'text'}
                                             required
                                             maxLength={2000}
+                                            className={fieldClass}
                                             value={proposed}
                                             onChange={(e) =>
                                                 setProposed(e.target.value)
@@ -736,13 +1299,22 @@ function Portal() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="note">
-                                            Message (facultatif)
-                                        </Label>
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            <Label htmlFor="note">
+                                                Message (facultatif)
+                                            </Label>
+                                            <span
+                                                className="text-xs text-muted-foreground tabular-nums"
+                                                aria-hidden="true"
+                                            >
+                                                {note.length}/500
+                                            </span>
+                                        </div>
                                         <textarea
                                             id="note"
-                                            className="min-h-20 w-full rounded-md border bg-transparent p-2 text-sm"
+                                            className="min-h-24 w-full rounded-md border border-input bg-card px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
                                             maxLength={500}
+                                            placeholder="Précisez si besoin (document justificatif, contexte…)"
                                             value={note}
                                             onChange={(e) =>
                                                 setNote(e.target.value)
@@ -750,14 +1322,15 @@ function Portal() {
                                         />
                                     </div>
                                     {dialogError && (
-                                        <p
+                                        <Notice
+                                            tone="danger"
+                                            icon={AlertCircle}
                                             role="alert"
-                                            className="text-sm text-destructive"
                                         >
                                             {dialogError}
-                                        </p>
+                                        </Notice>
                                     )}
-                                    <DialogFooter>
+                                    <DialogFooter className="gap-2">
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -767,6 +1340,11 @@ function Portal() {
                                             Annuler
                                         </Button>
                                         <Button disabled={busy}>
+                                            {busy ? (
+                                                <Spinner />
+                                            ) : (
+                                                <Send aria-hidden="true" />
+                                            )}
                                             {busy
                                                 ? 'Envoi…'
                                                 : 'Envoyer la demande'}
@@ -775,18 +1353,30 @@ function Portal() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                    </>
-                )}
-                {session?.authenticated && session.google_enabled && (
-                    <Button variant="outline" asChild>
-                        <a href="/api/student/auth/google/redirect">
-                            Associer ou utiliser Google
-                        </a>
-                    </Button>
+                    </div>
                 )}
             </main>
+
+            <footer className="border-t">
+                <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <p>
+                        © {new Date().getFullYear()} Université de Mahajanga ·
+                        Portail étudiant
+                    </p>
+                    <p>Bourses nationales · Vérification des informations</p>
+                </div>
+            </footer>
         </div>
     );
 }
+
+// Light / dark / system, shared with the internal portal (cookie + localStorage).
+initializeTheme();
+
 const element = document.getElementById('bourse-root');
-if (element) createRoot(element).render(<Portal />);
+if (element) {
+    // Dev HMR may evaluate this entry again: reuse the existing root instead of creating a second one.
+    const host = element as HTMLElement & { bourseRoot?: Root };
+    host.bourseRoot ??= createRoot(element);
+    host.bourseRoot.render(<Portal />);
+}
