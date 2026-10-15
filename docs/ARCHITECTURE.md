@@ -19,7 +19,7 @@ Les endpoints étudiants sont regroupés sous `/api/student/*` (`routes/student-
 
 L'authentification étudiante se fait par email + OTP (code à 6 chiffres haché, 10 minutes, 5 tentatives, lié à la session, jamais envoyé par le mailer `log`) ou par Google OAuth (email Google vérifié). Elle crée un compte numérique vérifié, qui ne donne accès à aucune fiche. L'accès à la fiche `Student` exige ensuite un rattachement :
 
-- automatique uniquement si l'identifiant (matricule ou numéro d'inscription au bac) correspond exactement, avec la même date de naissance, un candidat unique et actif, et l'email officiel de la fiche identique à l'email vérifié du compte ;
+- automatique uniquement si la CIN correspond exactement, avec la même date de naissance, un candidat unique et actif, et l'email officiel de la fiche identique à l'email vérifié du compte ;
 - sinon, une `StudentLinkRequest` est créée et doit être approuvée par le personnel (`/student-links`, permission `student_links.review`). Un établissement ne voit que les demandes dont l'étudiant a une déclaration active sur l'année courante ; la Scolarité Centrale a une revue globale.
 
 Une fiche ne peut être rattachée qu'à un seul compte (contrainte unique en SQL). Les réponses du portail ne renvoient jamais l'identifiant interne ni la CIN.
