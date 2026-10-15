@@ -1,4 +1,5 @@
 import { usePasskeyRegister } from '@laravel/passkeys/react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -58,15 +59,16 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
 
     if (!isSupported) {
         return (
-            <div className="text-sm text-muted-foreground">
+            <p className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
                 Les clés d'accès ne sont pas prises en charge par ce navigateur.
-            </div>
+            </p>
         );
     }
 
     if (!showForm) {
         return (
             <Button variant="outline" onClick={() => setShowForm(true)}>
+                <Plus aria-hidden="true" />
                 Ajouter une clé d'accès
             </Button>
         );
@@ -75,7 +77,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     return (
         <form
             onSubmit={handleSubmit}
-            className="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
+            className="space-y-4 rounded-xl border bg-muted/40 p-4"
         >
             <div className="grid gap-2">
                 <Label htmlFor="passkey-name">Nom de la clé d'accès</Label>
@@ -85,7 +87,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="ex. : MacBook Pro, iPhone"
-                    className="mt-1 block w-full border-foreground/20"
+                    className="h-10 bg-card"
                     autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
