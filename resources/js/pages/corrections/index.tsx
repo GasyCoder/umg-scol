@@ -27,7 +27,7 @@ type Row = {
     student: {
         last_name: string;
         first_names: string | null;
-        student_number: string | null;
+        birth_date: string | null;
     };
     establishments: string[];
 };
@@ -150,7 +150,7 @@ export default function CorrectionsIndex({
                         />
                         <Input
                             aria-label="Recherche étudiant"
-                            placeholder="Matricule, nom ou prénom"
+                            placeholder="Nom ou prénoms"
                             maxLength={100}
                             className="pl-9"
                             value={form.data.search}
@@ -276,10 +276,10 @@ export default function CorrectionsIndex({
                                                     {item.student.last_name}{' '}
                                                     {item.student.first_names}
                                                 </Link>
-                                                <span className="block font-mono text-xs text-muted-foreground">
-                                                    {item.student
-                                                        .student_number ??
-                                                        'Sans matricule'}
+                                                <span className="block text-xs text-muted-foreground">
+                                                    {item.student.birth_date
+                                                        ? `Né(e) le ${new Date(item.student.birth_date).toLocaleDateString('fr-FR')}`
+                                                        : 'Date de naissance non renseignée'}
                                                 </span>
                                                 {item.establishments.length >
                                                     0 && (
