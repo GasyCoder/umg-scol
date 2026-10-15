@@ -14,6 +14,8 @@ export type ReferenceRecord = {
     address?: string | null;
     phone?: string | null;
     email?: string | null;
+    /** Private, versioned logo URL (establishments only). */
+    logo_url?: string | null;
     starts_at?: string | null;
     ends_at?: string | null;
     is_current?: boolean;
@@ -52,7 +54,7 @@ export const definitions: Record<
         singular: 'établissement',
         permission: 'establishments.manage',
         fields: [
-            { key: 'code', label: 'Code', required: true, maxLength: 30 },
+            { key: 'code', label: 'Sigle', required: true, maxLength: 30 },
             { key: 'name', label: 'Nom', required: true, maxLength: 255 },
             { key: 'type', label: 'Type', maxLength: 100 },
             { key: 'address', label: 'Adresse', maxLength: 2000 },
