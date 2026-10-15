@@ -5,11 +5,13 @@ namespace App\Providers;
 use App\Models\Activity;
 use App\Models\User;
 use App\Policies\AuditPolicy;
+use App\Policies\NotificationPolicy;
 use App\Policies\ReportPolicy;
 use App\Support\Branding;
 use App\Support\InternalUserProvider;
 use App\Support\StudentPortalAccess;
 use Carbon\CarbonImmutable;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Auth::provider('internal-eloquent', fn ($app, array $config) => new InternalUserProvider($app['hash'], $config['model']));
         Gate::policy(Activity::class, AuditPolicy::class);
+        Gate::policy(DatabaseNotification::class, NotificationPolicy::class);
         Gate::define('reports.view', [ReportPolicy::class, 'view']);
         Gate::define('reports.export', [ReportPolicy::class, 'export']);
         Gate::define('permissions.manage-ui', fn (User $user) => StudentPortalAccess::internal($user) && $user->hasUsableEstablishment() && $user->can('permissions.manage'));
