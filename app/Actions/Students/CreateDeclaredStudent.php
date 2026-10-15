@@ -13,8 +13,9 @@ class CreateDeclaredStudent
     public function handle(User $actor, array $data): Student
     {
         return Cache::lock('students:manual-identity-write', 60)->block(10, fn (): Student => DB::transaction(function () use ($actor, $data): Student {
-            $student = app(SaveStudentIdentity::class)->persist($actor, null, collect($data)->except(['academic_year_id', 'establishment_id', 'level_id', 'program_id'])->all());
-            app(SaveStudentRecord::class)->initial($actor, $student, collect($data)->only(['academic_year_id', 'establishment_id', 'level_id', 'program_id'])->all());
+            $recordFields = ['academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference'];
+            $student = app(SaveStudentIdentity::class)->persist($actor, null, collect($data)->except($recordFields)->all());
+            app(SaveStudentRecord::class)->initial($actor, $student, collect($data)->only($recordFields)->all());
 
             return $student;
         }, 5));
