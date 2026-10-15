@@ -29,7 +29,7 @@ class SaveMentionRequest extends ReferenceRequest
         $record = $this->route('mention');
         $id = $record instanceof Mention ? $record->id : null;
 
-        return ['establishment_id' => ['required', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')], 'code' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/', Rule::unique('mentions')->where('establishment_id', $this->input('establishment_id'))->ignore($id)], 'name' => ['required', 'string', 'max:255'], 'is_active' => ['sometimes', 'boolean']];
+        return ['establishment_id' => ['required', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')], 'code' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/', Rule::unique('mentions')->where('establishment_id', $this->input('establishment_id'))->ignore($id)], 'domain_id' => ['nullable', 'integer', Rule::exists('domains', 'id')], 'name' => ['required', 'string', 'max:255'], 'is_active' => ['sometimes', 'boolean']];
     }
 
     /** @return array<\Closure(Validator): void> */
