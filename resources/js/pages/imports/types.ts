@@ -1,3 +1,5 @@
+import type { Tone } from '@/components/tone-badge';
+
 export type Page<T> = {
     data: T[];
     total: number;
@@ -57,3 +59,17 @@ export const statuses: Record<ImportStatus | RowStatus, string> = {
     rejected: 'Rejetée',
     duplicate: 'Doublon',
 };
+
+/** Row status → tone: valid rows go through, the others are set aside (colour repeats the written label). */
+export const rowStatusTones: Record<RowStatus, Tone> = {
+    valid: 'success',
+    warning: 'warning',
+    rejected: 'danger',
+    duplicate: 'info',
+};
+export const rowStatusOrder: RowStatus[] = [
+    'valid',
+    'warning',
+    'rejected',
+    'duplicate',
+];
