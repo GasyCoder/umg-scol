@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { FolderCheck, ShieldCheck, Users } from 'lucide-react';
-import AppLogoIcon from '@/components/app-logo-icon';
+import { BrandMark } from '@/components/brand-mark';
 import { CampusIllustration } from '@/components/illustrations';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { home } from '@/routes';
@@ -33,7 +33,8 @@ export default function AuthSplitLayout({
     title,
     description,
 }: AuthLayoutProps) {
-    const { name } = usePage().props;
+    const { branding } = usePage().props;
+    const name = branding.scol_name;
 
     return (
         <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
@@ -52,15 +53,16 @@ export default function AuthSplitLayout({
                 />
                 <div className="relative z-10 flex h-full flex-col p-10 xl:p-14">
                     <Link href={home()} className="flex items-center gap-3">
-                        <span className="flex size-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
-                            <AppLogoIcon className="size-8 fill-current text-brand-gold" />
-                        </span>
+                        <BrandMark
+                            logoUrl={branding.logo_url}
+                            className="size-11"
+                        />
                         <span className="leading-tight">
                             <span className="block font-heading text-lg font-extrabold">
                                 {name}
                             </span>
                             <span className="block text-sm text-white/60">
-                                Université de Mahajanga
+                                {branding.institution_name}
                             </span>
                         </span>
                     </Link>
@@ -100,8 +102,8 @@ export default function AuthSplitLayout({
                     </div>
 
                     <p className="text-xs text-white/50">
-                        © {new Date().getFullYear()} Université de Mahajanga ·
-                        Portail réservé au personnel autorisé
+                        © {new Date().getFullYear()} {branding.institution_name}{' '}
+                        · Portail réservé au personnel autorisé
                     </p>
                 </div>
             </aside>
@@ -112,9 +114,14 @@ export default function AuthSplitLayout({
                         href={home()}
                         className="flex items-center gap-2 lg:invisible"
                     >
-                        <span className="flex size-10 items-center justify-center rounded-xl bg-sidebar">
-                            <AppLogoIcon className="size-7 fill-current text-brand-gold" />
-                        </span>
+                        <BrandMark
+                            logoUrl={branding.logo_url}
+                            className={
+                                branding.logo_url
+                                    ? 'size-10 border'
+                                    : 'size-10 bg-sidebar'
+                            }
+                        />
                         <span className="font-heading font-extrabold text-foreground">
                             {name}
                         </span>
