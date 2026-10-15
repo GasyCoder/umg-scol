@@ -8,15 +8,25 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-    /* DashWind typography: Roboto for text, Nunito for headings. */
+    /* UMG Bourse typography: Public Sans for text, Plus Jakarta Sans for headings and figures. */
     --font-sans:
-        'Roboto', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-    --font-heading: 'Nunito', 'Roboto', ui-sans-serif, system-ui, sans-serif;
+        'Public Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --font-heading:
+        'Plus Jakarta Sans', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
+    --radius-xl: calc(var(--radius) + 4px);
+    --radius-2xl: calc(var(--radius) + 8px);
+
+    --shadow-card:
+        0 1px 2px 0 rgb(15 27 51 / 0.04), 0 1px 3px 0 rgb(15 27 51 / 0.03);
+    --shadow-elevated:
+        0 12px 32px -12px rgb(15 27 51 / 0.18),
+        0 2px 6px -2px rgb(15 27 51 / 0.06);
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -42,6 +52,21 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
 
+    /* Status tones: solid colour, soft surface and readable text on that surface. */
+    --color-success: var(--success);
+    --color-success-soft: var(--success-soft);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-soft: var(--warning-soft);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-info: var(--info);
+    --color-info-soft: var(--info-soft);
+    --color-info-foreground: var(--info-foreground);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-danger-foreground: var(--danger-foreground);
+    --color-brand-gold: var(--brand-gold);
+
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -54,6 +79,7 @@
 
     --color-sidebar: var(--sidebar);
     --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-muted: var(--sidebar-muted);
     --color-sidebar-primary: var(--sidebar-primary);
     --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
     --color-sidebar-accent: var(--sidebar-accent);
@@ -63,75 +89,103 @@
 }
 
 :root {
-    /* DashWind palette (template-model) mapped onto the shadcn tokens. */
-    --background: #f5f6fa;
-    --foreground: #364a63;
+    /* Institutional palette: royal blue on cool neutrals, navy sidebar, academic gold accent. */
+    --background: #f4f6fb;
+    --foreground: #0f1b33;
     --card: #ffffff;
-    --card-foreground: #364a63;
+    --card-foreground: #0f1b33;
     --popover: #ffffff;
-    --popover-foreground: #364a63;
-    --primary: #6576ff;
+    --popover-foreground: #0f1b33;
+    --primary: #2453d4;
     --primary-foreground: #ffffff;
-    --secondary: #ebeef2;
-    --secondary-foreground: #364a63;
-    --muted: #f5f7fd;
-    --muted-foreground: #6e82a5;
-    --accent: #eff1ff;
-    --accent-foreground: #465fff;
-    --destructive: #e85347;
-    --destructive-foreground: #e85347;
-    --border: #e5e9f2;
-    --input: #dbdfea;
-    --ring: #9cabff;
-    --chart-1: #6576ff;
-    --chart-2: #1ee0ac;
-    --chart-3: #09c2de;
-    --chart-4: #f4bd0e;
-    --chart-5: #e85347;
-    --radius: 0.5rem;
-    --sidebar: #ffffff;
-    --sidebar-foreground: #526484;
-    --sidebar-primary: #6576ff;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #eff1ff;
-    --sidebar-accent-foreground: #465fff;
-    --sidebar-border: #e5e9f2;
-    --sidebar-ring: #9cabff;
+    --secondary: #edf1f8;
+    --secondary-foreground: #1c2a47;
+    --muted: #f1f4f9;
+    --muted-foreground: #5b6b85;
+    --accent: #eaf0fd;
+    --accent-foreground: #1d43b0;
+    --destructive: #d92d20;
+    --destructive-foreground: #b42318;
+    --success: #0e9f6e;
+    --success-soft: #e6f6ef;
+    --success-foreground: #05603a;
+    --warning: #dc8a06;
+    --warning-soft: #fef4e2;
+    --warning-foreground: #8a3b0b;
+    --info: #0b8bb5;
+    --info-soft: #e5f5fb;
+    --info-foreground: #0b5470;
+    --danger: #d92d20;
+    --danger-soft: #fdeceb;
+    --danger-foreground: #b42318;
+    --brand-gold: #c79a1e;
+    --border: #e3e8f1;
+    --input: #d5dce8;
+    --ring: #5b82ea;
+    --chart-1: #2453d4;
+    --chart-2: #0e9f9a;
+    --chart-3: #e3a008;
+    --chart-4: #7c4ddb;
+    --chart-5: #e0475b;
+    --radius: 0.625rem;
+    --sidebar: #0c1a3d;
+    --sidebar-foreground: #c9d3ea;
+    --sidebar-muted: #7f8db0;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #0c1a3d;
+    --sidebar-accent: #172a59;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #1b2d5b;
+    --sidebar-ring: #5b82ea;
 }
 
 .dark {
-    --background: #0d141d;
-    --foreground: #e5e9f2;
-    --card: #101924;
-    --card-foreground: #e5e9f2;
-    --popover: #101924;
-    --popover-foreground: #e5e9f2;
-    --primary: #798bff;
-    --primary-foreground: #0d141d;
-    --secondary: #1f2b3a;
-    --secondary-foreground: #e5e9f2;
-    --muted: #1f2b3a;
-    --muted-foreground: #8094ae;
-    --accent: #1c2b46;
-    --accent-foreground: #c4cefe;
-    --destructive: #ed756c;
-    --destructive-foreground: #f19891;
-    --border: #1f2b3a;
-    --input: #2b3748;
-    --ring: #5664d9;
-    --chart-1: #798bff;
-    --chart-2: #1ee0ac;
-    --chart-3: #3acee5;
-    --chart-4: #f6ca3e;
-    --chart-5: #ed756c;
-    --sidebar: #101924;
-    --sidebar-foreground: #b6c6e3;
-    --sidebar-primary: #798bff;
-    --sidebar-primary-foreground: #0d141d;
-    --sidebar-accent: #1c2b46;
-    --sidebar-accent-foreground: #c4cefe;
-    --sidebar-border: #1f2b3a;
-    --sidebar-ring: #5664d9;
+    --background: #0a0f1c;
+    --foreground: #e6ebf5;
+    --card: #111a2c;
+    --card-foreground: #e6ebf5;
+    --popover: #131d31;
+    --popover-foreground: #e6ebf5;
+    --primary: #5b8cff;
+    --primary-foreground: #08101f;
+    --secondary: #1a2540;
+    --secondary-foreground: #dfe6f3;
+    --muted: #161f34;
+    --muted-foreground: #95a3bf;
+    --accent: #182746;
+    --accent-foreground: #c4d4ff;
+    --destructive: #f2675c;
+    --destructive-foreground: #ff9b93;
+    --success: #34c88f;
+    --success-soft: #0f2a22;
+    --success-foreground: #7fe0b8;
+    --warning: #f0ad2f;
+    --warning-soft: #2c2210;
+    --warning-foreground: #f7cd7c;
+    --info: #3cb7e0;
+    --info-soft: #0e2633;
+    --info-foreground: #8fd6ef;
+    --danger: #f2675c;
+    --danger-soft: #2f1517;
+    --danger-foreground: #ff9b93;
+    --brand-gold: #e2b84a;
+    --border: #212d47;
+    --input: #2b3856;
+    --ring: #5b8cff;
+    --chart-1: #5b8cff;
+    --chart-2: #2fc6be;
+    --chart-3: #f0b429;
+    --chart-4: #a07cf0;
+    --chart-5: #f26d80;
+    --sidebar: #080d19;
+    --sidebar-foreground: #b9c4dc;
+    --sidebar-muted: #6c7896;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #080d19;
+    --sidebar-accent: #15203a;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #182340;
+    --sidebar-ring: #5b8cff;
 }
 
 @layer base {
@@ -146,6 +200,11 @@
 
     body {
         @apply bg-background text-foreground;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+
+    ::selection {
+        background-color: color-mix(in oklab, var(--primary) 22%, transparent);
     }
 
     h1,
@@ -153,6 +212,72 @@
     h3,
     h4 {
         font-family: var(--font-heading);
-        letter-spacing: -0.01em;
+        letter-spacing: -0.015em;
+    }
+}
+
+@layer components {
+    /* Card surface shared by panels, tables and forms. */
+    .surface {
+        @apply rounded-xl border bg-card text-card-foreground shadow-card;
+    }
+
+    /* Data tables: sticky muted header, generous rows, hover highlight. Wrap in .surface and an overflow-x-auto div. */
+    .data-table {
+        @apply w-full text-left text-sm;
+    }
+    .data-table thead th {
+        @apply border-b bg-muted/60 px-4 py-3 text-xs font-semibold tracking-wide whitespace-nowrap text-muted-foreground uppercase;
+    }
+    .data-table tbody td {
+        @apply border-b px-4 py-3 align-middle;
+    }
+    .data-table tbody tr:last-child td {
+        @apply border-b-0;
+    }
+    .data-table tbody tr {
+        @apply transition-colors hover:bg-muted/50;
+    }
+}
+
+/* No width animation while the sidebar splitter is dragged, so the panels follow the pointer. */
+[data-resizing] [data-slot='sidebar'] > div {
+    transition: none;
+}
+
+/* Subtle dotted grid used behind illustrations and hero panels. */
+.bg-grid {
+    background-image: radial-gradient(
+        color-mix(in oklab, currentColor 14%, transparent) 1px,
+        transparent 1px
+    );
+    background-size: 18px 18px;
+}
+
+@keyframes wiggle {
+    0%,
+    100% {
+        transform: rotate(0);
+    }
+    20% {
+        transform: rotate(14deg);
+    }
+    40% {
+        transform: rotate(-12deg);
+    }
+    60% {
+        transform: rotate(8deg);
+    }
+    80% {
+        transform: rotate(-4deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
     }
 }
