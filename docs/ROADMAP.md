@@ -69,3 +69,5 @@
 - [x] Matrice de permissions modifiable, rôles fixes, réglages conservés au déploiement
 - [x] Corbeille, restauration et purge contrôlées avec audit
 - [x] Reprise des suppressions de fichiers après une indisponibilité du stockage
+
+- [x] Notifications étudiantes persistantes : signalements et confirmations, cloche, lecture et préférences individuelles
