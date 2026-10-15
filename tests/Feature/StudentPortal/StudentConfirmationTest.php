@@ -14,6 +14,7 @@ use App\Models\AcademicYear;
 use App\Models\Activity;
 use App\Models\Establishment;
 use App\Models\Level;
+use App\Models\Mention;
 use App\Models\Program;
 use App\Models\ScholarshipCampaign;
 use App\Models\Student;
@@ -43,9 +44,9 @@ beforeEach(function () {
     $this->level = Level::factory()->create(['name' => 'L1']);
     $this->program = Program::factory()->create(['establishment_id' => $this->a->id, 'name' => 'Informatique']);
     $this->student = Student::factory()->create([
-        'student_number' => 'MAT200', 'last_name' => 'RABE', 'first_names' => 'Aina', 'birth_date' => '2002-03-04', 'birth_place' => 'Mahajanga',
+        'last_name' => 'RABE', 'first_names' => 'Aina', 'sex' => 'F', 'birth_date' => '2002-03-04', 'mother_name' => 'RASOA Mahajanga', 'nationality' => 'Malagasy',
         'cin' => '401011099999', 'phone' => '0341112233', 'email' => 'contact@example.test', 'address' => 'Lot 12 Tsaramandroso',
-        'bac_registration_number' => 'BAC200', 'bac_series' => 'C', 'bac_year' => 2020, 'bac_mention' => 'Bien',
+        'bac_series' => 'C', 'bac_year' => 2020,
     ]);
     $this->record = StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'status' => 'active']);
     $this->studentUser = User::factory()->create(['email' => 'login@example.test'])->assignRole('student');
@@ -230,9 +231,11 @@ it('becomes stale when a displayed field changes', function (string $field, mixe
     'phone' => ['phone', '0329998877'],
     'contact email' => ['email', 'autre@example.test'],
     'address' => ['address', 'Lot 13 Tsaramandroso'],
-    'bac number' => ['bac_registration_number', 'BAC201'],
+    'sex' => ['sex', 'M'],
+    'mother name' => ['mother_name', 'RASOA Vola'],
+    'nationality' => ['nationality', 'Comorien'],
+    'bac series' => ['bac_series', 'D'],
     'bac year' => ['bac_year', 2019],
-    'bac mention' => ['bac_mention', 'Assez bien'],
 ]);
 it('stays confirmed when only hidden CIN data or the login email changes', function () {
     confirmInformation($this)->assertOk();
@@ -244,6 +247,23 @@ it('becomes stale when the level of the current declaration changes', function (
     confirmInformation($this)->assertOk();
     $this->record->update(['level_id' => Level::factory()->create()->id]);
     expect(confirmationState($this)['status'])->toBe('stale');
+});
+it('becomes stale when the repeat code of the current declaration changes', function () {
+    confirmInformation($this)->assertOk();
+    $this->record->update(['repeat_code' => 'R']);
+    expect(confirmationState($this)['status'])->toBe('stale');
+});
+it('becomes stale when the mention of the displayed program is renamed', function () {
+    $mention = Mention::factory()->create(['establishment_id' => $this->a->id, 'name' => 'Mathématiques et informatique']);
+    $this->program->update(['mention_id' => $mention->id]);
+    confirmInformation($this)->assertOk();
+    $mention->update(['name' => 'Sciences du numérique']);
+    expect(confirmationState($this)['status'])->toBe('stale');
+});
+it('stays confirmed when only the scholarship request deposit of the declaration changes', function () {
+    confirmInformation($this)->assertOk();
+    $this->record->update(['scholarship_requested_at' => '2026-10-01', 'scholarship_request_reference' => 'DB-001']);
+    expect(confirmationState($this)['status'])->toBe('confirmed');
 });
 it('becomes stale when the program changes, including a rename of the displayed program', function () {
     confirmInformation($this)->assertOk();
@@ -297,7 +317,7 @@ it('never exposes the fingerprint through the API', function () {
 it('keeps the fingerprint and personal data out of the activity log', function () {
     confirmInformation($this)->assertOk();
     $json = Activity::where('log_name', 'student_confirmations')->get()->toJson();
-    foreach ([StudentInformationConfirmation::sole()->information_fingerprint, 'RABE', 'Aina', '2002-03-04', 'Mahajanga', '0341112233', 'contact@example.test', 'Tsaramandroso', 'BAC200', 'Bien', '401011099999'] as $secret) {
+    foreach ([StudentInformationConfirmation::sole()->information_fingerprint, 'RABE', 'Aina', '2002-03-04', 'Mahajanga', '0341112233', 'contact@example.test', 'Tsaramandroso', 'RASOA', '401011099999'] as $secret) {
         expect($json)->not->toContain($secret);
     }
 });
