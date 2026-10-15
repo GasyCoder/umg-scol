@@ -45,6 +45,7 @@ import type {
     ReferenceKind,
     ReferenceRecord,
 } from './definitions';
+import { LogoTile } from './logo-tile';
 import { formatDay, listDescriptions, referenceIcons } from './reference-meta';
 import { ReferenceTransferToolbar } from './reference-transfer';
 
@@ -134,7 +135,7 @@ export default function ReferenceList({
         );
     const columns =
         kind === 'establishments'
-            ? ['Code', 'Nom', 'Type', 'Contact']
+            ? ['Sigle', 'Établissement', 'Type', 'Contact']
             : kind === 'academic-years'
               ? ['Nom', 'Dates', 'Année courante']
               : kind === 'levels'
@@ -146,7 +147,14 @@ export default function ReferenceList({
         kind === 'establishments'
             ? [
                   <Code key="code" value={row.code} />,
-                  name(row),
+                  <span key="name" className="flex min-w-0 items-center gap-3">
+                      <LogoTile
+                          src={row.logo_url}
+                          code={row.code}
+                          className="size-10 rounded-xl text-xs"
+                      />
+                      {name(row)}
+                  </span>,
                   row.type ?? <Muted>—</Muted>,
                   row.phone || row.email ? (
                       <span className="flex flex-col gap-0.5 text-xs">
@@ -262,7 +270,9 @@ export default function ReferenceList({
                         placeholder={
                             kind === 'academic-years'
                                 ? 'Rechercher une année…'
-                                : 'Rechercher par nom ou code…'
+                                : kind === 'establishments'
+                                  ? 'Rechercher par nom ou sigle…'
+                                  : 'Rechercher par nom ou code…'
                         }
                         className="pl-9"
                         value={search.data.search}
