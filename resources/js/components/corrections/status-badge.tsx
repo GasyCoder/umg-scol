@@ -1,13 +1,11 @@
-import { Badge } from '@/components/ui/badge';
+import { ToneBadge } from '@/components/tone-badge';
+import type { Tone } from '@/components/tone-badge';
 
-const variants: Record<
-    string,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'default',
-    approved: 'secondary',
-    rejected: 'destructive',
-    cancelled: 'outline',
+const tones: Record<string, Tone> = {
+    pending: 'warning',
+    approved: 'success',
+    rejected: 'danger',
+    cancelled: 'neutral',
 };
 
 export function CorrectionStatusBadge({
@@ -17,5 +15,5 @@ export function CorrectionStatusBadge({
     status: string;
     label: string;
 }) {
-    return <Badge variant={variants[status] ?? 'outline'}>{label}</Badge>;
+    return <ToneBadge tone={tones[status] ?? 'neutral'}>{label}</ToneBadge>;
 }
