@@ -43,7 +43,7 @@ beforeEach(function () {
     $this->actor->assignRole('establishment');
     $this->admin = User::factory()->create()->assignRole('superadmin');
     $this->actingAs($this->actor);
-    $this->data = ['last_name' => 'Nom', 'first_names' => 'Prénom', 'student_number' => 'MAT001', 'level' => 'L1', 'program' => 'INFO'];
+    $this->data = ['last_name' => 'Nom', 'first_names' => 'Prénom', 'sex' => 'M', 'birth_date' => '2001-01-01', 'nationality' => 'Malagasy', 'repeat_code' => 'N', 'level' => 'L1', 'program' => 'INFO'];
 });
 
 /** @param list<array<string,mixed>> $rows */
@@ -71,7 +71,7 @@ function analyzeStudentCsv(TestCase $test, array $rows): StudentImport
 }
 function existingImportStudent(TestCase $test, array $attributes = []): Student
 {
-    $student = Student::factory()->create(['last_name' => 'Nom', 'first_names' => 'Prénom', 'student_number' => 'MAT001', 'birth_date' => null, 'email' => null, 'cin' => null, 'bac_registration_number' => null, ...$attributes]);
+    $student = Student::factory()->create(['last_name' => 'Nom', 'first_names' => 'Prénom', 'sex' => 'M', 'birth_date' => '2001-01-01', 'nationality' => 'Malagasy', 'email' => null, 'cin' => null, ...$attributes]);
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $test->oldYear->id, 'establishment_id' => $test->a->id, 'level_id' => $test->level->id, 'program_id' => $test->program->id]);
 
     return $student;
@@ -134,28 +134,43 @@ it('allows superadmin to select an establishment', function () {
     expect(StudentImport::sole()->establishment_id)->toBe($this->b->id);
 });
 it('maps canonical fields and French aliases deterministically', function () {
-    expect(StudentImportColumns::suggest(['NOM', 'Prénoms', 'N° matricule', 'N° BAC', 'N° inscription Bacc', 'Niveau']))->toBe(['last_name' => 0, 'first_names' => 1, 'student_number' => 2, 'bac_registration_number' => 3, 'level' => 5]);
-    expect(StudentImportColumns::suggest(array_keys(StudentImportColumns::labels())))->toHaveCount(17);
+    expect(StudentImportColumns::suggest(['NOM', 'Prénoms', 'Sexe', 'N° matricule', 'CIN', 'Niveau', 'Code redoublement']))->toBe(['last_name' => 0, 'first_names' => 1, 'sex' => 2, 'cin' => 4, 'level' => 5, 'repeat_code' => 6]);
+    expect(StudentImportColumns::suggest(array_keys(StudentImportColumns::labels())))->toHaveCount(24)
+        ->and(StudentImportColumns::suggest(array_values(StudentImportColumns::labels())))->toHaveCount(24);
 });
-it('rejects incomplete, duplicated, unknown and out of range mappings', function (array $mapping) {
+it('rejects incomplete, duplicated, unknown and out of range mappings', function (string $case) {
     $import = uploadStudentCsv($this, [$this->data]);
+    $mapping = $import->mapping;
+    match ($case) {
+        'missing sex' => $mapping = array_diff_key($mapping, ['sex' => true]),
+        'missing repeat code' => $mapping = array_diff_key($mapping, ['repeat_code' => true]),
+        'duplicated' => $mapping['level'] = $mapping['last_name'],
+        'out of range' => $mapping['level'] = 999,
+        'unknown' => $mapping['student_number'] = 998,
+    };
     $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $mapping])->assertSessionHasErrors();
     expect($import->fresh()->status)->toBe(ImportStatus::Uploaded);
-})->with([[['last_name' => 0]], [['last_name' => 0, 'level' => 0]], [['last_name' => 0, 'level' => 999]], [['last_name' => 0, 'level' => 1, 'unknown' => 2]]]);
+})->with(['missing sex', 'missing repeat code', 'duplicated', 'out of range', 'unknown']);
 it('permits a corrected mapping before analysis', function () {
     $import = uploadStudentCsv($this, [$this->data]);
     $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $import->mapping])->assertSessionHasNoErrors()->assertRedirect();
     expect($import->fresh()->status)->toBe(ImportStatus::Ready)->and(Student::count())->toBe(0);
 });
 it('reuses student normalization and preserves identifiers', function () {
-    $data = StudentImportColumns::normalize([' EMAIL@EXAMPLE.TEST ', ' 034 (12)-345 67 ', ' 123 456 ', '  BAC  001 ', '   ', '01/02/2001'], ['email' => 0, 'phone' => 1, 'cin' => 2, 'bac_registration_number' => 3, 'first_names' => 4, 'birth_date' => 5]);
-    expect($data)->toBe(['email' => 'email@example.test', 'phone' => '0341234567', 'cin' => '123456', 'bac_registration_number' => 'BAC 001', 'first_names' => null, 'birth_date' => '2001-02-01']);
+    $data = StudentImportColumns::normalize(
+        [' EMAIL@EXAMPLE.TEST ', ' 034 (12)-345 67 ', ' 123 456 ', 'n (Nouveau)', '   ', '01/02/2001', 413012049888.0, 327407096.0, ' féminin ', 'MALAGASY', '  REF  12 ', 'tech. génie civil'],
+        ['email' => 0, 'phone' => 1, 'cin' => 2, 'repeat_code' => 3, 'first_names' => 4, 'birth_date' => 5, 'cin_issued_place' => 6, 'address' => 7, 'sex' => 8, 'nationality' => 9, 'scholarship_request_reference' => 10, 'bac_series' => 11],
+    );
+    expect($data)->toBe(['email' => 'email@example.test', 'phone' => '0341234567', 'cin' => '123456', 'repeat_code' => 'N', 'first_names' => null, 'birth_date' => '2001-02-01',
+        'cin_issued_place' => '413012049888', 'address' => '327407096', 'sex' => 'F', 'nationality' => 'Malagasy', 'scholarship_request_reference' => 'REF 12', 'bac_series' => 'Tech. Génie civil']);
+    expect(StudentImportColumns::normalize([413012049888.0, 327407096.0], ['cin' => 0, 'phone' => 1]))->toBe(['cin' => '413012049888', 'phone' => '0327407096']);
 });
 it('rejects invalid row fields with structured errors', function (string $field, mixed $value) {
     $import = analyzeStudentCsv($this, [[...$this->data, $field => $value]]);
     $row = $import->rows()->sole();
     expect($row->status)->toBe(RowStatus::Rejected)->and($row->errors[0])->toHaveKeys(['field', 'code', 'message']);
-})->with([['last_name', ''], ['email', 'invalid'], ['level', 'unknown'], ['birth_date', '31/02/2001'], ['birth_date', '2999-01-01'], ['phone', 'bad'], ['bac_year', 1800], ['cin', str_repeat('1', 101)], ['last_name', '=1+1']]);
+})->with([['last_name', ''], ['email', 'invalid'], ['level', 'unknown'], ['birth_date', '31/02/2001'], ['birth_date', '2999-01-01'], ['birth_date', ''], ['phone', 'bad'], ['bac_year', 1800], ['cin', str_repeat('1', 101)], ['last_name', '=1+1'],
+    ['sex', ''], ['sex', 'X'], ['nationality', ''], ['nationality', 'Martienne'], ['repeat_code', ''], ['repeat_code', 'Q (Quadruplant)'], ['bac_series', 'Z9'], ['scholarship_requested_at', '2026-01-01']]);
 it('rejects foreign inactive or ambiguous programs', function (string $case) {
     if ($case === 'foreign') {
         $this->program->update(['establishment_id' => $this->b->id]);
@@ -173,47 +188,89 @@ it('rejects CIN issued before birth', function () {
     $import = analyzeStudentCsv($this, [[...$this->data, 'birth_date' => '2001-01-01', 'cin_issued_at' => '2000-01-01']]);
     expect($import->rejected_rows)->toBe(1);
 });
-it('detects internal duplicates across chunk boundaries', function (string $field) {
+it('detects the same identity twice across chunk boundaries as a duplicate', function (array $identifiers) {
     config(['student_imports.chunk_size' => 1]);
-    $first = [...$this->data, 'student_number' => null, $field => 'IDENTIFIER'];
-    $second = [...$first, 'last_name' => 'Autre'];
-    $import = analyzeStudentCsv($this, [$first, $second]);
-    expect($import->valid_rows)->toBe(1)->and($import->duplicate_rows)->toBe(1);
+    $row = [...$this->data, ...$identifiers];
+    $import = analyzeStudentCsv($this, [$row, $row]);
+    expect($import->valid_rows)->toBe(1)->and($import->duplicate_rows)->toBe(1)
+        ->and($import->rows()->where('status', 'duplicate')->sole()->warnings[0]['code'])->toBe('file_duplicate');
     app(CommitStudentImport::class)->handle($this->actor, $import);
     expect(Student::count())->toBe(1)->and(StudentRecord::count())->toBe(1);
-})->with(['student_number', 'cin', 'bac_registration_number']);
+})->with([
+    'names and birth date only' => [[]],
+    'standard CIN' => [['cin' => '101234567890']],
+    'phone' => [['phone' => '0341234567']],
+    'email' => [['email' => 'same@example.test']],
+    'request reference' => [['scholarship_request_reference' => 'REF-1']],
+]);
+it('rejects another identity of the file reusing a unique value', function (string $field, string $value) {
+    config(['student_imports.chunk_size' => 1]);
+    $first = [...$this->data, $field => $value];
+    $import = analyzeStudentCsv($this, [$first, [...$first, 'last_name' => 'Autre']]);
+    expect($import->valid_rows)->toBe(1)->and($import->rejected_rows)->toBe(1);
+    expect($import->rows()->where('status', 'rejected')->sole()->errors)->toContainEqual(['field' => $field, 'code' => 'file_unique', 'message' => 'Valeur déjà utilisée par une autre ligne du fichier ('.StudentImportColumns::labels()[$field].').']);
+    app(CommitStudentImport::class)->handle($this->actor, $import);
+    expect(Student::count())->toBe(1)->and(StudentRecord::count())->toBe(1);
+})->with([['cin', '101234567890'], ['phone', '0341234567'], ['email', 'shared@example.test'], ['scholarship_request_reference', 'REF-1']]);
+it('accepts a non-standard CIN shared by two identities of the file', function () {
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => 'RECU 42'], [...$this->data, 'last_name' => 'Autre', 'cin' => 'RECU 42']]);
+    expect($import->valid_rows)->toBe(2);
+    app(CommitStudentImport::class)->handle($this->actor, $import);
+    expect(Student::where('cin', 'RECU42')->count())->toBe(2);
+});
 it('detects exact name and date duplicates without strong identifiers', function () {
-    $data = [...$this->data, 'student_number' => null, 'birth_date' => '2001-01-01'];
-    $import = analyzeStudentCsv($this, [$data, $data]);
+    $import = analyzeStudentCsv($this, [$this->data, [...$this->data, 'last_name' => ' NOM ', 'first_names' => 'prénom']]);
     expect($import->valid_rows)->toBe(1)->and($import->duplicate_rows)->toBe(1);
 });
-it('matches a single existing identity and fills empty fields only', function (string $identifier) {
-    $student = existingImportStudent($this, ['student_number' => null, $identifier => 'IDENTIFIER']);
-    $import = analyzeStudentCsv($this, [[...$this->data, 'student_number' => null, $identifier => 'IDENTIFIER', 'email' => ' New@Example.test ']]);
+it('matches a single existing identity and fills empty fields only', function (string $key) {
+    // By standard CIN (the official birth date is still empty) or by names and birth date.
+    $student = existingImportStudent($this, $key === 'cin' ? ['cin' => '101234567890', 'birth_date' => null, 'mother_name' => 'Mère officielle'] : ['mother_name' => 'Mère officielle']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '101234567890', 'email' => ' New@Example.test ']]);
     expect($import->valid_rows)->toBe(1)->and($import->rows()->sole()->matched_student_id)->toBe($student->id);
     app(CommitStudentImport::class)->handle($this->actor, $import);
-    expect(Student::count())->toBe(1)->and($student->fresh()->email)->toBe('new@example.test')->and(StudentRecord::count())->toBe(2)->and($import->fresh()->updated_rows)->toBe(1)->and($import->fresh()->created_rows)->toBe(0);
-})->with(['student_number', 'cin', 'bac_registration_number']);
+    $student->refresh();
+    expect(Student::count())->toBe(1)->and($student->email)->toBe('new@example.test')->and($student->cin)->toBe('101234567890')
+        ->and($student->birth_date->format('Y-m-d'))->toBe('2001-01-01')->and($student->mother_name)->toBe('Mère officielle')
+        ->and(StudentRecord::count())->toBe(2)->and($import->fresh()->updated_rows)->toBe(1)->and($import->fresh()->created_rows)->toBe(0);
+})->with(['cin', 'identity']);
 it('matches exact names and birth date when no identifier exists', function () {
-    $student = existingImportStudent($this, ['student_number' => null, 'birth_date' => '2001-01-01']);
-    $import = analyzeStudentCsv($this, [[...$this->data, 'student_number' => null, 'birth_date' => '2001-01-01']]);
+    $student = existingImportStudent($this);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'last_name' => ' Nom ']]);
     expect($import->rows()->sole()->matched_student_id)->toBe($student->id);
+});
+it('does not match an identity by a non-standard CIN', function () {
+    existingImportStudent($this, ['last_name' => 'Autre', 'cin' => 'RECU42']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => 'RECU 42']]);
+    expect($import->valid_rows)->toBe(1)->and($import->rows()->sole()->matched_student_id)->toBeNull();
+});
+it('rejects a phone or email owned by another existing student', function (string $field, string $value) {
+    existingImportStudent($this, ['last_name' => 'Autre', $field => $value]);
+    $import = analyzeStudentCsv($this, [[...$this->data, $field => $value]]);
+    expect($import->rejected_rows)->toBe(1)->and(collect($import->rows()->sole()->errors)->firstWhere('field', $field)['code'])->toBe('already_used');
+})->with([['phone', '0341234567'], ['email', 'owned@example.test']]);
+it('rejects a request reference already given to another student of the establishment and year', function () {
+    StudentRecord::factory()->create(['academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'scholarship_request_reference' => 'REF-9']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'scholarship_request_reference' => 'ref-9']]);
+    expect($import->rejected_rows)->toBe(1)->and($import->rows()->sole()->errors[0]['code'])->toBe('reference_used');
+    StudentRecord::query()->update(['establishment_id' => $this->b->id]);
+    expect(analyzeStudentCsv($this, [[...$this->data, 'scholarship_request_reference' => 'REF-9']])->valid_rows)->toBe(1);
 });
 it('never merges multiple possible identities', function () {
     existingImportStudent($this);
-    existingImportStudent($this, ['student_number' => 'MAT002', 'cin' => '123']);
-    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '123']]);
+    existingImportStudent($this, ['last_name' => 'Autre', 'cin' => '101234567890']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '101234567890']]);
     expect($import->warning_rows)->toBe(1)->and($import->rows()->sole()->matched_student_id)->toBeNull();
     app(CommitStudentImport::class)->handle($this->actor, $import);
     expect(Student::count())->toBe(2)->and($import->fresh()->declared_rows)->toBe(0);
 });
 it('never overwrites nonempty official or contact data', function (string $field, string $old, string $new) {
-    $student = existingImportStudent($this, [$field => $old]);
-    $import = analyzeStudentCsv($this, [[...$this->data, $field => $new]]);
-    expect($import->warning_rows)->toBe(1);
+    // Matched by its standard CIN, except when the CIN itself differs (then by names and birth date).
+    $student = existingImportStudent($this, ['cin' => '101234567890', $field => $old]);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '101234567890', $field => $new]]);
+    expect($import->warning_rows)->toBe(1)->and(collect($import->rows()->sole()->warnings)->pluck('field')->all())->toContain($field);
     app(CommitStudentImport::class)->handle($this->actor, $import);
-    expect((string) $student->fresh()->getAttribute($field))->toBe($old);
-})->with([['last_name', 'Nom', 'Autre'], ['cin', '123', '456'], ['email', 'old@example.test', 'new@example.test'], ['phone', '0341234567', '0321234567'], ['address', 'Ancienne adresse', 'Nouvelle adresse']]);
+    expect((string) ($student->fresh()->getAttribute($field)?->value ?? $student->fresh()->getAttribute($field)))->toBe($old);
+})->with([['last_name', 'Nom', 'Autre'], ['cin', '123', '456'], ['sex', 'F', 'M'], ['nationality', 'Comorien', 'Malagasy'], ['email', 'old@example.test', 'new@example.test'], ['phone', '0341234567', '0321234567'], ['address', 'Ancienne adresse', 'Nouvelle adresse']]);
 it('skips an identical annual record', function () {
     $student = existingImportStudent($this);
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id]);
@@ -222,12 +279,16 @@ it('skips an identical annual record', function () {
     app(CommitStudentImport::class)->handle($this->actor, $import);
     expect(StudentRecord::count())->toBe(2)->and($import->fresh()->skipped_rows)->toBe(1);
 });
-it('warns on a contradictory annual record', function () {
+it('warns on a contradictory annual record', function (array $attributes) {
     $student = existingImportStudent($this);
-    StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => Level::factory()->create()->id, 'program_id' => null]);
+    StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, ...$attributes]);
     $import = analyzeStudentCsv($this, [$this->data]);
-    expect($import->warning_rows)->toBe(1);
-});
+    expect($import->warning_rows)->toBe(1)->and($import->rows()->sole()->warnings[0]['code'])->toBe('record_conflict');
+})->with([
+    'level' => [['level_id' => fn () => Level::factory()->create()->id, 'program_id' => null]],
+    'repeat code' => [['repeat_code' => 'R']],
+    'request reference' => [['scholarship_request_reference' => 'REF-OLD']],
+]);
 it('does not expose foreign identities or automatically transfer them', function () {
     $student = existingImportStudent($this);
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->b->id]);
@@ -238,8 +299,8 @@ it('does not expose foreign identities or automatically transfer them', function
     expect($import->rows()->sole()->warnings)->toContainEqual(['field' => 'record', 'code' => 'foreign_active_record', 'message' => 'Une déclaration active existe dans un autre établissement. Aucun transfert automatique.']);
 });
 it('commits only valid rows and ignores warnings rejected rows and duplicates', function () {
-    existingImportStudent($this, ['student_number' => 'OLD']);
-    $import = analyzeStudentCsv($this, [$this->data, $this->data, [...$this->data, 'student_number' => 'INVALID', 'email' => 'bad'], [...$this->data, 'student_number' => 'OLD', 'last_name' => 'Conflit']]);
+    existingImportStudent($this, ['last_name' => 'Ancien', 'cin' => '101234567890']);
+    $import = analyzeStudentCsv($this, [$this->data, $this->data, [...$this->data, 'email' => 'bad'], [...$this->data, 'cin' => '101234567890', 'last_name' => 'Conflit']]);
     expect($import->valid_rows)->toBe(1)->and($import->duplicate_rows)->toBe(1)->and($import->warning_rows)->toBe(1)->and($import->rejected_rows)->toBe(1);
     $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors()->assertRedirect();
     expect(Student::count())->toBe(2)->and(StudentRecord::count())->toBe(2)->and($import->fresh()->status)->toBe(ImportStatus::Completed)->and($import->fresh()->created_rows)->toBe(1)->and($import->fresh()->declared_rows)->toBe(1)->and($import->fresh()->skipped_rows)->toBe(3);
@@ -257,8 +318,8 @@ it('requires analysis before commit', function () {
     expect(Student::count())->toBe(0);
 });
 it('rechecks database conflicts introduced after preview', function () {
-    $import = analyzeStudentCsv($this, [$this->data]);
-    existingImportStudent($this, ['last_name' => 'Changed']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '101234567890']]);
+    existingImportStudent($this, ['last_name' => 'Changed', 'cin' => '101234567890']);
     $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
     expect(Student::count())->toBe(1)->and($import->fresh()->warning_rows)->toBe(1)->and($import->fresh()->skipped_rows)->toBe(1);
 });
@@ -269,7 +330,7 @@ it('rechecks references at confirmation', function () {
     expect(Student::count())->toBe(0)->and($import->fresh()->rejected_rows)->toBe(1);
 });
 it('rolls back students records staging resolutions and audit on a critical error', function () {
-    $import = analyzeStudentCsv($this, [$this->data, [...$this->data, 'student_number' => 'MAT002', 'last_name' => 'Deuxième']]);
+    $import = analyzeStudentCsv($this, [$this->data, [...$this->data, 'last_name' => 'Deuxième']]);
     $count = 0;
     StudentRecord::creating(function () use (&$count) {
         if (++$count === 2) {
@@ -298,10 +359,12 @@ it('audits upload analysis and commit without private data or filename', functio
 it('paginates preview without sensitive data and filters status', function () {
     $rows = [];
     for ($i = 0; $i < 30; $i++) {
-        $rows[] = [...$this->data, 'last_name' => 'Nom '.$i, 'student_number' => 'M'.$i, 'cin' => 'SECRET-CIN-'.$i];
+        $rows[] = [...$this->data, 'last_name' => 'Nom '.$i, 'cin' => 'SECRET-CIN-'.$i, 'phone' => '03400000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT)];
     }
     $import = analyzeStudentCsv($this, $rows);
-    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->component('imports/show')->has('rows.data', 25)->where('rows.total', 30)->missing('rows.data.0.data.cin')->missing('rows.data.0.raw_data')->missing('import.stored_path'));
+    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->component('imports/show')->has('rows.data', 25)->where('rows.total', 30)
+        ->where('rows.data.0.data', ['last_name' => 'Nom 0', 'first_names' => 'Prénom', 'repeat_code' => 'N', 'level' => 'L1', 'mention' => null, 'program' => 'INFO'])
+        ->missing('rows.data.0.data.cin')->missing('rows.data.0.data.phone')->missing('rows.data.0.data.birth_date')->missing('rows.data.0.raw_data')->missing('import.stored_path'));
     $this->get('/imports/'.$import->uuid.'?status=rejected')->assertInertia(fn (Assert $page) => $page->has('rows.data', 0));
 });
 it('loads import history with eager relations and scoped pagination', function () {
@@ -313,7 +376,7 @@ it('loads import history with eager relations and scoped pagination', function (
 it('keeps preview and history relation queries bounded', function () {
     $rows = [];
     for ($i = 0; $i < 30; $i++) {
-        $rows[] = [...$this->data, 'student_number' => 'M'.$i];
+        $rows[] = [...$this->data, 'last_name' => 'Nom '.$i];
     }
     $import = analyzeStudentCsv($this, $rows);
     DB::enableQueryLog();
@@ -327,7 +390,7 @@ it('chunks a multi-line file without persisting before confirmation', function (
     config(['student_imports.chunk_size' => 100]);
     $rows = [];
     for ($i = 0; $i < 1001; $i++) {
-        $rows[] = [...$this->data, 'last_name' => 'Nom '.$i, 'student_number' => 'M'.$i];
+        $rows[] = [...$this->data, 'last_name' => 'Nom '.$i];
     }
     $import = analyzeStudentCsv($this, $rows);
     expect($import->valid_rows)->toBe(1001)->and($import->rows()->count())->toBe(1001)->and(Student::count())->toBe(0);
@@ -378,9 +441,9 @@ it('preserves the 1904 Excel date calendar across upload and analysis requests',
 });
 
 it('refuses a proposed date inconsistent with an existing official birth date', function () {
-    existingImportStudent($this, ['birth_date' => '2001-01-01']);
-    $import = analyzeStudentCsv($this, [[...$this->data, 'cin_issued_at' => '2000-01-01']]);
-    expect($import->warning_rows)->toBe(1);
+    existingImportStudent($this, ['cin' => '101234567890', 'birth_date' => '2001-01-01']);
+    $import = analyzeStudentCsv($this, [[...$this->data, 'cin' => '101234567890', 'birth_date' => '1990-01-01', 'cin_issued_at' => '2000-01-01']]);
+    expect($import->warning_rows)->toBe(1)->and(collect($import->rows()->sole()->warnings)->pluck('code')->all())->toContain('merged_before_birth', 'official_conflict');
 });
 
 it('refuses multi-sheet workbooks rather than silently ignoring data', function () {
@@ -399,7 +462,7 @@ it('refuses multi-sheet workbooks rather than silently ignoring data', function 
 });
 
 it('hides a foreign match identified by an admin before an establishment views the preview', function () {
-    $student = Student::factory()->create(['last_name' => 'Nom', 'first_names' => 'Prénom', 'student_number' => 'MAT001']);
+    $student = Student::factory()->create(['last_name' => 'Nom', 'first_names' => 'Prénom', 'birth_date' => '2001-01-01']);
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->oldYear->id, 'establishment_id' => $this->b->id, 'status' => 'inactive']);
     $import = uploadStudentCsv($this, [$this->data]);
     app(AnalyzeStudentImport::class)->handle($this->admin, $import, $import->mapping);
@@ -418,7 +481,7 @@ it('always interprets CSV numeric dates using calendar 1900', function () {
 });
 it('offers a French import template that the column mapping recognises', function () {
     $csv = $this->actingAs($this->actor)->get('/imports/template')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
-    expect($csv)->toStartWith("\xEF\xBB\xBF")->toContain('Nom;Prénoms;Matricule');
+    expect($csv)->toStartWith("\xEF\xBB\xBF")->toContain('Nom;Prénoms;Sexe;"Date de naissance"')->not->toContain('Matricule');
     $headers = str_getcsv(trim(substr($csv, 3)), ';');
-    expect(array_keys(StudentImportColumns::suggest($headers)))->toContain('last_name', 'level', 'program');
+    expect(StudentImportColumns::suggest($headers))->toHaveCount(24)->toHaveKeys(StudentImportColumns::required());
 });
