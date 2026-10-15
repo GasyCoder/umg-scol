@@ -1,17 +1,26 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
-    CalendarRange,
+    AlertTriangle,
+    CalendarCheck,
+    CalendarDays,
+    ChevronRight,
     FolderOpen,
+    GraduationCap,
+    Info,
     Megaphone,
     Pencil,
+    PlayCircle,
     Plus,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ErrorSummary, FormField } from '@/components/forms/form-kit';
+import { EmptyState } from '@/components/empty-state';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { formatNumber } from '@/components/reporting/shared';
+import { ToneBadge, toneFor } from '@/components/tone-badge';
+import type { Tone } from '@/components/tone-badge';
 import { TrashButton } from '@/components/trash/trash-button';
-import Heading from '@/components/heading';
-import InputError from '@/components/input-error';
 import {
     formatDate,
     Pagination,
@@ -35,6 +44,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type Campaign = {
     id: number;
@@ -57,6 +67,25 @@ const actionLabels: Record<string, string> = {
     open: 'Ouvrir la réception',
     closed: 'Clôturer',
     archived: 'Archiver',
+};
+
+/** Campaign lifecycle, in order (labels as shown by the status badges). */
+const lifecycle = [
+    { status: 'draft', label: 'Brouillon' },
+    { status: 'scheduled', label: 'Programmée' },
+    { status: 'open', label: 'Ouverte' },
+    { status: 'closed', label: 'Clôturée' },
+    { status: 'archived', label: 'Archivée' },
+];
+
+/** Thin top accent of a campaign card, coloured by its status tone. */
+const accents: Record<Tone, string> = {
+    primary: 'bg-primary',
+    success: 'bg-success',
+    warning: 'bg-warning',
+    info: 'bg-info',
+    danger: 'bg-danger',
+    neutral: 'bg-border',
 };
 
 export default function Campaigns({
@@ -114,111 +143,234 @@ export default function Campaigns({
         else if (editing)
             form.put(`/scholarships/campaigns/${editing.uuid}`, options);
     };
+    const openCampaigns = campaigns.data.filter(
+        (campaign) => campaign.status === 'open',
+    );
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <PageBody>
             <Head title="Campagnes de bourse" />
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <Heading
-                    title="Campagnes de bourse"
-                    description="Une campagne par année universitaire encadre la réception des dossiers papier : la réception n’est possible que pendant une campagne ouverte."
-                />
-                {canManage && (
-                    <Button onClick={() => open('new')}>
-                        <Plus aria-hidden="true" />
-                        Nouvelle campagne
-                    </Button>
-                )}
-            </div>
-            <p className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
-                Cycle d’une campagne :{' '}
-                <strong className="text-foreground">Brouillon</strong> →
-                Programmée →{' '}
-                <strong className="text-foreground">Ouverte</strong> (réception
-                des dossiers) → Clôturée → Archivée. Chaque étape est
-                définitive.
-            </p>
-            <InputError message={pageErrors.status} />
-            {campaigns.data.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed bg-card p-10 text-center">
-                    <Megaphone
-                        className="size-8 text-muted-foreground"
+            <PageHeader
+                icon={Megaphone}
+                title="Campagnes de bourse"
+                description="Une campagne par année universitaire encadre la réception des dossiers papier : la réception n’est possible que pendant une campagne ouverte."
+                meta={
+                    openCampaigns.length > 0 && (
+                        <ToneBadge tone="success" className="whitespace-normal">
+                            Réception ouverte :{' '}
+                            {openCampaigns
+                                .map((campaign) => campaign.name)
+                                .join(', ')}
+                        </ToneBadge>
+                    )
+                }
+                actions={
+                    canManage && (
+                        <Button onClick={() => open('new')}>
+                            <Plus aria-hidden="true" />
+                            Nouvelle campagne
+                        </Button>
+                    )
+                }
+            />
+
+            <section
+                aria-labelledby="campaign-lifecycle"
+                className="surface flex flex-col gap-3 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between"
+            >
+                <div className="flex items-start gap-3">
+                    <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-info-soft text-info"
+                        aria-hidden="true"
+                    >
+                        <Info className="size-[18px]" />
+                    </span>
+                    <div>
+                        <h2
+                            id="campaign-lifecycle"
+                            className="text-sm font-bold text-foreground"
+                        >
+                            Cycle d’une campagne
+                        </h2>
+                        <p className="text-xs text-muted-foreground">
+                            La réception des dossiers n’a lieu que pendant
+                            l’étape « Ouverte ». Chaque étape est définitive.
+                        </p>
+                    </div>
+                </div>
+                <ol className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                    {lifecycle.map((step, index) => (
+                        <li
+                            key={step.status}
+                            className="flex items-center gap-1.5"
+                        >
+                            <ToneBadge
+                                tone={toneFor(step.status)}
+                                className={
+                                    step.status === 'open'
+                                        ? 'ring-1 ring-success/40'
+                                        : undefined
+                                }
+                            >
+                                {step.label}
+                                {step.status === 'open' && (
+                                    <span className="font-normal">
+                                        (réception)
+                                    </span>
+                                )}
+                            </ToneBadge>
+                            {index < lifecycle.length - 1 && (
+                                <ChevronRight
+                                    className="size-3.5 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                            )}
+                        </li>
+                    ))}
+                </ol>
+            </section>
+
+            {pageErrors.status && (
+                <p
+                    role="alert"
+                    className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger-foreground"
+                >
+                    <AlertTriangle
+                        className="mt-0.5 size-4 shrink-0"
                         aria-hidden="true"
                     />
-                    <p className="font-medium">
-                        Aucune campagne pour le moment.
-                    </p>
-                    {canManage && (
-                        <Button onClick={() => open('new')}>
-                            Créer la première campagne
-                        </Button>
-                    )}
+                    {pageErrors.status}
+                </p>
+            )}
+
+            {campaigns.data.length === 0 ? (
+                <div className="surface">
+                    <EmptyState
+                        illustration="scholarship"
+                        title="Aucune campagne pour le moment."
+                        description="Créez une campagne pour l’année universitaire, puis ouvrez-la pour commencer la réception des dossiers papier."
+                        action={
+                            canManage && (
+                                <Button onClick={() => open('new')}>
+                                    <Plus aria-hidden="true" />
+                                    Créer la première campagne
+                                </Button>
+                            )
+                        }
+                    />
                 </div>
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                    {campaigns.data.map((campaign) => (
-                        <article
-                            key={campaign.id}
-                            className="flex flex-col rounded-lg border bg-card"
-                        >
-                            <div className="flex items-start gap-3 p-5">
+                    {campaigns.data.map((campaign) => {
+                        const isOpen = campaign.status === 'open';
+                        return (
+                            <article
+                                key={campaign.id}
+                                className={cn(
+                                    'surface relative flex flex-col overflow-hidden transition-shadow hover:shadow-elevated',
+                                    isOpen && 'border-success/40',
+                                )}
+                            >
                                 <span
-                                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-primary"
+                                    className={cn(
+                                        'absolute inset-x-0 top-0 h-1',
+                                        accents[toneFor(campaign.status)],
+                                    )}
                                     aria-hidden="true"
-                                >
-                                    <Megaphone className="size-5" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <h2 className="truncate text-base font-bold text-foreground">
-                                            {campaign.name}
-                                        </h2>
-                                        <StatusBadge
-                                            status={campaign.status}
-                                            label={campaign.status_label}
-                                        />
-                                    </div>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Année {campaign.academic_year}
-                                    </p>
-                                </div>
-                            </div>
-                            <dl className="grid grid-cols-2 gap-4 border-y px-5 py-4 text-sm">
-                                <div>
-                                    <dt className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <CalendarRange
-                                            className="size-3.5"
-                                            aria-hidden="true"
-                                        />
-                                        Période indicative
-                                    </dt>
-                                    <dd className="mt-1 font-medium text-foreground">
-                                        {campaign.starts_at || campaign.ends_at
-                                            ? `${formatDate(campaign.starts_at)} → ${formatDate(campaign.ends_at)}`
-                                            : 'Non définie'}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <FolderOpen
-                                            className="size-3.5"
-                                            aria-hidden="true"
-                                        />
-                                        Dossiers reçus
-                                    </dt>
-                                    <dd className="mt-1 font-heading text-lg leading-none font-bold text-foreground tabular-nums">
-                                        {campaign.applications_count}
-                                    </dd>
-                                </div>
-                            </dl>
-                            <div className="px-5 pb-4">
-                                <TrashButton
-                                    kind="campaigns"
-                                    uuid={campaign.uuid}
-                                    label={campaign.name}
                                 />
-                            </div>
-                            {(canManage || campaign.targets.length > 0) && (
-                                <div className="mt-auto flex flex-wrap items-center gap-2 p-4">
+                                <div className="flex items-start gap-3 p-5 pb-4">
+                                    <span
+                                        className={cn(
+                                            'flex size-11 shrink-0 items-center justify-center rounded-xl',
+                                            isOpen
+                                                ? 'bg-success-soft text-success'
+                                                : 'bg-accent text-primary',
+                                        )}
+                                        aria-hidden="true"
+                                    >
+                                        <Megaphone className="size-5" />
+                                    </span>
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                            <h2 className="min-w-0 text-base leading-snug font-bold break-words text-foreground">
+                                                {campaign.name}
+                                            </h2>
+                                            <StatusBadge
+                                                status={campaign.status}
+                                                label={campaign.status_label}
+                                            />
+                                        </div>
+                                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                            <GraduationCap
+                                                className="size-4 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                            Année {campaign.academic_year}
+                                        </p>
+                                    </div>
+                                </div>
+                                <dl className="mx-5 grid grid-cols-3 gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+                                    <div className="min-w-0">
+                                        <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <CalendarDays
+                                                className="size-3.5 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                            Début
+                                        </dt>
+                                        <dd className="mt-1 font-medium text-foreground tabular-nums">
+                                            {campaign.starts_at
+                                                ? formatDate(campaign.starts_at)
+                                                : '—'}
+                                        </dd>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <CalendarCheck
+                                                className="size-3.5 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                            Fin
+                                        </dt>
+                                        <dd className="mt-1 font-medium text-foreground tabular-nums">
+                                            {campaign.ends_at
+                                                ? formatDate(campaign.ends_at)
+                                                : '—'}
+                                        </dd>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <FolderOpen
+                                                className="size-3.5 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                            Dossiers
+                                        </dt>
+                                        <dd className="mt-1 font-heading text-lg leading-none font-bold text-foreground tabular-nums">
+                                            {formatNumber(
+                                                campaign.applications_count,
+                                            )}
+                                            <span className="sr-only">
+                                                {' '}
+                                                dossiers reçus
+                                            </span>
+                                        </dd>
+                                    </div>
+                                </dl>
+                                {!campaign.starts_at && !campaign.ends_at && (
+                                    <p className="mx-5 mt-2 text-xs text-muted-foreground">
+                                        Période indicative non définie.
+                                    </p>
+                                )}
+                                {campaign.notes && (
+                                    <p className="mx-5 mt-3 line-clamp-2 text-sm text-muted-foreground">
+                                        {campaign.notes}
+                                    </p>
+                                )}
+                                <div
+                                    className="min-h-5 flex-1"
+                                    aria-hidden="true"
+                                />
+                                <div className="flex flex-wrap items-center gap-2 border-t bg-muted/30 px-5 py-3">
                                     {campaign.targets.map((target) => (
                                         <Button
                                             key={target.value}
@@ -235,26 +387,37 @@ export default function Campaigns({
                                                 })
                                             }
                                         >
+                                            {target.value === 'open' && (
+                                                <PlayCircle aria-hidden="true" />
+                                            )}
                                             {actionLabels[target.value] ??
                                                 target.label}
                                         </Button>
                                     ))}
-                                    {canManage &&
-                                        campaign.status !== 'archived' && (
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="ml-auto"
-                                                onClick={() => open(campaign)}
-                                            >
-                                                <Pencil aria-hidden="true" />
-                                                Modifier
-                                            </Button>
-                                        )}
+                                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                                        {canManage &&
+                                            campaign.status !== 'archived' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        open(campaign)
+                                                    }
+                                                >
+                                                    <Pencil aria-hidden="true" />
+                                                    Modifier
+                                                </Button>
+                                            )}
+                                        <TrashButton
+                                            kind="campaigns"
+                                            uuid={campaign.uuid}
+                                            label={campaign.name}
+                                        />
+                                    </div>
                                 </div>
-                            )}
-                        </article>
-                    ))}
+                            </article>
+                        );
+                    })}
                 </div>
             )}
             <Pagination links={campaigns.links} />
@@ -445,7 +608,7 @@ export default function Campaigns({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </PageBody>
     );
 }
 Campaigns.layout = {
