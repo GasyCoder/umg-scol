@@ -8,6 +8,8 @@ use App\Http\Requests\Students\CreateStudentRequest;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\User;
+use App\Notifications\StudentActivity;
+use App\Support\StaffNotifications;
 use App\Support\StudentCorrectionAudit;
 use App\Support\StudentNormalization;
 use App\Support\StudentPortalAccess;
@@ -43,6 +45,7 @@ class RequestStudentCorrection
                     'current_fingerprint' => $field->fingerprint($student), 'status' => StudentCorrectionStatus::Pending, 'student_message' => $message,
                 ]);
                 StudentCorrectionAudit::log($user, $correction, 'correction_requested');
+                StaffNotifications::student($student, StudentActivity::CORRECTION_REQUESTED, trim($student->last_name.' '.$student->first_names).' signale une erreur : '.mb_strtolower($field->label()).'.', $correction->uuid, 'corrections.view');
 
                 return $correction;
             }, 5);
