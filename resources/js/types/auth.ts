@@ -45,3 +45,16 @@ export type TwoFactorSetupData = {
 export type TwoFactorSecretKey = {
     secretKey: string;
 };
+
+export type PendingTask = {
+    key: string;
+    label: string;
+    description: string;
+    count: number;
+    href: string;
+};
+
+export type PendingTasks = {
+    total: number;
+    items: PendingTask[];
+};
