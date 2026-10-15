@@ -1,9 +1,10 @@
 import { router } from '@inertiajs/react';
-import { KeyRound } from 'lucide-react';
+import { Fingerprint, KeyRound } from 'lucide-react';
 import { destroy } from '@/actions/Laravel/Passkeys/Http/Controllers/PasskeyRegistrationController';
-import Heading from '@/components/heading';
 import PasskeyItem from '@/components/passkey-item';
 import PasskeyRegistration from '@/components/passkey-register';
+import { ToneBadge } from '@/components/tone-badge';
+import { SettingsSection } from '@/layouts/settings/layout';
 import type { Passkey } from '@/types/auth';
 
 export type Props = {
@@ -13,11 +14,16 @@ export type Props = {
 
 const EmptyState = () => {
     return (
-        <div className="p-8 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-                <KeyRound className="h-7 w-7 text-muted-foreground" />
+        <div className="px-6 py-8 text-center">
+            <div
+                className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-accent text-primary ring-4 ring-accent/50"
+                aria-hidden="true"
+            >
+                <KeyRound className="size-7" />
             </div>
-            <p className="font-medium">Aucune clé d'accès pour le moment</p>
+            <p className="font-heading font-bold text-foreground">
+                Aucune clé d'accès pour le moment
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
                 Ajoutez une clé d'accès pour vous connecter sans mot de passe
             </p>
@@ -44,14 +50,19 @@ export default function ManagePasskeys(props: Props) {
     }
 
     return (
-        <div className="space-y-6">
-            <Heading
-                variant="small"
-                title="Clés d'accès"
-                description="Gérez vos clés d'accès pour vous connecter sans mot de passe"
-            />
-
-            <div className="overflow-hidden rounded-lg border border-border">
+        <SettingsSection
+            icon={Fingerprint}
+            title="Clés d'accès"
+            description="Gérez vos clés d'accès pour vous connecter sans mot de passe"
+            meta={
+                passkeys.length > 0 ? (
+                    <ToneBadge tone="primary">
+                        {passkeys.length} {passkeys.length > 1 ? 'clés' : 'clé'}
+                    </ToneBadge>
+                ) : undefined
+            }
+        >
+            <div className="mb-4 overflow-hidden rounded-xl border bg-card">
                 {passkeys.length > 0 ? (
                     passkeys.map((passkey) => (
                         <PasskeyItem
@@ -66,6 +77,6 @@ export default function ManagePasskeys(props: Props) {
             </div>
 
             <PasskeyRegistration onSuccess={handleRegisterSuccess} />
-        </div>
+        </SettingsSection>
     );
 }
