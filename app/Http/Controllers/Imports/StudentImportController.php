@@ -36,8 +36,8 @@ class StudentImportController extends Controller
         Gate::authorize('create', StudentImport::class);
 
         return Inertia::render('imports/create', ['options' => app(StudentReferenceOptions::class)->forUser($request->user()), 'maxKilobytes' => config('student_imports.max_kilobytes'), 'maxRows' => config('student_imports.max_rows'),
-            // Expected columns, shown before upload; names and level are required by the analysis.
-            'columns' => collect(StudentImportColumns::labels())->map(fn ($label, $key) => ['label' => $label, 'required' => in_array($key, ['last_name', 'level'], true)])->values()]);
+            // Expected columns of the establishment file, shown before upload, with those the analysis requires.
+            'columns' => collect(StudentImportColumns::labels())->map(fn ($label, $key) => ['label' => $label, 'required' => in_array($key, StudentImportColumns::required(), true)])->values()]);
     }
 
     public function store(UploadStudentImportRequest $request, UploadStudentImport $action): RedirectResponse
@@ -56,10 +56,10 @@ class StudentImportController extends Controller
         $rows->through(function ($row) use ($visibleIds) {
             $data = $row->normalized_data ?? [];
 
-            return ['id' => $row->id, 'row_number' => $row->row_number, 'status' => $row->status, 'errors' => $row->errors, 'warnings' => $row->warnings, 'resolution' => $row->resolution, 'matched_student_id' => in_array($row->matched_student_id, $visibleIds, true) ? $row->matched_student_id : null, 'data' => array_intersect_key($data, array_flip(['last_name', 'first_names', 'student_number', 'level', 'program']))];
+            return ['id' => $row->id, 'row_number' => $row->row_number, 'status' => $row->status, 'errors' => $row->errors, 'warnings' => $row->warnings, 'resolution' => $row->resolution, 'matched_student_id' => in_array($row->matched_student_id, $visibleIds, true) ? $row->matched_student_id : null, 'data' => array_intersect_key($data, array_flip(['last_name', 'first_names', 'repeat_code', 'level', 'mention', 'program']))];
         });
 
-        return Inertia::render('imports/show', ['import' => $studentImport->load(['establishment:id,code,name', 'academicYear:id,name', 'user:id,name'])->makeHidden(['stored_path', 'disk']), 'rows' => $rows, 'columns' => StudentImportColumns::labels(), 'filter' => $filters['status'] ?? '', 'canAnalyze' => Gate::allows('analyze', $studentImport), 'canCommit' => Gate::allows('commit', $studentImport), 'canExport' => Gate::allows('exportErrors', $studentImport)]);
+        return Inertia::render('imports/show', ['import' => $studentImport->load(['establishment:id,code,name', 'academicYear:id,name', 'user:id,name'])->makeHidden(['stored_path', 'disk']), 'rows' => $rows, 'columns' => StudentImportColumns::labels(), 'requiredColumns' => StudentImportColumns::required(), 'filter' => $filters['status'] ?? '', 'canAnalyze' => Gate::allows('analyze', $studentImport), 'canCommit' => Gate::allows('commit', $studentImport), 'canExport' => Gate::allows('exportErrors', $studentImport)]);
     }
 
     public function analyze(AnalyzeStudentImportRequest $request, StudentImport $studentImport, AnalyzeStudentImport $action): RedirectResponse
