@@ -47,7 +47,7 @@ type Correction = {
         uuid: string;
         last_name: string;
         first_names: string | null;
-        student_number: string | null;
+        birth_date: string | null;
         is_active: boolean;
         establishments: string[];
     };
@@ -93,7 +93,14 @@ export default function CorrectionShow({
                 <PageHeader
                     icon={FilePenLine}
                     title={`${correction.student.last_name} ${correction.student.first_names ?? ''}`}
-                    description={`${correction.student.student_number ?? 'Sans matricule'}${correction.student.establishments.length > 0 ? ` · ${correction.student.establishments.join(', ')}` : ''}`}
+                    description={[
+                        correction.student.birth_date
+                            ? `Né(e) le ${new Date(correction.student.birth_date).toLocaleDateString('fr-FR')}`
+                            : 'Date de naissance non renseignée',
+                        correction.student.establishments.join(', '),
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     meta={
                         <div className="flex flex-wrap items-center gap-2">
                             <CorrectionStatusBadge
