@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstablishmentSector;
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\InstitutionalReference;
 use App\Models\Concerns\Trashable;
@@ -13,8 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string|null $logo_path
+ * @property EstablishmentSector|null $sector
  */
-#[Fillable(['code', 'name', 'type', 'address', 'phone', 'email', 'is_active'])]
+#[Fillable(['code', 'name', 'type', 'sector', 'address', 'phone', 'email', 'is_active'])]
 class Establishment extends Model
 {
     protected $attributes = ['is_active' => true];
@@ -24,7 +26,7 @@ class Establishment extends Model
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['sector' => EstablishmentSector::class, 'is_active' => 'boolean'];
     }
 
     /** Known establishment types; any other value is a free "Autre" type. */
@@ -34,7 +36,7 @@ class Establishment extends Model
 
     protected function referenceAuditAttributes(): array
     {
-        return ['code', 'name', 'type', 'is_active', 'logo_path'];
+        return ['code', 'name', 'type', 'sector', 'is_active', 'logo_path'];
     }
 
     /** Private logo URL, versioned so a replaced logo is never served from the browser cache. */
