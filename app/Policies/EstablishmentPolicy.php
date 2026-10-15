@@ -12,6 +12,12 @@ class EstablishmentPolicy
         return $user->can('establishments.manage') && $user->hasUsableEstablishment();
     }
 
+    /** An establishment account only sees its own establishment. */
+    public function view(User $user, Establishment $record): bool
+    {
+        return $this->viewAny($user) && (! $user->hasRole('establishment') || $user->establishment_id === $record->id);
+    }
+
     public function create(User $user): bool
     {
         return $this->viewAny($user) && ! $user->hasRole('establishment');
