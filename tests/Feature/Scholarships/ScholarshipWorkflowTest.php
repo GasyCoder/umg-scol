@@ -41,8 +41,8 @@ beforeEach(function () {
     $this->program = Program::factory()->create(['establishment_id' => $this->establishment->id, 'name' => 'Biologie']);
     $this->year = AcademicYear::factory()->create(['name' => '2025-2026', 'is_current' => true, 'is_active' => true]);
     $this->student = Student::factory()->create([
-        'student_number' => 'MAT500', 'last_name' => 'RABE', 'first_names' => 'Hery', 'birth_date' => '2003-04-05', 'cin' => '501012345678',
-        'phone' => '0347654321', 'email' => 'hery@example.test', 'address' => 'Lot SECRET 7', 'bac_registration_number' => 'BAC500', 'is_active' => true,
+        'last_name' => 'RABE', 'first_names' => 'Hery', 'sex' => 'M', 'birth_date' => '2003-04-05', 'cin' => '501012345678',
+        'phone' => '0347654321', 'email' => 'hery@example.test', 'address' => 'Lot SECRET 7', 'is_active' => true,
     ]);
     $this->record = StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->establishment->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'status' => 'active']);
     $this->central = User::factory()->create()->assignRole('central_scholarship_office');
@@ -188,16 +188,16 @@ it('searches students on the server with a minimal preview', function (string $t
     $response = $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search='.urlencode($term))
         ->assertInertia(fn (Assert $page) => $page->component('scholarships/reception')->has('results', 1)->where('results.0.id', $this->student->id)
             ->where('results.0.records.0.establishment', 'Faculté des Sciences')->where('results.0.records.0.program', 'Biologie')->missing('results.0.cin')->missing('results.0.address'));
-    // The typed term is echoed back in the search box; the official CIN and address are never sent.
+    // The search matches on the CIN but never returns it; the typed term is only echoed back in the search box.
     expect($response->getContent())->not->toContain('Lot SECRET 7');
     if ($term !== '501012345678') {
         expect($response->getContent())->not->toContain('501012345678');
     }
-})->with(['MAT500', 'rabe', 'Hery', '501012345678', 'BAC500', '0347654321', 'hery@example.test']);
+})->with(['rabe', 'Hery', '501012345678', '5010 1234', '0347654321', 'hery@example.test']);
 it('shows an existing file in reception search results', function () {
     $application = receiveFile($this);
-    $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search=MAT500')
-        ->assertInertia(fn (Assert $page) => $page->where('results.0.application.id', $application->id));
+    $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search=501012345678')
+        ->assertInertia(fn (Assert $page) => $page->where('results.0.application.id', $application->id)->where('results.0.birth_date', '2003-04-05')->missing('results.0.cin'));
 });
 
 // Isolation
@@ -423,14 +423,14 @@ it('keeps a readable business history of every transition', function () {
 it('lists, filters and searches files with server pagination', function () {
     $mine = receiveFile($this, ddb: 'DDB-777');
     $other = Establishment::factory()->create(['name' => 'École Normale']);
-    $foreignStudent = Student::factory()->create(['last_name' => 'ZAFY', 'student_number' => 'MAT900']);
+    $foreignStudent = Student::factory()->create(['last_name' => 'ZAFY', 'cin' => '509000000001']);
     StudentRecord::factory()->create(['student_id' => $foreignStudent->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $other->id, 'level_id' => $this->level->id, 'program_id' => null, 'status' => 'active']);
     $foreign = receiveFile($this, $foreignStudent);
     app(TransitionScholarshipApplication::class)->handle($this->central, $foreign, ScholarshipApplicationStatus::Rejected, 'Dossier hors délai.');
     $this->actingAs($this->central);
     $count = fn (string $query) => $this->get('/scholarships/applications'.$query)->assertOk()->viewData('page')['props']['applications']['total'];
     expect($count(''))->toBe(2)->and($count('?establishment_id='.$other->id))->toBe(1)->and($count('?status=rejected'))->toBe(1)
-        ->and($count('?search=ddb-777'))->toBe(1)->and($count('?search=DDB 777'))->toBe(0)->and($count('?search='.$mine->application_number))->toBe(1)->and($count('?search=MAT90'))->toBe(1)
+        ->and($count('?search=ddb-777'))->toBe(1)->and($count('?search=DDB 777'))->toBe(0)->and($count('?search='.$mine->application_number))->toBe(1)->and($count('?search=50900'))->toBe(1)->and($count('?search=509.000'))->toBe(1)
         ->and($count('?search=zaf'))->toBe(1)->and($count('?campaign_id='.$this->campaign->id.'&level_id='.$this->level->id))->toBe(2)
         ->and($count('?received_from='.now()->addDay()->format('Y-m-d')))->toBe(0);
     $this->get('/scholarships/applications?received_from=2026-02-01&received_to=2026-01-01')->assertSessionHasErrors('received_to');
@@ -490,7 +490,7 @@ it('exports filtered files as CSV without sensitive data and requires the export
     $rejected = receiveFile($this, declaredStudent($this, ['last_name' => 'REJETE']));
     app(TransitionScholarshipApplication::class)->handle($this->central, $rejected, ScholarshipApplicationStatus::Rejected, 'Motif interne détaillé.');
     $csv = $this->actingAs($this->central)->get('/scholarships/applications/export?status=pending')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
-    expect($csv)->toContain('"N° dossier";"N° DDB";Matricule')->toContain('MAT500')->toContain('Faculté des Sciences')->toContain('Biologie')->toContain("'=HYPERLINK")
+    expect($csv)->toContain('"N° dossier";"N° DDB";"Date de naissance";Nom')->toContain('2003-04-05;RABE;Hery')->toContain('Faculté des Sciences')->toContain('Biologie')->toContain("'=HYPERLINK")
         ->not->toContain('REJETE')->not->toContain('501012345678')->not->toContain('0347654321')->not->toContain('hery@example.test')->not->toContain('Lot SECRET 7')->not->toContain('Motif interne');
     expect(substr_count(trim($csv), "\n"))->toBe(1);
     Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.export');
@@ -507,5 +507,11 @@ it('renders the file detail with official data, checklist and allowed actions', 
     $this->actingAs($this->central)->get('/scholarships/applications/'.$application->uuid)->assertOk()->assertInertia(fn (Assert $page) => $page->component('scholarships/applications/show')
         ->where('application.student.establishment', 'Faculté des Sciences')->where('application.student.program', 'Biologie')->has('application.checks', 5)
         ->where('actions', ['in_review', 'validated', 'needs_correction', 'rejected'])->where('canEditChecks', true)->where('canViewStudent', true)
-        ->missing('application.student.cin')->missing('application.student.address'));
+        ->where('application.student.birth_date', '2003-04-05')->where('application.student.sex', 'M')->where('application.student.nationality', 'Malagasy')
+        ->missing('application.student.cin')->missing('application.student.address')->missing('application.student.phone'));
+});
+it('identifies the student of a listed file by names and birth date without the CIN', function () {
+    receiveFile($this);
+    $this->actingAs($this->central)->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
+        ->where('applications.data.0.student', ['last_name' => 'RABE', 'first_names' => 'Hery', 'birth_date' => '2003-04-05']));
 });
