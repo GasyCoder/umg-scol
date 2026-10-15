@@ -3,6 +3,7 @@ import {
     Building2,
     CalendarDays,
     Layers,
+    Library,
     Route,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -13,6 +14,7 @@ export const referenceIcons: Record<ReferenceKind, LucideIcon> = {
     establishments: Building2,
     'academic-years': CalendarDays,
     levels: Layers,
+    domains: Library,
     mentions: BookMarked,
     programs: Route,
 };
@@ -23,8 +25,10 @@ export const recordDescriptions: Record<ReferenceKind, string> = {
     'academic-years':
         'Période universitaire ; l’année courante se définit depuis la liste.',
     levels: 'Niveau d’études (L1, L2, M1…), commun à tous les établissements.',
+    domains:
+        'Domaine LMD (ALSH, STS…), commun à tous les établissements ; chaque mention appartient à un domaine.',
     mentions:
-        'Mention d’un établissement (LMD) ; elle regroupe plusieurs parcours.',
+        'Mention d’un établissement (LMD) ; elle regroupe plusieurs parcours et relève d’un domaine.',
     programs:
         'Parcours d’un établissement, rattaché si possible à une mention du même établissement.',
 };
@@ -36,6 +40,8 @@ export const listDescriptions: Record<ReferenceKind, string> = {
     'academic-years':
         'Périodes universitaires ; une seule année est courante à la fois.',
     levels: 'Niveaux d’études (L1, L2, M1…), communs à tous les établissements.',
+    domains:
+        'Domaines LMD (ALSH, STS…), communs à tous les établissements ; chaque mention appartient à un domaine.',
     mentions:
         'Mentions LMD de chaque établissement ; elles regroupent les parcours.',
     programs:
