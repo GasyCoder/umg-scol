@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Mention of an establishment (LMD), grouping its programs. */
-#[Fillable(['establishment_id', 'code', 'name', 'is_active'])]
+#[Fillable(['establishment_id', 'domain_id', 'code', 'name', 'is_active'])]
 class Mention extends Model
 {
     protected $attributes = ['is_active' => true];
@@ -23,18 +23,24 @@ class Mention extends Model
 
     protected function casts(): array
     {
-        return ['establishment_id' => 'integer', 'is_active' => 'boolean'];
+        return ['establishment_id' => 'integer', 'domain_id' => 'integer', 'is_active' => 'boolean'];
     }
 
     protected function referenceAuditAttributes(): array
     {
-        return ['establishment_id', 'code', 'name', 'is_active'];
+        return ['establishment_id', 'domain_id', 'code', 'name', 'is_active'];
     }
 
     /** @return BelongsTo<Establishment, $this> */
     public function establishment(): BelongsTo
     {
         return $this->belongsTo(Establishment::class);
+    }
+
+    /** @return BelongsTo<Domain, $this> */
+    public function domain(): BelongsTo
+    {
+        return $this->belongsTo(Domain::class);
     }
 
     /** @return HasMany<Program, $this> */
