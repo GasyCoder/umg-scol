@@ -2,6 +2,7 @@ export type ReferenceKind =
     | 'establishments'
     | 'academic-years'
     | 'levels'
+    | 'domains'
     | 'mentions'
     | 'programs';
 export type ReferenceRecord = {
@@ -11,6 +12,7 @@ export type ReferenceRecord = {
     is_active: boolean;
     code?: string | null;
     type?: string | null;
+    sector?: string | null;
     address?: string | null;
     phone?: string | null;
     email?: string | null;
@@ -19,11 +21,15 @@ export type ReferenceRecord = {
     starts_at?: string | null;
     ends_at?: string | null;
     is_current?: boolean;
+    scholarship_max_bac_year?: number | null;
     sort_order?: number;
     establishment_id?: number;
     establishment?: { id: number; code: string; name: string };
     mention_id?: number | null;
     mention?: { id: number; name: string } | null;
+    domain_id?: number | null;
+    domain?: { id: number; code: string; name: string } | null;
+    training_type?: string | null;
 };
 export type MentionOption = {
     id: number;
@@ -38,13 +44,47 @@ export type EstablishmentOption = {
     code: string;
     is_active: boolean;
 };
+export type DomainOption = {
+    id: number;
+    code: string;
+    name: string;
+    is_active: boolean;
+};
+export type FieldOption = { value: string; label: string };
 export type Field = {
     key: string;
     label: string;
-    type?: 'text' | 'email' | 'date' | 'number' | 'establishment' | 'mention';
+    type?:
+        | 'text'
+        | 'email'
+        | 'date'
+        | 'number'
+        | 'establishment'
+        | 'mention'
+        | 'domain'
+        | 'select';
     required?: boolean;
     maxLength?: number;
+    min?: number;
+    max?: number;
+    /** Closed list of a 'select' field (backend enum values and labels). */
+    options?: FieldOption[];
 };
+/** Same values and labels as the EstablishmentSector enum (backend). */
+export const sectorOptions: FieldOption[] = [
+    { value: 'public', label: 'Publique' },
+    { value: 'private', label: 'Privée' },
+];
+/** Same values and labels as the TrainingType enum (backend). */
+export const trainingTypeOptions: FieldOption[] = [
+    { value: 'academic', label: 'Académique' },
+    { value: 'professional', label: 'Professionnalisant' },
+];
+/** Label of a stored enum value, or the value itself when unknown. */
+export const optionLabel = (options: FieldOption[], value?: string | null) =>
+    value
+        ? (options.find((option) => option.value === value)?.label ?? value)
+        : null;
 export const definitions: Record<
     ReferenceKind,
     { title: string; singular: string; permission: string; fields: Field[] }
@@ -57,6 +97,12 @@ export const definitions: Record<
             { key: 'code', label: 'Sigle', required: true, maxLength: 30 },
             { key: 'name', label: 'Nom', required: true, maxLength: 255 },
             { key: 'type', label: 'Type', maxLength: 100 },
+            {
+                key: 'sector',
+                label: 'Institution',
+                type: 'select',
+                options: sectorOptions,
+            },
             { key: 'address', label: 'Adresse', maxLength: 2000 },
             { key: 'phone', label: 'Téléphone', maxLength: 30 },
             { key: 'email', label: 'Email', type: 'email', maxLength: 255 },
@@ -75,11 +121,33 @@ export const definitions: Record<
             },
             { key: 'starts_at', label: 'Date de début', type: 'date' },
             { key: 'ends_at', label: 'Date de fin', type: 'date' },
+            {
+                key: 'scholarship_max_bac_year',
+                label: 'Année limite du BAC pour la bourse',
+                type: 'number',
+                min: 1990,
+                max: 2100,
+            },
         ],
     },
     levels: {
         title: 'Niveaux',
         singular: 'niveau',
+        permission: 'levels.manage',
+        fields: [
+            { key: 'code', label: 'Code', required: true, maxLength: 30 },
+            { key: 'name', label: 'Nom', required: true, maxLength: 255 },
+            {
+                key: 'sort_order',
+                label: 'Ordre d’affichage',
+                type: 'number',
+                required: true,
+            },
+        ],
+    },
+    domains: {
+        title: 'Domaines',
+        singular: 'domaine',
         permission: 'levels.manage',
         fields: [
             { key: 'code', label: 'Code', required: true, maxLength: 30 },
@@ -103,6 +171,7 @@ export const definitions: Record<
                 type: 'establishment',
                 required: true,
             },
+            { key: 'domain_id', label: 'Domaine', type: 'domain' },
             { key: 'code', label: 'Code', maxLength: 30 },
             { key: 'name', label: 'Nom', required: true, maxLength: 255 },
         ],
@@ -121,6 +190,12 @@ export const definitions: Record<
             { key: 'mention_id', label: 'Mention', type: 'mention' },
             { key: 'code', label: 'Code', maxLength: 30 },
             { key: 'name', label: 'Nom', required: true, maxLength: 255 },
+            {
+                key: 'training_type',
+                label: 'Type de formation',
+                type: 'select',
+                options: trainingTypeOptions,
+            },
         ],
     },
 };
