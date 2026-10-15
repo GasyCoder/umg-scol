@@ -172,8 +172,11 @@ class TrashManager
             $target->checks()->delete();
             $target->history()->delete();
         }
-        $disk = $target instanceof StudentImport ? $target->disk : null;
-        $path = $target instanceof StudentImport ? $target->stored_path : null;
+        [$disk, $path] = match (true) {
+            $target instanceof StudentImport => [$target->disk, $target->stored_path],
+            $target instanceof Establishment && $target->logo_path !== null => [Establishment::LOGO_DISK, $target->logo_path],
+            default => [null, null],
+        };
         $this->audit($actor, $target, 'purged', (string) $target->getAttribute('trash_batch'));
         $target->forceDelete();
         // Files are removed only after the database transaction has committed.
