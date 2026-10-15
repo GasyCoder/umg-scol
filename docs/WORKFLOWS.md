@@ -9,9 +9,9 @@ Inscription réelle hors système → établissement confirme → ajout/import �
 Workflow implémenté dans `/imports` :
 
 1. Choisir établissement/année active. L'établissement est imposé depuis le compte lorsqu'il porte le rôle establishment ; payload étranger refusé 403. Année courante proposée par défaut.
-2. Upload XLSX/CSV privé, lecture en blocs et staging uniquement. Une seule feuille, en-têtes en première ligne, sans formules. XLS historique non accepté en V1 ; convertir en XLSX/CSV. Les identifiants doivent être des cellules texte pour préserver les zéros initiaux. Le système ne peut pas restaurer les zéros déjà perdus dans Excel.
-3. Mapping déterministe des 17 champs canoniques/alias français, corrigible avant analyse. Nom et niveau obligatoires ; chaque colonne est utilisée au plus une fois. Modèle CSV téléchargeable.
-4. Normalisation commune Student, dates Excel 1900/1904, dates ISO ou jj/mm/aaaa. Niveau : code puis nom exact normalisé ; parcours : même résolution uniquement dans l'établissement. Référentiel inconnu/ambigu/inactif rejeté.
+2. Upload XLSX/CSV privé, lecture en blocs et staging uniquement. Une seule feuille, en-têtes en première ligne. Le **fichier modèle des établissements** est accepté tel quel : la ligne de légende `[ 1 ]`, `[ 2 ]`… sous les en-têtes et le bloc de totaux du bas (à partir de « Arrêté au nombre de ») sont ignorés ; les colonnes BOURSIER et TAUX DE BOURSE (formules) ne sont jamais importées. Une formule dans une colonne importée rejette la ligne. XLS historique non accepté en V1 ; convertir en XLSX/CSV. Les cellules numériques (CIN, téléphone, référence) sont relues avec tous leurs chiffres ; le zéro initial d'un téléphone à 9 chiffres est restauré.
+3. Mapping déterministe des 24 colonnes du modèle (en-têtes officiels et variantes, y compris « Date delivrabce »), corrigible avant analyse. Nom, sexe, date de naissance, nationalité, code de redoublement et niveau obligatoires ; chaque colonne est utilisée au plus une fois. Modèle CSV téléchargeable.
+4. Normalisation commune Student, dates Excel 1900/1904, dates ISO ou j/m/aaaa. Niveau : code puis nom exact normalisé ; mention : même résolution dans l'établissement ; parcours : dans la mention indiquée (un même nom, « Tronc Commun », peut exister dans plusieurs mentions), sinon dans l'établissement. Mention sans parcours rejetée. Référentiel inconnu/ambigu/inactif rejeté. Colonnes descriptives contrôlées : « École / Institut » doit désigner l'établissement de l'import (nom, sigle ou « Nom (SIGLE) ») ; Institution, Domaine (« (ALSH) Arts, Lettres… », code ou nom) et Type de formation doivent concorder avec l'établissement, la mention et le parcours lorsque ceux-ci les renseignent. CIN de 12 chiffres = CIN standard ; une autre valeur est acceptée et signalée. Téléphone, email et référence de demande déjà utilisés par une autre identité (base ou fichier) : ligne rejetée.
 5. Analyse des validations, doublons internes et candidats DB. Prévisualisation de 25 lignes paginées, filtres valid/warning/rejected/duplicate et compteurs. CIN/contacts/BAC et données brutes ne sont pas transmis dans la liste.
 6. Confirmation explicite : seules les lignes valid sont importables ; les warnings demandent une correction du fichier ou une revue administrative hors pipeline, sans bouton de contournement. Les lignes identiques sont ignorées. Revalidation sous verrou au moment du commit.
 7. Résultat : identités créées/complétées, déclarations créées, lignes ignorées ; historique de 20 imports paginés avec relations chargées en une fois. CSV d'erreurs autorisé par imports.export_errors : numéro de ligne, statut, champ, code et message uniquement, sans nom ou autre donnée personnelle.
@@ -19,6 +19,10 @@ Workflow implémenté dans `/imports` :
 Permissions existantes imports.view/create/commit/export_errors, Policy serveur et contexte établissement actif. Comptes student et Scolarité Centrale refusés dans cette V1 ; superadmin/developer gardent leurs permissions explicites, sans bypass.
 
 Traitement synchrone V1, **10 Mo, 5 000 lignes physiques de données, 50 colonnes**, expansion XLSX limitée à 100 Mo. Taille/lignes configurables dans `config/student_imports.php`. Lecture et inserts staging par blocs de 200 ; analyse et confirmation par blocs ; aucun chargement intégral des lignes en mémoire. Les clés de doublons/verrouillage sont conservées en mémoire (volume borné), pas le fichier complet. La confirmation reste une transaction globale : les chunks ne sont pas des commits partiels. Test automatisé de 1 001 lignes ; vérifier les temps et limites PHP/proxy sur le matériel cible avant de relever les bornes. Pour des lots plus grands, passer les Actions en Jobs avec suivi d'état ; aucun worker n'est requis en local dans cette phase.
+
+## Demande de bourse déclarée par l'établissement
+
+Le fichier modèle porte, pour chaque étudiant, la date de dépôt et la référence de sa demande de bourse auprès de l'établissement, ainsi que le code de redoublement (N, R, T+). Ces valeurs sont des **déclarations annuelles** (`student_records`), saisies par import ou par le formulaire de déclaration ; la référence est unique par établissement et année. Les colonnes BOURSIER et TAUX ne sont pas reprises : la fiche interne affiche le résultat de la règle du modèle calculé par le serveur (éligible : Malagasy, BAC au plus tard l'année limite définie sur l'année universitaire, référence présente ; taux 1 pour N, 1/4 pour R ; T+ non boursier ; « indéterminé » sans année limite). Ce résultat est indicatif : la réception et la décision du dossier papier par la Scolarité Centrale restent inchangées.
 
 ## Import/export des mentions et parcours
 
@@ -32,15 +36,15 @@ Sur `/references/mentions` et `/references/programs`, un compte autorisé (`prog
 
 ## Navigation des étudiants (portail interne)
 
-`/students` se parcourt en cartes : établissement → niveau → mention → parcours → liste paginée. Chaque carte compte les déclarations actives (et inactives) de l'année choisie, l'année courante par défaut. Un compte établissement commence directement à ses niveaux et ne voit jamais un autre établissement. « Sans mention » regroupe les parcours non rattachés et les déclarations sans parcours ; « Sans parcours », les déclarations sans parcours. À chaque étape : fil d'Ariane cliquable, bouton « Voir toute la sélection en liste », recherche (matricule, nom, prénom, CIN, numéro BAC, téléphone, email) limitée à l'année affichée ; une recherche par URL sans année couvre toutes les années.
+`/students` se parcourt en cartes : établissement → niveau → mention → parcours → liste paginée. Chaque carte compte les déclarations actives (et inactives) de l'année choisie, l'année courante par défaut. Un compte établissement commence directement à ses niveaux et ne voit jamais un autre établissement. « Sans mention » regroupe les parcours non rattachés et les déclarations sans parcours ; « Sans parcours », les déclarations sans parcours. À chaque étape : fil d'Ariane cliquable, bouton « Voir toute la sélection en liste », recherche (nom, prénom, CIN, téléphone, email) limitée à l'année affichée ; une recherche par URL sans année couvre toutes les années.
 
 ## Portail étudiant : compte et rattachement
 
 Implémenté sur `bourse` (`/api/student/*`) :
 
 1. L'étudiant saisit son email → code à 6 chiffres envoyé → vérification → compte `student` créé ou retrouvé, email vérifié. Variante : Google OAuth (email vérifié). Le compte seul ne donne accès à aucune fiche et ne vaut pas inscription.
-2. L'étudiant saisit matricule ou numéro d'inscription au BAC + date de naissance.
-3. Rattachement automatique si identifiant exact, même naissance, fiche unique et active, non déjà liée, et email officiel de la fiche identique à l'email vérifié du compte.
+2. L'étudiant saisit son numéro CIN + date de naissance.
+3. Rattachement automatique si CIN exacte, même naissance, fiche unique et active, non déjà liée, et email officiel de la fiche identique à l'email vérifié du compte.
 4. Sinon, si une fiche unique active non liée correspond, une demande `pending` est créée (une seule par compte) ; la réponse reste générique dans tous les cas d'échec.
 5. Le personnel autorisé traite la demande dans `/student-links` : approbation (revalidée sous verrou : compte toujours `student` vérifié non lié, fiche active non liée) ou rejet avec motif interne (10 à 500 caractères). Une double approbation est un no-op. Un rattachement automatique ultérieur annule la demande pending.
 6. Une fois rattaché, l'étudiant consulte sa fiche et ses déclarations annuelles en lecture seule.
@@ -77,14 +81,14 @@ L'étudiant ne modifie jamais directement ses données officielles :
 
 Transitions : `pending → approved | rejected | cancelled` uniquement. Une demande décidée ou annulée n'est jamais retraitée ; une double approbation est un no-op.
 
-Champs corrigibles : nom, prénoms, date et lieu de naissance, CIN (numéro, date et lieu de délivrance), téléphone, email de contact, adresse, numéro/série/année/mention du BAC. Exclus : le matricule (identifiant institutionnel attribué par l'établissement) et toute la déclaration annuelle (année, établissement, niveau, parcours, statut) : l'étudiant est invité à contacter son établissement.
+Champs corrigibles : nom, prénoms, sexe, date de naissance, nom et prénoms de la mère, CIN (numéro, date et lieu de délivrance), nationalité, téléphone, email de contact, adresse, série/année du BAC. Exclue : toute la déclaration annuelle (année, établissement, niveau, parcours, code de redoublement, demande de bourse, statut) : l'étudiant est invité à contacter son établissement.
 
 ## Bourse (implémentée)
 
 **La demande de bourse reste papier.** Aucun dépôt numérique, aucun upload, aucun formulaire de demande dans le portail étudiant en V1. La plateforme enregistre la réception du dossier papier et son traitement par la Scolarité Centrale.
 
 1. **Campagne** (`/scholarships/campaigns`, `campaigns.manage`) : une campagne appartient à une année universitaire. Statuts `draft → scheduled | open`, `scheduled → open`, `open → closed`, `closed → archived`, sans retour. Ouverture refusée si l'année est inactive. Aucun changement automatique selon les dates en V1 : les dates sont indicatives, l'ouverture et la clôture sont manuelles. Pas de suppression.
-2. **Réception** (`/scholarships/reception`, `scholarships.receive`) : uniquement pour une campagne `open`. Le secrétariat choisit la campagne, recherche l'étudiant côté serveur (matricule, nom, prénom, CIN, numéro BAC, téléphone, email ; 2 caractères minimum, 20 résultats maximum), vérifie la fiche synthétique (matricule, nom, naissance, établissement, niveau, parcours, année) puis saisit le numéro DDB et des observations internes.
+2. **Réception** (`/scholarships/reception`, `scholarships.receive`) : uniquement pour une campagne `open`. Le secrétariat choisit la campagne, recherche l'étudiant côté serveur (nom, prénom, CIN, téléphone, email ; 2 caractères minimum, 20 résultats maximum), vérifie la fiche synthétique (nom, naissance, établissement, niveau, parcours, année) puis saisit le numéro DDB et des observations internes.
 3. Le serveur impose l'étudiant (actif), la **déclaration annuelle** (l'unique déclaration `active` de l'année de la campagne, avec établissement, niveau et parcours actifs et cohérents), l'acteur et la date. Aucune déclaration, déclaration inactive ou situation ambiguë : refus avec message, aucun dossier créé. **Un dossier par étudiant et par campagne.**
 4. **Vérification** (`scholarships.review`) : checklist de contrôles du dossier papier contre la fiche officielle (`conforme`, `anomalie`, `non applicable`, note facultative). Commencer la vérification ou enregistrer un premier contrôle fait passer le dossier `pending → in_review`.
 5. **Décision** : `validated` (`scholarships.validate`) exige que tous les contrôles soient conformes ou non applicables, et que la fiche et la déclaration soient toujours actives ; `needs_correction` (`scholarships.request_correction`) et `rejected` (`scholarships.reject`) exigent un motif (10 à 1000 caractères).
@@ -93,7 +97,7 @@ Statuts du dossier : `pending` (reçu), `in_review`, `validated`, `needs_correct
 
 `needs_correction` concerne le **dossier papier** (pièce manquante, incohérence à clarifier). Il ne modifie jamais `Student` et ne crée pas de `StudentCorrectionRequest` : si une donnée officielle est fausse, le workflow de correction existant s'applique séparément.
 
-Liste `/scholarships/applications` : pagination serveur (25), recherche (N° dossier, N° DDB, matricule, nom, prénom), filtres campagne, statut, établissement, niveau, période de réception. Export CSV (`scholarships.export`) des mêmes filtres. Historique métier visible sur chaque dossier.
+Liste `/scholarships/applications` : pagination serveur (25), recherche (N° dossier, N° DDB, CIN, nom, prénom), filtres campagne, statut, établissement, niveau, période de réception. Export CSV (`scholarships.export`) des mêmes filtres. Historique métier visible sur chaque dossier.
 
 ## Historique
 
