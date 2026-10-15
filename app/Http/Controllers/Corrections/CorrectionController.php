@@ -24,7 +24,7 @@ class CorrectionController extends Controller
         $user = $request->user();
         $status = $request->string('status')->toString() ?: StudentCorrectionStatus::Pending->value;
         $query = StudentCorrectionRequest::query()->visibleTo($user)->when($status !== 'all', fn ($q) => $q->where('status', $status))
-            ->with(['student' => fn ($q) => $q->select('id', 'student_number', 'last_name', 'first_names')->with(['studentRecords' => fn ($r) => $r->currentActive()->with('establishment:id,name')])]);
+            ->with(['student' => fn ($q) => $q->select('id', 'last_name', 'first_names', 'birth_date')->with(['studentRecords' => fn ($r) => $r->currentActive()->with('establishment:id,name')])]);
         if ($request->filled('field')) {
             $query->where('field', $request->input('field'));
         }
@@ -35,7 +35,7 @@ class CorrectionController extends Controller
         if ($search !== '') {
             $query->whereHas('student', function ($q) use ($search): void {
                 $q->where(function ($q) use ($search): void {
-                    foreach (['student_number' => '%s%%', 'last_name' => '%%%s%%', 'first_names' => '%%%s%%'] as $field => $format) {
+                    foreach (['last_name' => '%%%s%%', 'first_names' => '%%%s%%'] as $field => $format) {
                         $term = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], (string) StudentNormalization::value($field, $search));
                         $q->orWhereRaw($field." LIKE ? ESCAPE '!'", [sprintf($format, $term)]);
                     }
@@ -46,7 +46,7 @@ class CorrectionController extends Controller
         return Inertia::render('corrections/index', [
             'corrections' => $query->orderBy('created_at')->orderBy('id')->paginate(20)->withQueryString()->through(fn (StudentCorrectionRequest $c) => [
                 'id' => $c->id, 'uuid' => $c->uuid, 'field_label' => $c->field->label(), 'status' => $c->status->value, 'status_label' => $c->status->label(), 'created_at' => $c->created_at->toIso8601String(),
-                'student' => $c->student->only(['last_name', 'first_names', 'student_number']), 'establishments' => $c->student->studentRecords->pluck('establishment.name')->unique()->values(),
+                'student' => [...$c->student->only(['last_name', 'first_names']), 'birth_date' => $c->student->birth_date?->format('Y-m-d')], 'establishments' => $c->student->studentRecords->pluck('establishment.name')->unique()->values(),
             ]),
             'filters' => ['status' => $status, ...$request->only(['search', 'field', 'establishment_id'])],
             'options' => [
@@ -67,7 +67,7 @@ class CorrectionController extends Controller
             'current_value' => $correction->field->valueOf($student), 'proposed_value' => $correction->proposed_value, 'student_message' => $correction->student_message,
             'rejection_reason' => $correction->rejection_reason, 'created_at' => $correction->created_at->toIso8601String(), 'reviewed_at' => $correction->reviewed_at?->toIso8601String(),
             'reviewer' => $correction->reviewer?->name, 'conflict' => $correction->status === StudentCorrectionStatus::Pending && ! hash_equals($correction->current_fingerprint, $correction->field->fingerprint($student)),
-            'student' => [...$student->only(['last_name', 'first_names', 'student_number', 'is_active']), 'uuid' => $student->uuid, 'establishments' => $student->studentRecords->pluck('establishment.name')->unique()->values()],
+            'student' => [...$student->only(['last_name', 'first_names', 'is_active']), 'birth_date' => $student->birth_date?->format('Y-m-d'), 'uuid' => $student->uuid, 'establishments' => $student->studentRecords->pluck('establishment.name')->unique()->values()],
         ], 'canReview' => $correction->status === StudentCorrectionStatus::Pending && Gate::allows('review', $correction), 'canViewStudent' => Gate::allows('view', $student)]);
     }
 
