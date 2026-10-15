@@ -8,42 +8,42 @@ use Carbon\CarbonInterface;
 
 /**
  * Whitelist of Student fields a linked student may ask to correct.
- * student_number and annual declarations are deliberately excluded.
+ * Annual declarations (level, program, repeat code, scholarship request) are deliberately excluded.
  */
 enum StudentCorrectionField: string
 {
     case LastName = 'last_name';
     case FirstNames = 'first_names';
+    case Sex = 'sex';
     case BirthDate = 'birth_date';
-    case BirthPlace = 'birth_place';
+    case MotherName = 'mother_name';
     case Cin = 'cin';
     case CinIssuedAt = 'cin_issued_at';
     case CinIssuedPlace = 'cin_issued_place';
+    case Nationality = 'nationality';
     case Phone = 'phone';
     case Email = 'email';
     case Address = 'address';
-    case BacRegistrationNumber = 'bac_registration_number';
     case BacSeries = 'bac_series';
     case BacYear = 'bac_year';
-    case BacMention = 'bac_mention';
 
     public function label(): string
     {
         return match ($this) {
             self::LastName => 'Nom',
             self::FirstNames => 'Prénoms',
+            self::Sex => 'Sexe',
             self::BirthDate => 'Date de naissance',
-            self::BirthPlace => 'Lieu de naissance',
+            self::MotherName => 'Nom et prénoms de la mère',
             self::Cin => 'Numéro CIN',
             self::CinIssuedAt => 'Date de délivrance CIN',
             self::CinIssuedPlace => 'Lieu de délivrance CIN',
+            self::Nationality => 'Nationalité',
             self::Phone => 'Téléphone',
             self::Email => 'Email de contact',
             self::Address => 'Adresse',
-            self::BacRegistrationNumber => 'Numéro BAC',
             self::BacSeries => 'Série BAC',
             self::BacYear => 'Année BAC',
-            self::BacMention => 'Mention BAC',
         };
     }
 
@@ -73,6 +73,7 @@ enum StudentCorrectionField: string
         return match (true) {
             $value === null => null,
             $value instanceof CarbonInterface => $value->format('Y-m-d'),
+            $value instanceof \BackedEnum => (string) $value->value,
             default => (string) $value,
         };
     }
