@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\DB;
 
 class StudentIdentityLocks
 {
+    public const UNIQUE_FIELDS = ['cin', 'phone', 'email'];
+
     /**
      * @param  array<string,mixed>  $data
      * @return list<string>
@@ -13,16 +15,34 @@ class StudentIdentityLocks
     public static function keys(array $data): array
     {
         $keys = [];
-        foreach (['student_number', 'cin', 'bac_registration_number'] as $field) {
-            if (filled($data[$field] ?? null)) {
-                $keys[] = hash('sha256', $field.':'.StudentImportColumns::fold((string) $data[$field]));
-            }
+        foreach (self::uniqueValues($data) as $field => $value) {
+            $keys[] = hash('sha256', $field.':'.StudentImportColumns::fold($value));
         }
         if (filled($data['birth_date'] ?? null) && filled($data['last_name'] ?? null)) {
             $keys[] = hash('sha256', 'identity:'.StudentImportColumns::fold((string) $data['last_name']).'|'.StudentImportColumns::fold((string) ($data['first_names'] ?? '')).'|'.substr((string) $data['birth_date'], 0, 10));
         }
 
         return $keys;
+    }
+
+    /**
+     * Values that identify one student only: a standard (12-digit) CIN, the phone and the email
+     * (unique per the establishment file). A non-standard CIN may be shared and identifies nobody.
+     *
+     * @param  array<string,mixed>  $data
+     * @return array<string,string>
+     */
+    public static function uniqueValues(array $data): array
+    {
+        $values = [];
+        foreach (self::UNIQUE_FIELDS as $field) {
+            $value = $data[$field] ?? null;
+            if (filled($value) && ($field !== 'cin' || StudentNormalization::isStandardCin((string) $value))) {
+                $values[$field] = (string) $value;
+            }
+        }
+
+        return $values;
     }
 
     /**
