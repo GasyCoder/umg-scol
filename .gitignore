@@ -53,3 +53,4 @@ yarn-error.log
 
 # Third-party DashWind theme kept locally as a design reference (licensed, own git repository)
 /template-model
+/docs/template-model
