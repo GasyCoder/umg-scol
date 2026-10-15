@@ -4,27 +4,25 @@ import {
     CircleCheck,
     CircleMinus,
     CirclePlus,
+    Clock,
     FileSpreadsheet,
+    FileUp,
     RefreshCw,
+    Rows3,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
-import Heading from '@/components/heading';
+import { EmptyState } from '@/components/empty-state';
+import { PageBody, PageHeader } from '@/components/page-header';
 import { baseUrl } from '@/components/references/definitions';
 import type { TransferKind } from '@/components/references/reference-transfer';
 import { formatNumber } from '@/components/reporting/shared';
 import { formatDate } from '@/components/scholarships/shared';
-import { Badge } from '@/components/ui/badge';
+import { ToneBadge } from '@/components/tone-badge';
+import type { Tone } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 type Status = 'create' | 'update' | 'unchanged' | 'error';
 type PreviewRow = {
@@ -40,39 +38,53 @@ type Counts = Record<Status, number> & { total: number };
 
 const statuses: Record<
     Status,
-    {
-        label: string;
-        summary: string;
-        icon: LucideIcon;
-        variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    }
+    { label: string; summary: string; icon: LucideIcon; tone: Tone }
 > = {
     create: {
         label: 'À créer',
         summary: 'À créer',
         icon: CirclePlus,
-        variant: 'default',
+        tone: 'success',
     },
     update: {
         label: 'À mettre à jour',
         summary: 'À mettre à jour',
         icon: RefreshCw,
-        variant: 'secondary',
+        tone: 'info',
     },
     unchanged: {
         label: 'Inchangé',
         summary: 'Inchangées',
         icon: CircleMinus,
-        variant: 'outline',
+        tone: 'neutral',
     },
     error: {
         label: 'Erreur',
         summary: 'En erreur',
         icon: AlertTriangle,
-        variant: 'destructive',
+        tone: 'danger',
     },
 };
 const order: Status[] = ['create', 'update', 'unchanged', 'error'];
+
+const tileIcons: Record<Tone, string> = {
+    primary: 'bg-accent text-primary',
+    success: 'bg-success-soft text-success',
+    warning: 'bg-warning-soft text-warning',
+    info: 'bg-info-soft text-info',
+    danger: 'bg-danger-soft text-danger',
+    neutral: 'bg-secondary text-muted-foreground',
+};
+
+function CodeCell({ value }: { value: string | null }) {
+    return value ? (
+        <span className="inline-flex rounded-md border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
+            {value}
+        </span>
+    ) : (
+        <span className="text-muted-foreground">—</span>
+    );
+}
 
 export default function ImportPreview({
     kind,
@@ -101,51 +113,82 @@ export default function ImportPreview({
     const listUrl = baseUrl(kind);
     const submit = () =>
         confirm.post(`${listUrl}/import/${token}`, { preserveScroll: true });
+    const ignored = counts.error + counts.unchanged;
 
     return (
-        <div className="space-y-6 p-4 pb-0 md:p-6 md:pb-0">
+        <PageBody className="pb-0 md:pb-0 lg:pb-0">
             <Head title={`Import — ${title}`} />
-            <Heading
+            <PageHeader
+                icon={FileUp}
                 title={`${title} / Prévisualisation de l’import`}
                 description="Vérifiez chaque ligne avant de confirmer. Rien n’est enregistré tant que l’import n’est pas confirmé."
+                actions={
+                    <Button variant="outline" asChild>
+                        <Link href={listUrl}>
+                            <FileUp aria-hidden="true" />
+                            Importer un autre fichier
+                        </Link>
+                    </Button>
+                }
             />
 
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-5 py-4">
+            <section className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div className="flex min-w-0 items-center gap-3">
                     <span
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-primary"
+                        className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-success"
                         aria-hidden="true"
                     >
-                        <FileSpreadsheet className="size-4" />
+                        <FileSpreadsheet className="size-5" />
                     </span>
                     <div className="min-w-0">
-                        <p className="truncate font-bold">{filename}</p>
+                        <p className="truncate font-bold text-foreground">
+                            {filename}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                            {formatNumber(counts.total)} ligne(s) analysée(s) —
-                            prévisualisation valable jusqu’à{' '}
-                            {formatDate(expiresAt, true)}
+                            {formatNumber(counts.total)} ligne(s) analysée(s)
                         </p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                    <Link href={listUrl}>Importer un autre fichier</Link>
-                </Button>
+                <p className="inline-flex items-center gap-1.5 self-start rounded-full bg-warning-soft px-3 py-1 text-xs font-medium text-warning-foreground sm:self-auto">
+                    <Clock className="size-3.5" aria-hidden="true" />
+                    Prévisualisation valable jusqu’à{' '}
+                    {formatDate(expiresAt, true)}
+                </p>
             </section>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {order.map((status) => {
-                    const { icon: Icon, summary } = statuses[status];
+                    const { icon: Icon, summary, tone } = statuses[status];
+                    const highlight = status === 'error' && counts.error > 0;
                     return (
                         <div
                             key={status}
-                            className="rounded-lg border bg-card p-4"
+                            className={cn(
+                                'surface flex flex-col gap-2 p-4',
+                                highlight && 'border-danger/40',
+                            )}
                         >
-                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Icon className="size-4" aria-hidden="true" />
-                                {summary}
-                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    {summary}
+                                </p>
+                                <span
+                                    className={cn(
+                                        'flex size-9 shrink-0 items-center justify-center rounded-lg',
+                                        tileIcons[tone],
+                                    )}
+                                    aria-hidden="true"
+                                >
+                                    <Icon className="size-[18px]" />
+                                </span>
+                            </div>
                             <p
-                                className={`mt-1 text-2xl font-bold tabular-nums ${status === 'error' && counts.error > 0 ? 'text-destructive' : ''}`}
+                                className={cn(
+                                    'font-heading text-2xl font-extrabold tracking-tight tabular-nums',
+                                    highlight
+                                        ? 'text-danger'
+                                        : 'text-foreground',
+                                )}
                             >
                                 {formatNumber(counts[status])}
                             </p>
@@ -157,10 +200,10 @@ export default function ImportPreview({
             {counts.error > 0 && (
                 <div
                     role="alert"
-                    className="flex gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm"
+                    className="flex gap-3 rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-foreground"
                 >
                     <AlertTriangle
-                        className="mt-0.5 size-4 shrink-0 text-destructive"
+                        className="mt-0.5 size-4 shrink-0 text-danger"
                         aria-hidden="true"
                     />
                     <p>
@@ -175,7 +218,7 @@ export default function ImportPreview({
                 </div>
             )}
             {!canConfirm && (
-                <div className="flex gap-3 rounded-lg border bg-muted/40 p-4 text-sm">
+                <div className="flex gap-3 rounded-xl border bg-muted/60 p-4 text-sm text-foreground">
                     <CircleCheck
                         className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                         aria-hidden="true"
@@ -187,117 +230,181 @@ export default function ImportPreview({
                 </div>
             )}
 
-            <section className="rounded-lg border bg-card">
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
-                    <h2 className="text-base font-bold">Lignes du fichier</h2>
+            <section className="surface overflow-hidden">
+                <header className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-3">
+                        <span
+                            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                            aria-hidden="true"
+                        >
+                            <Rows3 className="size-[18px]" />
+                        </span>
+                        <h2 className="text-base font-bold text-foreground">
+                            Lignes du fichier
+                        </h2>
+                    </div>
                     <div
-                        className="flex flex-wrap gap-1"
+                        className="flex flex-wrap gap-1 rounded-lg bg-muted p-1"
                         role="group"
                         aria-label="Filtrer les lignes par statut"
                     >
-                        {(['all', ...order] as const).map((value) => (
-                            <Button
-                                key={value}
-                                size="sm"
-                                variant={
-                                    filter === value ? 'default' : 'outline'
-                                }
-                                aria-pressed={filter === value}
-                                onClick={() => setFilter(value)}
-                            >
-                                {value === 'all'
-                                    ? 'Toutes'
-                                    : statuses[value].summary}{' '}
-                                (
-                                {value === 'all' ? counts.total : counts[value]}
-                                )
-                            </Button>
-                        ))}
+                        {(['all', ...order] as const).map((value) => {
+                            const pressed = filter === value;
+                            return (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    aria-pressed={pressed}
+                                    onClick={() => setFilter(value)}
+                                    className={cn(
+                                        'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                        pressed
+                                            ? 'bg-card text-foreground shadow-card'
+                                            : 'text-muted-foreground hover:text-foreground',
+                                    )}
+                                >
+                                    {value === 'all'
+                                        ? 'Toutes'
+                                        : statuses[value].summary}
+                                    <span
+                                        className={cn(
+                                            'rounded-full px-1.5 tabular-nums',
+                                            pressed
+                                                ? 'bg-accent text-accent-foreground'
+                                                : 'bg-background/60',
+                                        )}
+                                    >
+                                        {value === 'all'
+                                            ? counts.total
+                                            : counts[value]}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </header>
-                <div className="overflow-x-auto">
-                    <Table>
-                        <caption className="sr-only">
-                            Prévisualisation des lignes importées
-                        </caption>
-                        <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                                <TableHead scope="col">Ligne</TableHead>
-                                <TableHead scope="col">Établissement</TableHead>
-                                {programs && (
-                                    <TableHead scope="col">Mention</TableHead>
-                                )}
-                                <TableHead scope="col">Code</TableHead>
-                                <TableHead scope="col">Nom</TableHead>
-                                <TableHead scope="col">Statut</TableHead>
-                                <TableHead scope="col">Détail</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {visible.length === 0 ? (
-                                <TableRow className="hover:bg-transparent">
-                                    <TableCell
-                                        colSpan={programs ? 7 : 6}
-                                        className="p-8 text-center text-muted-foreground"
-                                    >
-                                        Aucune ligne pour ce statut.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                visible.map((row) => (
-                                    <TableRow
-                                        key={row.line}
-                                        className={
-                                            row.status === 'error'
-                                                ? 'bg-destructive/5'
-                                                : undefined
-                                        }
-                                    >
-                                        <TableCell className="text-muted-foreground tabular-nums">
-                                            {row.line}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-xs">
-                                            {row.establishment_code || '—'}
-                                        </TableCell>
-                                        {programs && (
-                                            <TableCell className="font-mono text-xs">
-                                                {row.mention_code || '—'}
-                                            </TableCell>
-                                        )}
-                                        <TableCell className="font-mono text-xs">
-                                            {row.code || '—'}
-                                        </TableCell>
-                                        <TableCell className="min-w-48">
-                                            {row.name || '—'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={
-                                                    statuses[row.status].variant
-                                                }
-                                            >
-                                                {statuses[row.status].label}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell
-                                            className={`min-w-56 text-xs ${row.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}
+                {visible.length === 0 ? (
+                    <EmptyState
+                        compact
+                        illustration="search"
+                        title="Aucune ligne pour ce statut."
+                        action={
+                            filter !== 'all' ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setFilter('all')}
+                                >
+                                    Afficher toutes les lignes
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="data-table min-w-[48rem]">
+                            <caption className="sr-only">
+                                Prévisualisation des lignes importées
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col" className="w-16">
+                                        Ligne
+                                    </th>
+                                    <th scope="col">Établissement</th>
+                                    {programs && <th scope="col">Mention</th>}
+                                    <th scope="col">Code</th>
+                                    <th scope="col">Nom</th>
+                                    <th scope="col">Statut</th>
+                                    <th scope="col">Détail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visible.map((row) => {
+                                    const isError = row.status === 'error';
+                                    return (
+                                        <tr
+                                            key={row.line}
+                                            className={
+                                                isError
+                                                    ? 'bg-danger-soft/40 hover:bg-danger-soft/60'
+                                                    : undefined
+                                            }
                                         >
-                                            {row.reason || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                                            <td className="font-mono text-xs text-muted-foreground tabular-nums">
+                                                {row.line}
+                                            </td>
+                                            <td>
+                                                <CodeCell
+                                                    value={
+                                                        row.establishment_code
+                                                    }
+                                                />
+                                            </td>
+                                            {programs && (
+                                                <td>
+                                                    <CodeCell
+                                                        value={row.mention_code}
+                                                    />
+                                                </td>
+                                            )}
+                                            <td>
+                                                <CodeCell value={row.code} />
+                                            </td>
+                                            <td className="min-w-48 font-medium text-foreground">
+                                                {row.name || (
+                                                    <span className="text-muted-foreground">
+                                                        —
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <ToneBadge
+                                                    tone={
+                                                        statuses[row.status]
+                                                            .tone
+                                                    }
+                                                >
+                                                    {statuses[row.status].label}
+                                                </ToneBadge>
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    'min-w-56 text-xs',
+                                                    isError
+                                                        ? 'font-medium text-danger-foreground'
+                                                        : 'text-muted-foreground',
+                                                )}
+                                            >
+                                                {isError && row.reason ? (
+                                                    <span className="inline-flex items-start gap-1.5">
+                                                        <AlertTriangle
+                                                            className="mt-px size-3.5 shrink-0 text-danger"
+                                                            aria-hidden="true"
+                                                        />
+                                                        {row.reason}
+                                                    </span>
+                                                ) : (
+                                                    row.reason || '—'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </section>
 
-            <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-card/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+            <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-card/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
                 <p className="text-xs text-muted-foreground">
-                    {formatNumber(counts.create)} création(s),{' '}
-                    {formatNumber(counts.update)} mise(s) à jour.{' '}
-                    {counts.error + counts.unchanged > 0 &&
-                        `${formatNumber(counts.error + counts.unchanged)} ligne(s) en erreur ou inchangée(s) seront ignorées.`}
+                    <span className="font-semibold text-foreground">
+                        {formatNumber(counts.create)} création(s),{' '}
+                        {formatNumber(counts.update)} mise(s) à jour.
+                    </span>{' '}
+                    {ignored > 0 &&
+                        `${formatNumber(ignored)} ligne(s) en erreur ou inchangée(s) seront ignorées.`}
                 </p>
                 <div className="flex gap-2">
                     <Button
@@ -311,14 +418,18 @@ export default function ImportPreview({
                         onClick={submit}
                         disabled={!canConfirm || confirm.processing}
                     >
-                        {confirm.processing && <Spinner />}
+                        {confirm.processing ? (
+                            <Spinner />
+                        ) : (
+                            <CircleCheck aria-hidden="true" />
+                        )}
                         {confirm.processing
                             ? 'Import en cours…'
                             : 'Confirmer l’import'}
                     </Button>
                 </div>
             </div>
-        </div>
+        </PageBody>
     );
 }
 
