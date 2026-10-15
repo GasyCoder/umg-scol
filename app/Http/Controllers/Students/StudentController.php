@@ -13,6 +13,7 @@ use App\Http\Requests\Students\UpdateStudentRequest;
 use App\Models\Student;
 use App\Models\StudentRecord;
 use App\Models\User;
+use App\Support\ScholarshipEligibility;
 use App\Support\StudentConfirmationContext;
 use App\Support\StudentReferenceOptions;
 use App\Support\Students\StudentBrowser;
@@ -32,7 +33,7 @@ class StudentController extends Controller
         $records = null;
         if ($step === 'list') {
             $query = $browser->applyToList(StudentRecord::query()->visibleTo($user))
-                ->with(['student:id,uuid,student_number,last_name,first_names,is_active', 'academicYear:id,name', 'establishment:id,code,name', 'level:id,code,name', 'program:id,code,name,mention_id', 'program.mention:id,name']);
+                ->with(['student:id,uuid,last_name,first_names,sex,birth_date,is_active', 'academicYear:id,name', 'establishment:id,code,name', 'level:id,code,name', 'program:id,code,name,mention_id', 'program.mention:id,name']);
             if ($request->filled('status')) {
                 $query->where('status', $request->input('status'));
             }
@@ -73,9 +74,11 @@ class StudentController extends Controller
     {
         Gate::authorize('view', $student);
         Gate::authorize('access', [Student::class, 'student_records.view']);
-        $records = $student->studentRecords()->visibleTo($request->user())->with(['academicYear:id,name,is_current', 'establishment:id,code,name', 'level:id,code,name', 'program:id,code,name,mention_id', 'program.mention:id,name', 'declaredBy:id,name'])->orderByDesc('academic_year_id')->orderByDesc('id')->get();
+        $records = $student->studentRecords()->visibleTo($request->user())->with(['academicYear:id,name,is_current,scholarship_max_bac_year', 'establishment:id,code,name', 'level:id,code,name', 'program:id,code,name,mention_id', 'program.mention:id,name', 'declaredBy:id,name'])->orderByDesc('academic_year_id')->orderByDesc('id')->get();
 
-        return Inertia::render('students/show', ['student' => $student, 'records' => $records->map(fn ($record) => [...$record->toArray(), 'canUpdate' => Gate::allows('update', $record)]),
+        return Inertia::render('students/show', ['student' => [...$student->toArray(), 'cin_is_standard' => $student->hasStandardCin()],
+            // Indicative scholarship rule of the establishment file, per declaration.
+            'records' => $records->map(fn ($record) => [...$record->toArray(), 'eligibility' => ScholarshipEligibility::evaluate($student, $record), 'canUpdate' => Gate::allows('update', $record)]),
             'confirmation' => StudentConfirmationContext::load($student)->forStaff(),
             // Whether a portal account is linked; the login email is never shown here.
             'portalLinked' => User::query()->where('student_id', $student->id)->exists(),
