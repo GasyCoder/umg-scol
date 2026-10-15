@@ -320,7 +320,8 @@ it('keeps preview and history relation queries bounded', function () {
     $this->get('/imports/'.$import->uuid)->assertOk();
     $queries = DB::getQueryLog();
     DB::disableQueryLog();
-    expect(count($queries))->toBeLessThan(30);
+    // 30 rows: an N+1 would add 30+ queries. The margin covers the fixed shared-prop cost (pending tasks: one COUNT query plus Policy checks).
+    expect(count($queries))->toBeLessThan(35);
 });
 it('chunks a multi-line file without persisting before confirmation', function () {
     config(['student_imports.chunk_size' => 100]);
