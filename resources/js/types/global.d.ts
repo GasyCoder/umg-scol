@@ -1,4 +1,9 @@
-import type { Auth, Branding, PendingTasks } from '@/types/auth';
+import type {
+    Auth,
+    Branding,
+    NotificationFeed,
+    PendingTasks,
+} from '@/types/auth';
 
 declare module 'react' {
     interface InputHTMLAttributes<T> {
@@ -15,6 +20,7 @@ declare module '@inertiajs/core' {
             /** Sidebar width in px chosen with the splitter (cookie). */
             sidebarWidth: number;
             tasks: PendingTasks;
+            notifications: NotificationFeed;
             branding: Branding;
             [key: string]: unknown;
         };
