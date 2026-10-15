@@ -26,7 +26,7 @@ import { confirm } from '@/routes/two-factor';
 function GridScanIcon() {
     return (
         <div className="mb-3 rounded-full border border-border bg-card p-0.5 shadow-sm">
-            <div className="relative overflow-hidden rounded-full border border-border bg-muted p-2.5">
+            <div className="relative overflow-hidden rounded-full border border-border bg-accent p-2.5">
                 <div className="absolute inset-0 grid grid-cols-5 opacity-50">
                     {Array.from({ length: 5 }, (_, i) => (
                         <div
@@ -43,7 +43,7 @@ function GridScanIcon() {
                         />
                     ))}
                 </div>
-                <ScanLine className="relative z-20 size-6 text-foreground" />
+                <ScanLine className="relative z-20 size-6 text-primary" />
             </div>
         </div>
     );
@@ -73,7 +73,7 @@ function TwoFactorSetupStep({
             ) : (
                 <>
                     <div className="mx-auto flex max-w-md overflow-hidden">
-                        <div className="mx-auto aspect-square w-64 rounded-lg border border-border">
+                        <div className="mx-auto aspect-square w-60 rounded-xl border border-border bg-card shadow-card">
                             <div className="z-10 flex h-full w-full items-center justify-center p-5">
                                 {qrCodeSvg ? (
                                     <div
@@ -95,21 +95,26 @@ function TwoFactorSetupStep({
                         </div>
                     </div>
 
-                    <div className="flex w-full space-x-5">
+                    <div className="flex w-full">
                         <Button className="w-full" onClick={onNextStep}>
                             {buttonText}
                         </Button>
                     </div>
 
-                    <div className="relative flex w-full items-center justify-center">
-                        <div className="absolute inset-0 top-1/2 h-px w-full bg-border" />
-                        <span className="relative bg-card px-2 py-1">
-                            ou saisissez le code manuellement
-                        </span>
+                    <div className="flex w-full items-center gap-3 text-xs font-medium text-muted-foreground">
+                        <span
+                            className="h-px flex-1 bg-border"
+                            aria-hidden="true"
+                        />
+                        ou saisissez le code manuellement
+                        <span
+                            className="h-px flex-1 bg-border"
+                            aria-hidden="true"
+                        />
                     </div>
 
                     <div className="flex w-full space-x-2">
-                        <div className="flex w-full items-stretch overflow-hidden rounded-xl border border-border">
+                        <div className="flex h-11 w-full items-stretch overflow-hidden rounded-lg border border-input">
                             {!manualSetupKey ? (
                                 <div className="flex h-full w-full items-center justify-center bg-muted p-3">
                                     <Spinner />
@@ -120,13 +125,18 @@ function TwoFactorSetupStep({
                                         type="text"
                                         readOnly
                                         value={manualSetupKey}
-                                        className="h-full w-full bg-background p-3 text-foreground outline-none"
+                                        aria-label="Clé de configuration"
+                                        className="h-full w-full min-w-0 bg-muted/40 px-3 font-mono text-sm tracking-wide text-foreground outline-none"
                                     />
                                     <button
                                         onClick={() => copy(manualSetupKey)}
-                                        className="border-l border-border px-3 hover:bg-muted"
+                                        className="flex w-11 shrink-0 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:bg-accent hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+                                        aria-label="Copier la clé de configuration"
                                     >
-                                        <IconComponent className="w-4" />
+                                        <IconComponent
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
                                     </button>
                                 </>
                             )}
@@ -183,13 +193,14 @@ function TwoFactorVerificationStep({
                                 pattern={REGEXP_ONLY_DIGITS}
                                 autoFocus
                             >
-                                <InputOTPGroup>
+                                <InputOTPGroup className="gap-2">
                                     {Array.from(
                                         { length: OTP_MAX_LENGTH },
                                         (_, index) => (
                                             <InputOTPSlot
                                                 key={index}
                                                 index={index}
+                                                className="size-11 rounded-lg border bg-card font-heading text-lg font-bold first:rounded-lg last:rounded-lg"
                                             />
                                         ),
                                     )}
@@ -202,7 +213,7 @@ function TwoFactorVerificationStep({
                             />
                         </div>
 
-                        <div className="flex w-full space-x-5">
+                        <div className="flex w-full gap-3">
                             <Button
                                 type="button"
                                 variant="outline"
