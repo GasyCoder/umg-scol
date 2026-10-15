@@ -9,6 +9,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { REPEAT_CODE_CHOICES } from './types';
 import type { Option, Options } from './types';
 
 const optionLabel = (option: Option) =>
@@ -190,6 +192,76 @@ export default function RecordFields({
                         ))}
                     </SelectContent>
                 </Select>
+            </FormField>
+            <FormField
+                id="repeat_code"
+                label="Code de redoublement"
+                required
+                error={errors.repeat_code}
+                hint="Situation de l’étudiant dans le niveau déclaré."
+            >
+                <Select
+                    value={data.repeat_code || undefined}
+                    onValueChange={(value) => setData('repeat_code', value)}
+                >
+                    <SelectTrigger
+                        id="repeat_code"
+                        className="w-full"
+                        aria-invalid={errors.repeat_code ? true : undefined}
+                    >
+                        <SelectValue placeholder="Choisir un code" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {REPEAT_CODE_CHOICES.map((choice) => (
+                            <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </FormField>
+            <FormField
+                id="scholarship_requested_at"
+                label="Date de dépôt de la demande de bourse"
+                error={errors.scholarship_requested_at}
+                hint="À renseigner si l’étudiant a déposé une demande de bourse."
+            >
+                <Input
+                    id="scholarship_requested_at"
+                    type="date"
+                    value={data.scholarship_requested_at ?? ''}
+                    onChange={(event) =>
+                        setData('scholarship_requested_at', event.target.value)
+                    }
+                    min="2000-01-01"
+                    max={new Date().toISOString().slice(0, 10)}
+                    aria-invalid={
+                        errors.scholarship_requested_at ? true : undefined
+                    }
+                />
+            </FormField>
+            <FormField
+                id="scholarship_request_reference"
+                label="Référence demande de bourse"
+                required={Boolean(data.scholarship_requested_at)}
+                error={errors.scholarship_request_reference}
+                hint="Obligatoire si la date de dépôt est renseignée ; unique par établissement et par année."
+            >
+                <Input
+                    id="scholarship_request_reference"
+                    value={data.scholarship_request_reference ?? ''}
+                    onChange={(event) =>
+                        setData(
+                            'scholarship_request_reference',
+                            event.target.value,
+                        )
+                    }
+                    maxLength={50}
+                    autoComplete="off"
+                    aria-invalid={
+                        errors.scholarship_request_reference ? true : undefined
+                    }
+                />
             </FormField>
         </FormSection>
     );
