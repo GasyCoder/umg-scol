@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils';
 
 type Result = {
     id: number;
-    student_number: string | null;
     last_name: string;
     first_names: string | null;
     birth_date: string | null;
@@ -407,7 +406,7 @@ export default function Reception({
                                                 id="reception-search"
                                                 type="search"
                                                 className="h-12 rounded-lg pl-11 text-base md:text-base"
-                                                placeholder="Matricule, nom, prénom, CIN, numéro BAC, téléphone ou email"
+                                                placeholder="Nom, prénoms, CIN, téléphone ou email"
                                                 maxLength={100}
                                                 value={query}
                                                 onChange={(e) =>
@@ -464,7 +463,7 @@ export default function Reception({
                                         compact
                                         illustration="search"
                                         title="Aucun étudiant ne correspond à cette recherche."
-                                        description="Vérifiez l’orthographe ou essayez avec le matricule, le CIN ou le numéro BAC."
+                                        description="Vérifiez l’orthographe ou essayez avec le CIN, le téléphone ou l’email."
                                     />
                                 </div>
                             ) : (
@@ -566,9 +565,11 @@ export default function Reception({
                                                 {selected.last_name}{' '}
                                                 {selected.first_names}
                                             </p>
-                                            <p className="mt-1 font-mono text-sm text-muted-foreground">
-                                                {selected.student_number ??
-                                                    'Sans matricule'}
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Né(e) le{' '}
+                                                {formatDate(
+                                                    selected.birth_date,
+                                                )}
                                             </p>
                                         </div>
                                     </div>
@@ -750,11 +751,6 @@ function ResultCard({
                                     {result.last_name} {result.first_names}
                                 </h3>
                                 <p className="text-sm text-muted-foreground">
-                                    <span className="font-mono">
-                                        {result.student_number ??
-                                            'Sans matricule'}
-                                    </span>
-                                    {' · '}
                                     Né(e) le {formatDate(result.birth_date)}
                                 </p>
                             </div>
