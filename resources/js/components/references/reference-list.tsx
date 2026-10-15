@@ -1,10 +1,25 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    ArrowRight,
+    Mail,
+    Pencil,
+    Phone,
+    Plus,
+    Power,
+    PowerOff,
+    RotateCcw,
+    Search,
+    Star,
+} from 'lucide-react';
 import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { TrashButton } from '@/components/trash/trash-button';
-import Heading from '@/components/heading';
+import type { FormEvent, ReactNode } from 'react';
+import { EmptyState } from '@/components/empty-state';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { formatNumber } from '@/components/reporting/shared';
+import { Pagination } from '@/components/scholarships/shared';
+import { ToneBadge } from '@/components/tone-badge';
+import { TrashButton } from '@/components/trash/trash-button';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -22,25 +37,42 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import { article, baseUrl, definitions } from './definitions';
-import { ReferenceTransferToolbar } from './reference-transfer';
 import type {
     EstablishmentOption,
     ReferenceKind,
     ReferenceRecord,
 } from './definitions';
+import { formatDay, listDescriptions, referenceIcons } from './reference-meta';
+import { ReferenceTransferToolbar } from './reference-transfer';
 
-type Pagination = {
+type Paginated = {
     data: ReferenceRecord[];
     total: number;
     links: { url: string | null; label: string; active: boolean }[];
 };
 export type ReferenceListProps = {
-    records: Pagination;
+    records: Paginated;
     filters: { search?: string; establishment_id?: string };
     canCreate: boolean;
     establishments?: EstablishmentOption[];
 };
+
+function Code({ value }: { value?: string | null }) {
+    if (!value) return <span className="text-muted-foreground">—</span>;
+    return (
+        <span className="inline-flex shrink-0 rounded-md border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold whitespace-nowrap text-foreground">
+            {value}
+        </span>
+    );
+}
+
+function Muted({ children }: { children: ReactNode }) {
+    return <span className="text-muted-foreground">{children}</span>;
+}
+
 export default function ReferenceList({
     kind,
     records,
@@ -77,6 +109,29 @@ export default function ReferenceList({
             { preserveScroll: true, onSuccess: () => setConfirmation(null) },
         );
     };
+    const byEstablishment = kind === 'programs' || kind === 'mentions';
+    const filtered = Boolean(filters.search || filters.establishment_id);
+    const Icon = referenceIcons[kind];
+    const createLabel = `Créer ${articleText} ${definition.singular}`;
+    const name = (row: ReferenceRecord) => (
+        <span
+            className={cn(
+                'font-semibold',
+                row.is_active ? 'text-foreground' : 'text-muted-foreground',
+            )}
+        >
+            {row.name}
+        </span>
+    );
+    const establishment = (row: ReferenceRecord) =>
+        row.establishment ? (
+            <span className="flex min-w-0 items-center gap-2">
+                <Code value={row.establishment.code} />
+                <span className="truncate">{row.establishment.name}</span>
+            </span>
+        ) : (
+            <Muted>—</Muted>
+        );
     const columns =
         kind === 'establishments'
             ? ['Code', 'Nom', 'Type', 'Contact']
@@ -87,69 +142,137 @@ export default function ReferenceList({
                 : kind === 'programs'
                   ? ['Établissement', 'Mention', 'Code', 'Nom']
                   : ['Établissement', 'Code', 'Nom'];
-    const cells = (row: ReferenceRecord) =>
+    const cells = (row: ReferenceRecord): ReactNode[] =>
         kind === 'establishments'
             ? [
-                  row.code,
-                  row.name,
-                  row.type ?? '—',
-                  [row.phone, row.email].filter(Boolean).join(' · ') || '—',
+                  <Code key="code" value={row.code} />,
+                  name(row),
+                  row.type ?? <Muted>—</Muted>,
+                  row.phone || row.email ? (
+                      <span className="flex flex-col gap-0.5 text-xs">
+                          {row.phone && (
+                              <span className="inline-flex items-center gap-1.5">
+                                  <Phone
+                                      className="size-3.5 text-muted-foreground"
+                                      aria-hidden="true"
+                                  />
+                                  {row.phone}
+                              </span>
+                          )}
+                          {row.email && (
+                              <span className="inline-flex items-center gap-1.5">
+                                  <Mail
+                                      className="size-3.5 text-muted-foreground"
+                                      aria-hidden="true"
+                                  />
+                                  {row.email}
+                              </span>
+                          )}
+                      </span>
+                  ) : (
+                      <Muted>—</Muted>
+                  ),
               ]
             : kind === 'academic-years'
               ? [
-                    row.name,
-                    `${row.starts_at?.slice(0, 10) ?? '—'} / ${row.ends_at?.slice(0, 10) ?? '—'}`,
-                    row.is_current ? 'Courante' : '—',
+                    name(row),
+                    <span
+                        key="dates"
+                        className="inline-flex items-center gap-1.5 text-sm tabular-nums"
+                    >
+                        {formatDay(row.starts_at) ?? <Muted>—</Muted>}
+                        <ArrowRight
+                            className="size-3.5 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <span className="sr-only">au</span>
+                        {formatDay(row.ends_at) ?? <Muted>—</Muted>}
+                    </span>,
+                    row.is_current ? (
+                        <ToneBadge key="current" tone="primary">
+                            Courante
+                        </ToneBadge>
+                    ) : (
+                        <Muted>—</Muted>
+                    ),
                 ]
               : kind === 'levels'
-                ? [row.code, row.name, String(row.sort_order)]
+                ? [
+                      <Code key="code" value={row.code} />,
+                      name(row),
+                      <span key="order" className="tabular-nums">
+                          {row.sort_order}
+                      </span>,
+                  ]
                 : kind === 'programs'
                   ? [
-                        row.establishment?.name ?? '—',
-                        row.mention?.name ?? 'Sans mention',
-                        row.code ?? '—',
-                        row.name,
+                        establishment(row),
+                        row.mention?.name ?? <Muted>Sans mention</Muted>,
+                        <Code key="code" value={row.code} />,
+                        name(row),
                     ]
-                  : [row.establishment?.name ?? '—', row.code ?? '—', row.name];
+                  : [
+                        establishment(row),
+                        <Code key="code" value={row.code} />,
+                        name(row),
+                    ];
+
     return (
-        <div className="space-y-6 p-4 md:p-6">
+        <PageBody>
             <Head title={definition.title} />
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <Heading
-                    title={definition.title}
-                    description="Administration des référentiels institutionnels."
-                />
-                {canCreate && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {(kind === 'mentions' || kind === 'programs') && (
-                            <ReferenceTransferToolbar
-                                kind={kind}
-                                filters={filters}
-                            />
-                        )}
+            <PageHeader
+                icon={Icon}
+                title={definition.title}
+                description={listDescriptions[kind]}
+                meta={
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground tabular-nums">
+                        {formatNumber(records.total)} résultat(s)
+                        {filtered ? ' filtré(s)' : ''}
+                    </span>
+                }
+                actions={
+                    canCreate && (
                         <Button asChild>
                             <Link href={`${baseUrl(kind)}/create`}>
-                                Créer {articleText} {definition.singular}
+                                <Plus aria-hidden="true" />
+                                {createLabel}
                             </Link>
                         </Button>
-                    </div>
-                )}
-            </div>
+                    )
+                }
+            />
+
+            {canCreate && byEstablishment && (
+                <ReferenceTransferToolbar kind={kind} filters={filters} />
+            )}
+
             <form
                 onSubmit={filter}
-                className="flex flex-wrap items-center gap-3"
+                className="surface flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4"
+                role="search"
+                aria-label={`Rechercher dans ${definition.title.toLowerCase()}`}
             >
-                <Input
-                    aria-label="Recherche"
-                    placeholder="Rechercher…"
-                    className="w-full sm:max-w-xs"
-                    value={search.data.search}
-                    onChange={(event) =>
-                        search.setData('search', event.target.value)
-                    }
-                    maxLength={100}
-                />
-                {(kind === 'programs' || kind === 'mentions') && (
+                <div className="relative w-full sm:max-w-xs sm:flex-1">
+                    <Search
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <Input
+                        aria-label="Recherche"
+                        placeholder={
+                            kind === 'academic-years'
+                                ? 'Rechercher une année…'
+                                : 'Rechercher par nom ou code…'
+                        }
+                        className="pl-9"
+                        value={search.data.search}
+                        onChange={(event) =>
+                            search.setData('search', event.target.value)
+                        }
+                        maxLength={100}
+                    />
+                </div>
+                {byEstablishment && (
                     <Select
                         value={search.data.establishment_id || 'all'}
                         onValueChange={(value) =>
@@ -180,156 +303,185 @@ export default function ReferenceList({
                         </SelectContent>
                     </Select>
                 )}
-                <Button variant="outline" disabled={search.processing}>
-                    Rechercher
-                </Button>
-                <Button variant="ghost" asChild>
-                    <Link href={baseUrl(kind)}>Réinitialiser</Link>
-                </Button>
+                <div className="flex gap-2 sm:ml-auto">
+                    <Button
+                        variant="outline"
+                        className="flex-1 sm:flex-none"
+                        disabled={search.processing}
+                    >
+                        {search.processing ? (
+                            <Spinner />
+                        ) : (
+                            <Search aria-hidden="true" />
+                        )}
+                        Rechercher
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        className="flex-1 sm:flex-none"
+                        asChild
+                    >
+                        <Link href={baseUrl(kind)}>
+                            <RotateCcw aria-hidden="true" />
+                            Réinitialiser
+                        </Link>
+                    </Button>
+                </div>
                 <InputError
+                    className="w-full"
                     message={
                         search.errors.search ?? search.errors.establishment_id
                     }
                 />
             </form>
-            <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-left text-sm">
-                    <caption className="sr-only">{definition.title}</caption>
-                    <thead className="bg-muted">
-                        <tr>
-                            {[...columns, 'Statut', 'Actions'].map((column) => (
-                                <th
-                                    scope="col"
-                                    key={column}
-                                    className="px-4 py-3 font-medium"
-                                >
-                                    {column}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {records.data.length === 0 ? (
-                            <tr>
-                                <td
-                                    colSpan={columns.length + 2}
-                                    className="p-8 text-center text-muted-foreground"
-                                >
-                                    Aucun résultat. Modifiez les filtres ou
-                                    créez un référentiel.
-                                </td>
-                            </tr>
-                        ) : (
-                            records.data.map((row) => (
-                                <tr key={row.id} className="border-t">
-                                    {cells(row).map((cell, index) => (
-                                        <td className="px-4 py-3" key={index}>
-                                            {cell}
-                                        </td>
+
+            <section className="surface overflow-hidden">
+                {records.data.length === 0 ? (
+                    filtered ? (
+                        <EmptyState
+                            illustration="search"
+                            title="Aucun résultat"
+                            description="Modifiez la recherche ou les filtres pour élargir la liste."
+                            action={
+                                <Button variant="outline" asChild>
+                                    <Link href={baseUrl(kind)}>
+                                        <RotateCcw aria-hidden="true" />
+                                        Réinitialiser les filtres
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <EmptyState
+                            illustration="inbox"
+                            title="Aucun élément pour le moment"
+                            description={
+                                canCreate
+                                    ? 'Créez le premier élément de ce référentiel pour le proposer dans les formulaires.'
+                                    : 'Les éléments de ce référentiel apparaîtront ici.'
+                            }
+                            action={
+                                canCreate && (
+                                    <Button asChild>
+                                        <Link href={`${baseUrl(kind)}/create`}>
+                                            <Plus aria-hidden="true" />
+                                            {createLabel}
+                                        </Link>
+                                    </Button>
+                                )
+                            }
+                        />
+                    )
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="data-table min-w-[44rem]">
+                            <caption className="sr-only">
+                                {definition.title}
+                            </caption>
+                            <thead>
+                                <tr>
+                                    {columns.map((column) => (
+                                        <th scope="col" key={column}>
+                                            {column}
+                                        </th>
                                     ))}
-                                    <td className="px-4 py-3">
-                                        <Badge
-                                            variant={
-                                                row.is_active
-                                                    ? 'secondary'
-                                                    : 'outline'
-                                            }
-                                        >
-                                            {row.is_active
-                                                ? 'Actif'
-                                                : 'Inactif'}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex flex-wrap gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`${baseUrl(kind)}/${row.uuid}/edit`}
-                                                >
-                                                    Modifier
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => open(row)}
+                                    <th scope="col">Statut</th>
+                                    <th scope="col" className="text-right">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.data.map((row) => (
+                                    <tr key={row.id}>
+                                        {cells(row).map((cell, index) => (
+                                            <td key={index}>{cell}</td>
+                                        ))}
+                                        <td>
+                                            <ToneBadge
+                                                tone={
+                                                    row.is_active
+                                                        ? 'success'
+                                                        : 'neutral'
+                                                }
                                             >
                                                 {row.is_active
-                                                    ? 'Désactiver'
-                                                    : 'Activer'}
-                                            </Button>
-                                            <TrashButton
-                                                kind={kind}
-                                                uuid={row.uuid}
-                                                label={row.name}
-                                            />
-                                            {kind === 'academic-years' &&
-                                                !row.is_current &&
-                                                row.is_active && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            open(row, true)
-                                                        }
+                                                    ? 'Actif'
+                                                    : 'Inactif'}
+                                            </ToneBadge>
+                                        </td>
+                                        <td>
+                                            <div
+                                                className="flex flex-wrap items-center justify-end gap-1.5"
+                                                role="group"
+                                                aria-label={`Actions pour ${row.name}`}
+                                            >
+                                                {kind === 'academic-years' &&
+                                                    !row.is_current &&
+                                                    row.is_active && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="text-primary hover:text-primary"
+                                                            onClick={() =>
+                                                                open(row, true)
+                                                            }
+                                                        >
+                                                            <Star aria-hidden="true" />
+                                                            Définir comme année
+                                                            courante
+                                                        </Button>
+                                                    )}
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`${baseUrl(kind)}/${row.uuid}/edit`}
                                                     >
-                                                        Définir comme année
-                                                        courante
-                                                    </Button>
-                                                )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                    {records.total} résultat(s)
-                </p>
-                <nav aria-label="Pagination" className="flex flex-wrap gap-1">
-                    {records.links.map((link, index) => {
-                        const label =
-                            index === 0
-                                ? 'Précédent'
-                                : index === records.links.length - 1
-                                  ? 'Suivant'
-                                  : link.label.replace('&hellip;', '…');
-                        return link.url ? (
-                            <Button
-                                key={index}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                asChild
-                            >
-                                <Link
-                                    href={link.url}
-                                    aria-current={
-                                        link.active ? 'page' : undefined
-                                    }
-                                >
-                                    {label}
-                                </Link>
-                            </Button>
-                        ) : (
-                            <Button
-                                key={index}
-                                size="sm"
-                                variant="outline"
-                                disabled
-                            >
-                                {label}
-                            </Button>
-                        );
-                    })}
-                </nav>
-            </div>
+                                                        <Pencil aria-hidden="true" />
+                                                        Modifier
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => open(row)}
+                                                >
+                                                    {row.is_active ? (
+                                                        <PowerOff aria-hidden="true" />
+                                                    ) : (
+                                                        <Power aria-hidden="true" />
+                                                    )}
+                                                    {row.is_active
+                                                        ? 'Désactiver'
+                                                        : 'Activer'}
+                                                </Button>
+                                                <TrashButton
+                                                    kind={kind}
+                                                    uuid={row.uuid}
+                                                    label={row.name}
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+
+            {records.data.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                        {formatNumber(records.total)} résultat(s)
+                    </p>
+                    <Pagination links={records.links} />
+                </div>
+            )}
+
             <Dialog
                 open={confirmation !== null}
                 onOpenChange={(openState) => {
@@ -338,6 +490,25 @@ export default function ReferenceList({
             >
                 <DialogContent>
                     <DialogHeader>
+                        <span
+                            className={cn(
+                                'mb-1 flex size-11 items-center justify-center rounded-xl',
+                                confirmation?.current
+                                    ? 'bg-accent text-primary'
+                                    : confirmation?.record.is_active
+                                      ? 'bg-warning-soft text-warning'
+                                      : 'bg-success-soft text-success',
+                            )}
+                            aria-hidden="true"
+                        >
+                            {confirmation?.current ? (
+                                <Star className="size-5" />
+                            ) : confirmation?.record.is_active ? (
+                                <PowerOff className="size-5" />
+                            ) : (
+                                <Power className="size-5" />
+                            )}
+                        </span>
                         <DialogTitle>
                             Confirmer{' '}
                             {confirmation?.current
@@ -345,7 +516,9 @@ export default function ReferenceList({
                                 : 'le changement de statut'}
                         </DialogTitle>
                         <DialogDescription>
-                            {confirmation?.record.name}
+                            <span className="font-semibold text-foreground">
+                                {confirmation?.record.name}
+                            </span>
                             {confirmation?.current
                                 ? ' deviendra l’année courante. L’année précédente perdra ce statut.'
                                 : confirmation?.record.is_active
@@ -363,11 +536,12 @@ export default function ReferenceList({
                             Annuler
                         </Button>
                         <Button onClick={confirm} disabled={action.processing}>
+                            {action.processing && <Spinner />}
                             {action.processing ? 'Traitement…' : 'Confirmer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </PageBody>
     );
 }
