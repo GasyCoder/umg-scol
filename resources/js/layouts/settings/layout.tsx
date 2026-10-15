@@ -1,5 +1,11 @@
-import { Link } from '@inertiajs/react';
-import { Palette, Settings2, ShieldCheck, UserRound } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import {
+    Palette,
+    Settings2,
+    ShieldCheck,
+    Sparkles,
+    UserRound,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { PageBody } from '@/components/page-header';
@@ -37,8 +43,19 @@ const sidebarNavItems: SettingsNavItem[] = [
  * Account settings shell inside the app layout: title block, vertical navigation with icons
  * (horizontal pills on small screens) and the page content stacked in `SettingsSection` cards.
  */
+const platformNavItem: SettingsNavItem = {
+    title: 'Plateforme',
+    hint: 'Noms, logo et favicon',
+    href: '/settings/platform',
+    icon: Sparkles,
+};
+
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { auth } = usePage().props;
+    const items = auth.canManageBranding
+        ? [...sidebarNavItems, platformNavItem]
+        : sidebarNavItems;
 
     return (
         <PageBody>
@@ -55,7 +72,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                         Paramètres
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        Gérez votre profil et les paramètres de votre compte
+                        Votre profil, la sécurité de votre compte et l’apparence
+                        du portail
                     </p>
                 </div>
             </div>
@@ -66,7 +84,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                         className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:sticky lg:top-20 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
                         aria-label="Paramètres"
                     >
-                        {sidebarNavItems.map((item) => {
+                        {items.map((item) => {
                             const active = isCurrentOrParentUrl(item.href);
                             const Icon = item.icon;
 
@@ -107,7 +125,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     </nav>
                 </aside>
 
-                <div className="max-w-3xl min-w-0 space-y-6">{children}</div>
+                <div className="min-w-0 space-y-6">{children}</div>
             </div>
         </PageBody>
     );
