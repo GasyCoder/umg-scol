@@ -6,6 +6,7 @@
 - `establishments`
 - `academic_years`
 - `levels`
+- `domains`
 - `mentions`
 - `programs`
 - `students`
@@ -20,11 +21,11 @@
 
 ## students
 
-Identité permanente : `student_number`, `last_name`, `first_names`, `birth_date`, `birth_place`, `cin`, `cin_issued_at`, `cin_issued_place`, `phone`, `email`, `address`, `bac_registration_number`, `bac_series`, `bac_year`, `bac_mention`, `is_active`.
+Identité permanente, alignée sur le fichier modèle des établissements : `last_name`, `first_names`, `sex`, `birth_date`, `mother_name`, `cin`, `cin_issued_at`, `cin_issued_place`, `nationality`, `phone`, `email`, `address`, `bac_series`, `bac_year`, `is_active`. Pas de matricule, de numéro BAC, de lieu de naissance ni de mention BAC (absents du modèle, supprimés par la migration `2026_10_17_100000_align_students_with_establishment_template`).
 
 ## student_records
 
-Déclaration annuelle d'un étudiant déjà inscrit : `student_id`, `academic_year_id`, `establishment_id`, `level_id`, `program_id`, `status`, `declared_by`, `declared_at`.
+Déclaration annuelle d'un étudiant déjà inscrit : `student_id`, `academic_year_id`, `establishment_id`, `level_id`, `program_id`, `repeat_code` (N, R, T+), `scholarship_requested_at`, `scholarship_request_reference`, `status`, `declared_by`, `declared_at`.
 
 Indexes conseillés : `(academic_year_id, establishment_id)`, `(student_id, academic_year_id)`, `(establishment_id, level_id)`.
 
@@ -48,10 +49,11 @@ Les migrations techniques sont complétées par `roles`, `permissions`, `model_h
 
 ## Référentiels institutionnels implémentés
 
-- `establishments` : code obligatoire unique (30 caractères, présenté comme « sigle »), nom, type optionnel (Faculté, Institut, École ou texte libre « Autre », 100 caractères), contacts optionnels, `logo_path` optionnel (migration `2026_10_16_110000_add_logo_to_establishments`), statut actif, timestamps. Codes normalisés en majuscules et sans espaces périphériques. Les contacts restent visibles aux administrateurs autorisés mais leurs valeurs ne sont pas dupliquées dans l'audit.
-- `academic_years` : nom unique (30 caractères), dates optionnelles, `is_current`, `is_active`, timestamps. `current_marker` est une colonne virtuelle technique valant 1 pour l'année courante et NULL sinon ; son index unique impose au plus une année courante, y compris hors interface. Cette colonne est masquée dans la sérialisation.
+- `establishments` : code obligatoire unique (30 caractères, présenté comme « sigle »), nom, type optionnel (Faculté, Institut, École ou texte libre « Autre », 100 caractères), `sector` optionnel (`public`, `private` = colonne « Institution » du modèle), contacts optionnels, `logo_path` optionnel (migration `2026_10_16_110000_add_logo_to_establishments`), statut actif, timestamps. Codes normalisés en majuscules et sans espaces périphériques. Les contacts restent visibles aux administrateurs autorisés mais leurs valeurs ne sont pas dupliquées dans l'audit.
+- `academic_years` : nom unique (30 caractères), dates optionnelles, `scholarship_max_bac_year` optionnel (année limite du BAC pour la règle de bourse), `is_current`, `is_active`, timestamps. `current_marker` est une colonne virtuelle technique valant 1 pour l'année courante et NULL sinon ; son index unique impose au plus une année courante, y compris hors interface. Cette colonne est masquée dans la sérialisation.
 - `levels` : code obligatoire unique (30 caractères), nom, ordre entier positif ou nul, statut actif et timestamps. Affichage stable par `sort_order`, puis code et id ; les niveaux ne sont pas codés en dur.
-- `programs` : FK restrictive `establishment_id`, code optionnel (30 caractères), nom, statut actif, timestamps. Unicité du code par établissement ; plusieurs codes NULL sont admis. Aucune unicité globale du nom, aucune relation imposée à un niveau.
+- `domains` : domaines LMD communs à tous les établissements (ALSH…) : code unique, nom, ordre, statut actif ; gérés avec la permission `levels.manage`, sans corbeille (désactivation seulement).
+- `programs` : FK restrictive `establishment_id`, code optionnel (30 caractères), nom, `training_type` optionnel (`academic`, `professional` = « Type de formation » du modèle), statut actif, timestamps. Unicité du code par établissement ; plusieurs codes NULL sont admis. Aucune unicité globale du nom, aucune relation imposée à un niveau.
 - `users.establishment_id` : FK nullable et restrictive. Relations `User belongsTo Establishment`, `Establishment hasMany Users`, `Establishment hasMany Programs`, `Program belongsTo Establishment`.
 
 Les statuts et les couples établissement/statut possèdent les index nécessaires aux listes. La suppression via Eloquent des quatre référentiels est refusée ; les routes et interfaces standard proposent uniquement activation/désactivation. Les FK empêchent la suppression SQL d'un établissement encore lié à un parcours ou utilisateur.
@@ -72,15 +74,15 @@ MySQL reste la référence : unicités, FK restrictives, index généré et roll
 
 ### Identité et index
 
-`students` contient `student_number` nullable (100), `last_name` obligatoire (150), `first_names` nullable (150), naissance (date et lieu), CIN (100, date et lieu de délivrance), téléphone (30), email (255), adresse (text), numéro BAC (100), série (50), année (unsigned small integer), mention (100), `is_active` et timestamps.
+`students` contient `last_name` obligatoire (150), `first_names` nullable (150), `sex` (`M`/`F`), date de naissance, `mother_name` (255, « Nom et prénoms de la mère »), CIN (100, date et lieu de délivrance), `nationality` (50), téléphone (30), email (255), adresse (text), série BAC (50), année BAC (unsigned small integer), `is_active` et timestamps. Les colonnes sont nullable en base pour les fiches antérieures ; la validation (saisie, import, correction) exige nom, sexe, date de naissance et nationalité. Nationalité et série BAC suivent les listes du modèle (`StudentReferenceLists`).
 
-Les identifiants `student_number`, `cin`, `bac_registration_number`, `phone` et `email` sont indexés sans contrainte UNIQUE. `last_name`, `is_active` et le triplet nom/prénoms/naissance sont également indexés. Les tailles sont compatibles avec les limites d'index MySQL utf8mb4. Aucun `user_id` n'est ajouté : le rattachement d'un compte étudiant reste une phase ultérieure.
+`cin`, `phone` et `email` sont indexés sans contrainte UNIQUE SQL (unicité applicative, voir ci-dessous). `last_name`, `is_active` et le triplet nom/prénoms/naissance sont également indexés. Les tailles sont compatibles avec les limites d'index MySQL utf8mb4. Aucun `user_id` n'est ajouté : le rattachement d'un compte étudiant reste une phase ultérieure.
 
-La normalisation s'applique dans les Form Requests et le modèle : trim des textes, email en minuscules, retrait des espaces CIN, retrait des séparateurs de présentation du téléphone (espaces, points, parenthèses, tirets), conservation du zéro initial et du préfixe +261. Les matricules et numéros BAC conservent casse et ponctuation ; seuls les espaces répétés sont réduits. Les noms officiels ne sont ni mis en majuscules ni translittérés. Les textes vides deviennent NULL.
+La normalisation s'applique dans les Form Requests et le modèle : trim des textes, email en minuscules, retrait des espaces et points de la CIN, téléphone sous forme nationale `0XXXXXXXXX` (séparateurs retirés, préfixe +261/261 remplacé, zéro initial perdu par une cellule numérique restauré pour 9 chiffres), sexe `M`/`F` (Masculin, Féminin, H… acceptés), nationalité et série BAC à l'orthographe de la liste, code de redoublement réduit au code (« N (Nouveau) » → `N`), espaces répétés réduits dans les noms et la référence de demande. Les noms officiels ne sont ni mis en majuscules ni translittérés. Les textes vides deviennent NULL.
 
 ### Anti-doublons manuels
 
-La saisie manuelle refuse un même matricule, CIN ou numéro BAC non vide dans la base entière, ainsi qu'une égalité nom/prénoms/date de naissance lorsque la naissance est fournie. Elle ne fusionne aucune identité, ne révèle aucune fiche étrangère et renvoie un message générique invitant à vérifier ou contacter la Scolarité Centrale. Le téléphone et l'email peuvent être partagés ; ils ne suffisent pas à conclure à un doublon.
+La saisie manuelle refuse une CIN standard (12 chiffres), un téléphone ou un email déjà portés par une autre fiche (« Unicité à respecter » du modèle), ainsi qu'une égalité nom/prénoms/date de naissance. Une CIN non standard (récépissé, numéro partiel) est acceptée, signalée « CIN non standard » sur la fiche, et n'identifie personne : elle peut être partagée. La saisie ne fusionne aucune identité, ne révèle aucune fiche étrangère et renvoie un message générique pour la CIN et l'identité.
 
 `CreateDeclaredStudent` maintient un verrou de cache partagé `students:manual-identity-write` pendant la transaction identité + première déclaration ; `SaveStudentIdentity` utilise le même verrou pour l'édition. Les deux opérations recontrôlent l'autorisation côté Action. Le cache database existant fournit ce verrou en local ; les déploiements multi-instances doivent utiliser un store partagé supportant les locks. Les écritures sont courtes et sérialisées, avec attente de dix secondes et durée du verrou de soixante secondes. Les imports utilisent désormais des verrous DB ciblés partagés avec la saisie manuelle (voir section Imports), sans appeler cette Action sous le verrou de cache. Les changements d'identifiants ne sont pas garantis uniques pour des écritures SQL directes, volontairement.
 
@@ -107,9 +109,9 @@ Les Policies combinent permissions, rôle interne autorisé, contexte d'établis
 
 Les établissements consultent uniquement les identités ayant une déclaration chez eux, y compris inactive pour conserver leur historique. Sur une fiche partagée, seuls leurs enregistrements annuels sont renvoyés. Pour protéger l'identité permanente commune, un établissement ne peut pas modifier/désactiver une identité déjà déclarée ailleurs (même historiquement) ; cette correction administrative nécessite un acteur global autorisé. Il conserve la gestion de ses propres déclarations.
 
-La liste est une vue de déclarations annuelles : un étudiant peut apparaître sur plusieurs lignes correspondant à plusieurs années, avec pagination SQL de 20 lignes. Elle sélectionne uniquement matricule, nom, prénoms et statut d'identité dans la relation Student. CIN, naissance, contacts et BAC restent hors liste. Les relations utiles sont chargées en eager loading ; un test sur 25 déclarations borne les requêtes vers students indépendamment du nombre de lignes.
+La liste est une vue de déclarations annuelles : un étudiant peut apparaître sur plusieurs lignes correspondant à plusieurs années, avec pagination SQL de 20 lignes. Elle sélectionne uniquement nom, prénoms, sexe, date de naissance et statut d'identité dans la relation Student. CIN, contacts et BAC restent hors liste. Les relations utiles sont chargées en eager loading ; un test sur 25 déclarations borne les requêtes vers students indépendamment du nombre de lignes.
 
-Recherche SQL normalisée : sous-chaîne pour nom/prénoms, préfixe pour matricule/CIN/BAC/téléphone/email afin d'exploiter les index lorsque le plan le permet. `%`, `_` et `!` sont échappés explicitement. Les filtres année/établissement/niveau/parcours/statut sont combinés côté SQL ; un filtre établissement falsifié est refusé en 403 pour un compte établissement. Les recherches partielles de noms peuvent scanner plus de lignes : aucune performance chiffrée sur plusieurs dizaines de milliers d'identités n'est prétendue sans données de charge.
+Recherche SQL normalisée : sous-chaîne pour nom/prénoms, préfixe pour CIN/téléphone/email afin d'exploiter les index lorsque le plan le permet. `%`, `_` et `!` sont échappés explicitement. Les filtres année/établissement/niveau/parcours/statut sont combinés côté SQL ; un filtre établissement falsifié est refusé en 403 pour un compte établissement. Les recherches partielles de noms peuvent scanner plus de lignes : aucune performance chiffrée sur plusieurs dizaines de milliers d'identités n'est prétendue sans données de charge.
 
 Les contraintes critiques ont été vérifiées sur MySQL : FK, unicités annuelles, cohérence parcours/établissement, identifiants NULL non uniques, historique inactif et rollback avec audit. Les tests Pest utilisent toujours SQLite en mémoire ; les collations peuvent différer, notamment pour les noms et identifiants non normalisés en casse.
 
@@ -119,13 +121,13 @@ Laravel Excel **4.0.4** et PhpSpreadsheet **5.10.0**, compatibles Laravel 13/PHP
 
 - `student_imports` : FK restrictives établissement/année/auteur ; nom original, chemin UUID privé, disque ; `StudentImportStatus` ; headers/mapping JSON ; `excel_calendar` (1900/1904) ; compteurs ; dates uploaded/analyzed/committed/failed et marqueur `purged_at`. Index `(establishment_id, created_at)` et `(status, created_at)`.
 - `student_import_rows` : FK import avec cascade réservée à la gestion technique, numéro physique de ligne, raw/normalized JSON, `StudentImportRowStatus`, erreurs/avertissements structurés `{field, code, message}`, FK restrictives vers identité/déclaration reconnues, résolution `imported`/`skipped`. Unicité `(student_import_id, row_number)` et index `(student_import_id, status, id)`. Aucune route DELETE.
-- `student_identity_locks` : clé SHA-256 primaire, sans valeur personnelle brute. Verrous transactionnels persistants sur matricule/CIN/BAC et identité exacte avec naissance ; clés triées pour limiter les deadlocks. Ne pas purger ces clés pendant l'exploitation : une suppression concurrente détruirait la coordination. Les clés sont des pseudonymes techniques à protéger dans les sauvegardes.
+- `student_identity_locks` : clé SHA-256 primaire, sans valeur personnelle brute. Verrous transactionnels persistants sur CIN standard, téléphone, email et identité exacte avec naissance ; clés triées pour limiter les deadlocks. Ne pas purger ces clés pendant l'exploitation : une suppression concurrente détruirait la coordination. Les clés sont des pseudonymes techniques à protéger dans les sauvegardes.
 
 `created_rows` compte les nouvelles identités ; `updated_rows` les identités dont des champs vides ont été complétés ; `declared_rows` les nouvelles déclarations, y compris pour une identité réutilisée sans changement ; `skipped_rows = total_rows - declared_rows`. Les compteurs valid/warning/rejected/duplicate sont recalculés après confirmation si la base a changé.
 
-Analyse : collecte groupée des candidats pour chaque bloc, union des correspondances matricule/CIN/BAC et nom/prénoms/naissance. Plusieurs candidats impliquent une revue, jamais une fusion. Téléphone/email ne sont pas des clés de rapprochement. Une seule identité visible chez l'établissement, sans historique étranger, est réutilisable ; sinon message générique sans ID ou valeurs officielles étrangers. Les valeurs non vides différentes déclenchent un warning sur **tous** les champs, contacts compris. Des valeurs DB vides peuvent être complétées, après validation et contrôle de cohérence des dates combinées.
+Analyse : collecte groupée des candidats pour chaque bloc, union des correspondances CIN standard et nom/prénoms/naissance. Plusieurs candidats impliquent une revue, jamais une fusion. Téléphone et email ne rapprochent pas deux fiches : portés par une autre identité, ils rejettent la ligne (unicité). Une référence de demande de bourse déjà attribuée à un autre étudiant dans l'établissement et l'année rejette aussi la ligne. Dans le fichier, une même identité répétée est un doublon ; une autre identité réutilisant CIN standard, téléphone, email ou référence est rejetée. Une seule identité visible chez l'établissement, sans historique étranger, est réutilisable ; sinon message générique sans ID ou valeurs officielles étrangers. Les valeurs non vides différentes déclenchent un warning sur **tous** les champs, contacts compris. Des valeurs DB vides peuvent être complétées, après validation et contrôle de cohérence des dates combinées.
 
-Même déclaration annuelle et même niveau/parcours : duplicate sans modification, même si inactive. Niveau/parcours différents : warning. Déclaration active étrangère : warning, sans transfert. Warnings/rejected/duplicate ne sont jamais écrits dans les tables métier.
+Même déclaration annuelle et mêmes niveau, parcours, code de redoublement et demande de bourse : duplicate sans modification, même si inactive. Valeurs différentes : warning. Déclaration active étrangère : warning, sans transfert. Warnings/rejected/duplicate ne sont jamais écrits dans les tables métier.
 
 Confirmation : transaction unique avec verrou de l'import, verrous partagés des référentiels et verrous ciblés d'identité, puis nouvelle analyse de chaque ligne valid et verrouillage des candidats/déclarations. Les écritures Eloquent conservent l'audit. Reprise limitée des deadlocks ; échec critique rollback identité/déclaration/staging/audit, puis statut failed avec motif générique sans données personnelles. Un retry completed est un no-op sans second audit. La saisie manuelle conserve son verrou court de cache et acquiert les mêmes verrous DB avant les contrôles de doublons. Les écritures SQL directes ne bénéficient pas de ce protocole.
 
@@ -166,10 +168,10 @@ Migration `2026_10_14_210000_create_student_information_confirmations`, table `s
 - `information_fingerprint` : HMAC-SHA256 (clé `APP_KEY`) de la version confirmée, **jamais une copie des valeurs**. Aucun nom, contact, naissance, BAC ni CIN dans cette table. Masqué à la sérialisation.
 - `confirmed_at`, timestamps. Aucune colonne d'état : « confirmée », « obsolète » ou « jamais confirmée » est **déduit** à chaque lecture en comparant la dernière confirmation (rang le plus élevé) à l'empreinte de la situation actuelle. Aucune Action Student ne touche cette table.
 
-Contenu canonique de l'empreinte (`StudentInformationFingerprint`, version `v1`) : ordre de clés fixe, valeurs préfixées par leur longueur, NULL distinct de la chaîne vide, dates `Y-m-d` ; jamais de JSON.
+Contenu canonique de l'empreinte (`StudentInformationFingerprint`, version `v2` depuis l'alignement sur le modèle établissement : toutes les confirmations `v1` apparaissent obsolètes) : ordre de clés fixe, valeurs préfixées par leur longueur, NULL distinct de la chaîne vide, dates `Y-m-d` ; jamais de JSON.
 
-- Student : `student_number`, `last_name`, `first_names`, `birth_date`, `birth_place`, `phone`, `email`, `address`, `bac_registration_number`, `bac_series`, `bac_year`, `bac_mention` (exactement les champs affichés sur `bourse`). Les données CIN, jamais affichées à l'étudiant, sont exclues.
-- Déclaration courante : `id`, `status` ; année, établissement, niveau, parcours : **identifiant et nom affiché**. Renommer un parcours ou un niveau rend donc la confirmation obsolète : l'étudiant n'a pas vu ce libellé.
+- Student : `last_name`, `first_names`, `sex`, `birth_date`, `mother_name`, `nationality`, `phone`, `email`, `address`, `bac_series`, `bac_year` (exactement les champs affichés sur `bourse`). Les données CIN, jamais affichées à l'étudiant, sont exclues.
+- Déclaration courante : `id`, `status`, `repeat_code` ; année, établissement, niveau, parcours : **identifiant et nom affiché** ; nom affiché de la mention. Renommer un parcours ou un niveau rend donc la confirmation obsolète : l'étudiant n'a pas vu ce libellé.
 - Les déclarations des autres années, affichées pour l'historique, ne font pas partie de la version confirmée.
 
 Rotation d'`APP_KEY` : toutes les empreintes deviennent non comparables, donc toutes les confirmations apparaissent obsolètes (échec sûr, même convention que les corrections) ; l'étudiant confirme à nouveau. Vérifications MySQL : `php tests/MySql/StudentConfirmationChecks.php`, **uniquement sur une base jetable dont le nom contient `check`**.
@@ -225,3 +227,26 @@ Migration `2026_10_16_100000_add_internal_user_management` : `users.uuid` (UUID 
 Migration `2026_10_16_110000_add_logo_to_establishments` : `establishments.logo_path` nullable, chemin sur le disque privé `local` (`establishment-logos/{uuid7}.{ext}`).
 
 Migration `2026_10_16_120000_create_platform_settings` : table clé/valeur `platform_settings` (`key` clé primaire, `value` texte nullable, timestamps) pour l'identité de la plateforme : `institution_name`, `scol_name`, `bourse_name`, `support_email`, `logo_path`, `favicon_path` (fichiers sur le disque privé `local`, dossier `branding/`).
+
+## Alignement sur le fichier modèle des établissements
+
+Migration `2026_10_17_100000_align_students_with_establishment_template`. Le fichier Excel transmis par les établissements (une ligne par étudiant, 26 colonnes) est la source de vérité des champs étudiants.
+
+| Colonne du modèle                                            | Stockage                                                                                                                                                                                           |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NOM, PRENOMS, SEXE, DATE DE NAISSANCE, Nom et prénom de mère | `students.last_name`, `first_names`, `sex`, `birth_date`, `mother_name`                                                                                                                            |
+| CIN, Date de délivrance, Lieu de délivrance                  | `students.cin`, `cin_issued_at`, `cin_issued_place`                                                                                                                                                |
+| NATIONALITÉ, ANNÉE D'OBTENTION DU BACC, SÉRIE DU BACC        | `students.nationality`, `bac_year`, `bac_series`                                                                                                                                                   |
+| ADRESSE EXACTE, NUMERO TELEPHONE, ADRESSE MAIL               | `students.address`, `phone`, `email` (téléphone et email uniques)                                                                                                                                  |
+| CODE DE REDOUBLEMENT                                         | `student_records.repeat_code` (`N`, `R`, `T+`)                                                                                                                                                     |
+| DATE DE DÉPÔT / RÉFÉRENCE DEMANDE DE BOURSE                  | `student_records.scholarship_requested_at`, `scholarship_request_reference` (unique par établissement et année, index `student_records_request_reference_unique` limité aux lignes hors corbeille) |
+| BOURSIER, TAUX DE BOURSE                                     | non stockés : formules du modèle recalculées par le serveur (`ScholarshipEligibility`)                                                                                                             |
+| Niveau, Mention, Parcours                                    | `student_records.level_id`, `program_id` (mention déduite du parcours)                                                                                                                             |
+| Domaine                                                      | `mentions.domain_id` → `domains`                                                                                                                                                                   |
+| Type de formation                                            | `programs.training_type`                                                                                                                                                                           |
+| Institution                                                  | `establishments.sector`                                                                                                                                                                            |
+| École / Institut                                             | établissement de l'import (contrôle de concordance)                                                                                                                                                |
+
+Règle de bourse indicative (`ScholarshipEligibility`, reprise des formules du modèle) : éligible si nationalité Malagasy, année du BAC ≤ `academic_years.scholarship_max_bac_year`, référence de demande présente et code `N` (taux 1) ou `R` (taux 1/4) ; `T+` n'est pas boursier. Sans année limite définie, le résultat est « indéterminé ». La règle est affichée sur la fiche interne ; elle ne remplace pas la vérification du dossier papier par la Scolarité Centrale.
+
+Suppression des colonnes `student_number`, `birth_place`, `bac_registration_number`, `bac_mention` : leurs valeurs sont perdues, ainsi que les demandes de correction portant sur ces champs (supprimées par la migration, faute de champ cible). Le `down()` recrée les colonnes vides.
