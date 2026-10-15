@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Platform\PlatformSettingsController;
 use App\Http\Controllers\Reporting\DashboardController;
 use App\Http\Controllers\StudentPortal\LinkReviewController;
@@ -29,6 +30,13 @@ Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware
     require __DIR__.'/permissions.php';
     require __DIR__.'/users.php';
     require __DIR__.'/trash.php';
+    Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::post('/{notification}/open', [NotificationController::class, 'open'])->whereUuid('notification')->name('open');
+        Route::patch('/{notification}', [NotificationController::class, 'read'])->whereUuid('notification')->name('read');
+        Route::post('/read-all', [NotificationController::class, 'readAll'])->name('read-all');
+        Route::put('/preferences', [NotificationController::class, 'preferences'])->name('preferences');
+    });
     Route::get('student-links', [LinkReviewController::class, 'index'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.index');
     Route::post('student-links/{student_link_request}/review', [LinkReviewController::class, 'review'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.review');
 
