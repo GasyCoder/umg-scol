@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Platform\PlatformSettingsController;
 use App\Http\Controllers\StudentPortal\AuthenticationController;
 use App\Http\Controllers\StudentPortal\ConfirmationController;
 use App\Http\Controllers\StudentPortal\CorrectionController;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 // Always bound, even while Wayfinder generates URLs: the bourse SPA does not use them, and an unbound '/' would replace the internal 'home' route.
 Route::domain(config('portals.bourse_domain'))->group(function () {
     Route::view('/', 'bourse')->name('student-portal');
+    Route::get('branding/{asset}', [PlatformSettingsController::class, 'asset'])->whereIn('asset', ['logo', 'favicon'])->middleware('throttle:120,1,branding-asset')->name('student-portal.branding');
     Route::prefix('api/student')->name('student-api.')->group(function () {
         Route::get('session', [AuthenticationController::class, 'session'])->name('session');
         Route::post('auth/otp/request', [AuthenticationController::class, 'requestOtp'])->middleware('throttle:student-otp-request')->name('otp.request');
