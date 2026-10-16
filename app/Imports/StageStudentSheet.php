@@ -44,7 +44,9 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
 
             return;
         }
-        if ($this->summary || count(array_filter($raw, fn ($v) => $v !== null && $v !== '')) === 0 || StudentImportColumns::isLegendRow($raw)) {
+        // Rows of the model holding only the BOURSIER/TAUX formulas are empty lines, not students.
+        $filled = array_filter($raw, fn ($v) => $v !== null && $v !== '' && ! (is_string($v) && str_starts_with($v, '=')));
+        if ($this->summary || $filled === [] || StudentImportColumns::isLegendRow($raw)) {
             return;
         }
         if (StudentImportColumns::isSummaryStart($raw)) {
