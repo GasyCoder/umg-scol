@@ -9,7 +9,7 @@ use App\Models\StudentRecord;
 /**
  * Rule of the establishment file (columns BOURSIER and TAUX DE BOURSE), applied by the server
  * instead of trusting spreadsheet formulas: Malagasy nationality, BAC obtained no later than the
- * limit of the academic year, a scholarship request reference, and a new (rate 1) or repeating
+ * limit of the academic year, a scholarship request reference, and a new or passing (rate 1) or repeating
  * (rate 1/4) student. A triple-or-more student gets no scholarship.
  *
  * Indicative only: the paper file is still checked and decided by the central scholarship office.
@@ -37,7 +37,7 @@ final class ScholarshipEligibility
         if (blank($record->scholarship_request_reference)) {
             $reasons[] = 'Aucune référence de demande de bourse.';
         }
-        if (! in_array($record->repeat_code, [RepeatCode::New, RepeatCode::Repeating], true)) {
+        if (! in_array($record->repeat_code, [RepeatCode::New, RepeatCode::Passing, RepeatCode::Repeating], true)) {
             $reasons[] = $record->repeat_code === null ? 'Code de redoublement non renseigné.' : 'Triplant ou plus : pas de bourse.';
         }
         $limit = $record->academicYear->scholarship_max_bac_year;
@@ -56,7 +56,7 @@ final class ScholarshipEligibility
         }
 
         return ['status' => $status, 'rate' => $status !== self::ELIGIBLE ? '0' : match ($record->repeat_code) {
-            RepeatCode::New => '1',
+            RepeatCode::New, RepeatCode::Passing => '1',
             RepeatCode::Repeating => '1/4',
             default => '0',
         }, 'reasons' => $reasons];
