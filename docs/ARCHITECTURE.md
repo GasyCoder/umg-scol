@@ -19,8 +19,8 @@ Les endpoints étudiants sont regroupés sous `/api/student/*` (`routes/student-
 
 L'authentification étudiante se fait par email + OTP (code à 6 chiffres haché, 10 minutes, 5 tentatives, lié à la session, jamais envoyé par le mailer `log`) ou par Google OAuth (email Google vérifié). Elle crée un compte numérique vérifié, qui ne donne accès à aucune fiche. L'accès à la fiche `Student` exige ensuite un rattachement :
 
-- automatique uniquement si la CIN correspond exactement, avec la même date de naissance, un candidat unique et actif, et l'email officiel de la fiche identique à l'email vérifié du compte ;
-- sinon, une `StudentLinkRequest` est créée et doit être approuvée par le personnel (`/student-links`, permission `student_links.review`). Un établissement ne voit que les demandes dont l'étudiant a une déclaration active sur l'année courante ; la Scolarité Centrale a une revue globale.
+- automatique dès que la date de naissance et un renseignement de la fiche (CIN, téléphone, email, ou nom + nom de la mère) désignent une seule fiche active non rattachée ; pas de revue manuelle (ADR-073) ;
+- sinon, réponse générique, sans demande au personnel ; si l'email officiel de la fiche diffère de celui du compte, une alerte lui est envoyée, et le personnel peut détacher un compte depuis la fiche étudiant.
 
 Une fiche ne peut être rattachée qu'à un seul compte (contrainte unique en SQL). Les réponses du portail ne renvoient jamais l'identifiant interne ni la CIN.
 
@@ -69,5 +69,6 @@ Thème : tokens shadcn/ui définis dans `resources/css/app.css` (palette institu
 - Résoudre `scol.umg.test` et `bourse.umg.test` vers `127.0.0.1` via le fichier hosts : le routage par domaine est actif et tout autre hôte (dont `127.0.0.1`) répond 404. Renseigner `APP_URL`, `SCOL_DOMAIN` et `BOURSE_DOMAIN` dans `.env`.
 - L'OTP étudiant exige un vrai transport email (SMTP local type Mailpit sur le port 1025 en développement) ; le mailer `log` est refusé pour ne pas écrire de code secret dans les journaux. Google OAuth reste désactivé tant que `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` et `GOOGLE_REDIRECT_URI` ne sont pas tous renseignés ; l'OTP fonctionne seul.
 - `students:purge-otp` supprime les défis OTP expirés toutes les heures : le scheduler doit être actif.
+- L'email OTP part par la file d'attente (chiffré) : un worker `php artisan queue:work` doit tourner en production (en local, `php artisan dev` lance `queue:listen`).
 - URL front générées par Wayfinder : relatives (`/login`, `/students`…), car les routes `scol` ne sont pas liées à leur domaine pendant `wayfinder:generate` (`PortalRouteDomain`). Sinon Wayfinder écrirait `//scol.umg.test/login` sans le port et enverrait formulaires et liens vers un autre origin. Le routage par hôte reste inchangé à l'exécution. Générer les assets (`npm run build`, qui lance `wayfinder:generate`) **avant** tout `php artisan route:cache` : avec des routes en cache, le domaine réapparaîtrait dans les URL générées.
 - SMTP local pour l'OTP : Mailpit (par exemple `docker run -d --name umg-mailpit -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit`), `MAIL_MAILER=smtp`, `MAIL_HOST=127.0.0.1`, `MAIL_PORT=1025` ; boîte de réception sur `http://127.0.0.1:8025`.
