@@ -175,7 +175,7 @@ it('enforces program establishment and all foreign keys in the database', functi
 it('strictly isolates student lists detail and foreign record urls', function () {
     $own = StudentRecord::factory()->create(['establishment_id' => $this->a->id]);
     $foreign = StudentRecord::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->actor)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->where('records.data.0.student_id', $own->student_id));
+    $this->actingAs($this->actor)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 1)->where('records.data.0.student_id', $own->student_id));
     $this->get('/students/'.$own->student->uuid)->assertOk();
     foreach (['/students/'.$foreign->student->uuid, '/students/'.$foreign->student->uuid.'/edit', '/student-records/'.$foreign->uuid.'/edit', '/students/'.$foreign->student->uuid.'/records/create'] as $url) {
         $this->get($url)->assertForbidden();
@@ -197,7 +197,7 @@ it('does not reveal other annual records on a shared student detail', function (
 it('keeps central office read only while allowing global filters and detail', function () {
     $a = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id]);
     StudentRecord::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->central)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', false));
+    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', false));
     $this->get('/students/'.$a->student->uuid)->assertInertia(fn (Assert $page) => $page->where('canUpdate', false)->where('canCreateRecord', false));
     $query = http_build_query(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'status' => 'active']);
     $this->get('/students?'.$query)->assertInertia(fn (Assert $page) => $page->has('records.data', 1));
@@ -250,10 +250,10 @@ it('searches all supported identity columns and hides sensitive list columns', f
 })->with([['last_name', 'Lookupnom'], ['first_names', 'Lookupprénom'], ['cin', '876543210123'], ['cin', 'RECU-LOOKUP'], ['phone', '0349999999'], ['email', 'lookup@example.test']]);
 
 it('paginates on the server and bounds relation queries independently of row count', function () {
-    StudentRecord::factory()->count(25)->create(['establishment_id' => $this->a->id]);
+    StudentRecord::factory()->count(30)->create(['establishment_id' => $this->a->id]);
     DB::enableQueryLog();
     DB::flushQueryLog();
-    $this->actingAs($this->central)->get('/students?view=list')->assertInertia(fn (Assert $page) => $page->has('records.data', 20)->where('records.total', 25));
+    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 25)->where('records.total', 30));
     $related = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'from "students"'));
     expect($related->count())->toBeLessThanOrEqual(2);
     DB::disableQueryLog();
@@ -326,4 +326,35 @@ it('shows the mention of each declaration and whether a portal account is linked
 it('rejects implausible dates such as a year typed on one digit', function () {
     $this->actingAs($this->actor)->post('/students', [...$this->data, 'birth_date' => '0005-02-01', 'cin_issued_at' => '1899-12-31'])
         ->assertSessionHasErrors(['birth_date' => 'La date est antérieure à 1900 : vérifiez l’année saisie.', 'cin_issued_at']);
+});
+
+it('deactivates the current declaration with the student and restores only that one on reactivation', function () {
+    $this->year->update(['is_current' => true, 'is_active' => true]);
+    $past = AcademicYear::factory()->create(['is_current' => false]);
+    $student = Student::factory()->create();
+    $current = StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id]);
+    $history = StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $past->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id]);
+    $this->actingAs($this->actor);
+
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => false])->assertRedirect();
+    expect($student->fresh()->is_active)->toBeFalse()
+        ->and($current->fresh()->status->value)->toBe('inactive')->and($current->fresh()->inactive_with_identity)->toBeTrue()
+        ->and($history->fresh()->status->value)->toBe('active');
+    $this->get('/students?view=list&academic_year_id='.$this->year->id)->assertInertia(fn ($page) => $page->where('records.data.0.status', 'inactive')->where('records.data.0.student.is_active', false));
+
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => true])->assertRedirect();
+    expect($current->fresh()->status->value)->toBe('active')->and($current->fresh()->inactive_with_identity)->toBeFalse();
+});
+
+it('keeps a declaration deactivated by hand inactive when the student is reactivated', function () {
+    $this->year->update(['is_current' => true, 'is_active' => true]);
+    $student = Student::factory()->create();
+    $record = StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id]);
+    $this->actingAs($this->actor);
+
+    $this->patch('/student-records/'.$record->uuid.'/status', ['status' => 'inactive'])->assertRedirect();
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => false])->assertRedirect();
+    $this->patch('/students/'.$student->uuid.'/status', ['is_active' => true])->assertRedirect();
+
+    expect($record->fresh()->status->value)->toBe('inactive')->and($record->fresh()->inactive_with_identity)->toBeFalse();
 });
