@@ -3,7 +3,6 @@
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Platform\PlatformSettingsController;
 use App\Http\Controllers\Reporting\DashboardController;
-use App\Http\Controllers\StudentPortal\LinkReviewController;
 use App\Http\Middleware\EnsureEstablishmentContext;
 use App\Http\Middleware\EnsureInternalPortal;
 use App\Support\PortalRouteDomain;
@@ -37,8 +36,6 @@ Route::domain(PortalRouteDomain::for(config('portals.scol_domain')))->middleware
         Route::post('/read-all', [NotificationController::class, 'readAll'])->name('read-all');
         Route::put('/preferences', [NotificationController::class, 'preferences'])->name('preferences');
     });
-    Route::get('student-links', [LinkReviewController::class, 'index'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.index');
-    Route::post('student-links/{student_link_request}/review', [LinkReviewController::class, 'review'])->middleware(['auth', 'verified', EnsureEstablishmentContext::class])->name('student-links.review');
 
 });
 require __DIR__.'/student-portal.php';
