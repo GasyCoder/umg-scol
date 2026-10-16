@@ -20,6 +20,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -135,14 +136,14 @@ it('allows superadmin to select an establishment', function () {
 });
 it('maps canonical fields and French aliases deterministically', function () {
     expect(StudentImportColumns::suggest(['NOM', 'Prénoms', 'Sexe', 'N° matricule', 'CIN', 'Niveau', 'Code redoublement']))->toBe(['last_name' => 0, 'first_names' => 1, 'sex' => 2, 'cin' => 4, 'level' => 5, 'repeat_code' => 6]);
-    expect(StudentImportColumns::suggest(array_keys(StudentImportColumns::labels())))->toHaveCount(24)
-        ->and(StudentImportColumns::suggest(array_values(StudentImportColumns::labels())))->toHaveCount(24);
+    expect(StudentImportColumns::suggest(array_keys(StudentImportColumns::labels())))->toHaveCount(25)
+        ->and(StudentImportColumns::suggest(array_values(StudentImportColumns::labels())))->toHaveCount(25);
 });
 it('rejects incomplete, duplicated, unknown and out of range mappings', function (string $case) {
     $import = uploadStudentCsv($this, [$this->data]);
     $mapping = $import->mapping;
     match ($case) {
-        'missing sex' => $mapping = array_diff_key($mapping, ['sex' => true]),
+        'missing birth date' => $mapping = array_diff_key($mapping, ['birth_date' => true]),
         'missing repeat code' => $mapping = array_diff_key($mapping, ['repeat_code' => true]),
         'duplicated' => $mapping['level'] = $mapping['last_name'],
         'out of range' => $mapping['level'] = 999,
@@ -150,7 +151,7 @@ it('rejects incomplete, duplicated, unknown and out of range mappings', function
     };
     $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $mapping])->assertSessionHasErrors();
     expect($import->fresh()->status)->toBe(ImportStatus::Uploaded);
-})->with(['missing sex', 'missing repeat code', 'duplicated', 'out of range', 'unknown']);
+})->with(['missing birth date', 'missing repeat code', 'duplicated', 'out of range', 'unknown']);
 it('permits a corrected mapping before analysis', function () {
     $import = uploadStudentCsv($this, [$this->data]);
     $this->post('/imports/'.$import->uuid.'/analyze', ['mapping' => $import->mapping])->assertSessionHasNoErrors()->assertRedirect();
@@ -171,10 +172,8 @@ it('rejects invalid row fields with structured errors', function (string $field,
     expect($row->status)->toBe(RowStatus::Rejected)->and($row->errors[0])->toHaveKeys(['field', 'code', 'message']);
 })->with([['last_name', ''], ['email', 'invalid'], ['level', 'unknown'], ['birth_date', '31/02/2001'], ['birth_date', '2999-01-01'], ['birth_date', ''], ['phone', 'bad'], ['bac_year', 1800], ['cin', str_repeat('1', 101)], ['last_name', '=1+1'],
     ['sex', ''], ['sex', 'X'], ['nationality', ''], ['nationality', 'Martienne'], ['repeat_code', ''], ['repeat_code', 'Q (Quadruplant)'], ['bac_series', 'Z9'], ['scholarship_requested_at', '2026-01-01']]);
-it('rejects foreign inactive or ambiguous programs', function (string $case) {
-    if ($case === 'foreign') {
-        $this->program->update(['establishment_id' => $this->b->id]);
-    } elseif ($case === 'inactive') {
+it('rejects inactive or ambiguous programs', function (string $case) {
+    if ($case === 'inactive') {
         $this->program->update(['is_active' => false]);
     } else {
         $this->program->update(['code' => null, 'name' => 'Parcours']);
@@ -183,7 +182,16 @@ it('rejects foreign inactive or ambiguous programs', function (string $case) {
     }
     $import = analyzeStudentCsv($this, [$this->data]);
     expect($import->rejected_rows)->toBe(1);
-})->with(['foreign', 'inactive', 'ambiguous']);
+})->with(['inactive', 'ambiguous']);
+it('creates a program missing from the import establishment instead of reusing a foreign one', function () {
+    $this->program->update(['establishment_id' => $this->b->id]);
+    $import = analyzeStudentCsv($this, [$this->data]);
+    expect($import->valid_rows)->toBe(1)->and($import->reference_changes['programs'])->toBe([$this->data['program']]);
+
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $created = Program::query()->where('establishment_id', $this->a->id)->where('name', $this->data['program'])->sole();
+    expect(StudentRecord::query()->sole()->program_id)->toBe($created->id)->and($this->program->fresh()->establishment_id)->toBe($this->b->id);
+});
 it('rejects CIN issued before birth', function () {
     $import = analyzeStudentCsv($this, [[...$this->data, 'birth_date' => '2001-01-01', 'cin_issued_at' => '2000-01-01']]);
     expect($import->rejected_rows)->toBe(1);
@@ -296,7 +304,7 @@ it('does not expose foreign identities or automatically transfer them', function
     expect($import->warning_rows)->toBe(1)->and($import->rows()->sole()->matched_student_id)->toBeNull();
     $this->actingAs($this->admin);
     app(AnalyzeStudentImport::class)->handle($this->admin, $import, $import->mapping);
-    expect($import->rows()->sole()->warnings)->toContainEqual(['field' => 'record', 'code' => 'foreign_active_record', 'message' => 'Une déclaration active existe dans un autre établissement. Aucun transfert automatique.']);
+    expect($import->rows()->sole()->warnings)->toContainEqual(['field' => 'record', 'code' => 'foreign_active_record', 'message' => 'Une situation active existe dans un autre établissement. Aucun transfert automatique.']);
 });
 it('commits only valid rows and ignores warnings rejected rows and duplicates', function () {
     existingImportStudent($this, ['last_name' => 'Ancien', 'cin' => '101234567890']);
@@ -481,9 +489,10 @@ it('always interprets CSV numeric dates using calendar 1900', function () {
         Date::setExcelCalendar(1900);
     }
 });
-it('offers a French import template that the column mapping recognises', function () {
-    $csv = $this->actingAs($this->actor)->get('/imports/template')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
-    expect($csv)->toStartWith("\xEF\xBB\xBF")->toContain('Nom;Prénoms;Sexe;"Date de naissance"')->not->toContain('Matricule');
-    $headers = str_getcsv(trim(substr($csv, 3)), ';');
-    expect(StudentImportColumns::suggest($headers))->toHaveCount(24)->toHaveKeys(StudentImportColumns::required());
+it('offers the establishment file as an XLSX model that the column mapping recognises', function () {
+    $response = $this->actingAs($this->actor)->get('/imports/template')->assertOk();
+    $path = tempnam(sys_get_temp_dir(), 'tpl').'.xlsx';
+    file_put_contents($path, $response->streamedContent());
+    $headers = IOFactory::load($path)->getSheet(0)->rangeToArray('A1:Z1')[0];
+    expect($headers)->not->toContain('Matricule')->and(StudentImportColumns::suggest($headers))->toHaveCount(24)->toHaveKeys(StudentImportColumns::required());
 });
