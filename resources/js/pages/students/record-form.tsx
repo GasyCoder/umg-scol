@@ -63,7 +63,7 @@ export default function AnnualRecordForm({
                             ? 'Modifier la situation de l’année'
                             : 'Ajouter la situation de l’année'
                     }
-                    description={`${fullName} — ${record ? 'l’établissement et l’année ne changent pas ; niveau, parcours, code de redoublement et demande de bourse peuvent être corrigés.' : 'nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
+                    description={`${fullName}. ${record ? 'L’établissement et l’année ne changent pas ; niveau, parcours, code de redoublement et demande de bourse peuvent être corrigés.' : 'Nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
                 />
                 <div className="space-y-6">
                     <Link
