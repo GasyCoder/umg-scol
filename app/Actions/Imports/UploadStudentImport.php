@@ -18,10 +18,10 @@ use Throwable;
 
 class UploadStudentImport
 {
-    public function handle(User $actor, UploadedFile $file, int $establishment, int $year): StudentImport
+    public function handle(User $actor, UploadedFile $file, ?int $establishment, int $year): StudentImport
     {
         Gate::forUser($actor)->authorize('create', StudentImport::class);
-        abort_if($actor->hasRole('establishment') && $actor->establishment_id !== $establishment, 403);
+        abort_if($actor->hasRole('establishment') && ($establishment === null || $actor->establishment_id !== $establishment), 403);
         try {
             app(StudentImportFileGuard::class)->validate($file);
         } catch (Throwable $error) {
