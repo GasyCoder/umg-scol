@@ -661,7 +661,7 @@ export default function StudentForm({
                     icon={editing ? UserRoundPen : UserPlus}
                     title={
                         editing
-                            ? `Modifier l’identité — ${fullName}`
+                            ? `Modifier l’identité de ${fullName}`
                             : 'Ajouter un étudiant'
                     }
                     description={
