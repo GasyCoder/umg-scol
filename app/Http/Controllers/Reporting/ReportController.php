@@ -17,8 +17,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportController extends Controller
 {
     private const COLUMNS = [
-        'students' => ['establishment' => 'Établissement', 'level' => 'Niveau', 'program' => 'Parcours', 'active' => 'Déclarations actives', 'inactive' => 'Déclarations inactives', 'total' => 'Total'],
-        'imports' => ['establishment' => 'Établissement', 'imports' => 'Imports', 'completed' => 'Terminés', 'failed' => 'En échec', 'total_rows' => 'Lignes traitées', 'valid_rows' => 'Valides', 'warning_rows' => 'Avertissements', 'rejected_rows' => 'Rejetées', 'duplicate_rows' => 'Doublons', 'declared_rows' => 'Déclarations importées'],
+        'students' => ['establishment' => 'Établissement', 'level' => 'Niveau', 'program' => 'Parcours', 'active' => 'Situations actives', 'inactive' => 'Situations inactives', 'total' => 'Total'],
+        'imports' => ['establishment' => 'Établissement', 'imports' => 'Imports', 'completed' => 'Terminés', 'failed' => 'En échec', 'total_rows' => 'Lignes traitées', 'valid_rows' => 'Valides', 'warning_rows' => 'Avertissements', 'rejected_rows' => 'Rejetées', 'duplicate_rows' => 'Doublons', 'declared_rows' => 'Situations importées'],
         'scholarships' => ['campaign' => 'Campagne', 'establishment' => 'Établissement', 'level' => 'Niveau', 'pending' => 'Reçus', 'in_review' => 'En vérification', 'validated' => 'Validés', 'needs_correction' => 'Correction demandée', 'rejected' => 'Rejetés', 'total' => 'Total'],
     ];
 
