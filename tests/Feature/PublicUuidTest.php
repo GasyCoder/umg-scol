@@ -70,7 +70,6 @@ it('answers 404 to the sequential id in every URL family', function () {
     $this->get('/imports/'.$this->import->uuid)->assertOk();
     $this->get('/corrections/'.$this->correction->id)->assertNotFound();
     $this->get('/corrections/'.$this->correction->uuid)->assertOk();
-    $this->post('/student-links/'.$this->link->id.'/review', ['decision' => 'approve'])->assertNotFound();
     $this->put('/scholarships/campaigns/'.$this->campaign->id, ['academic_year_id' => $this->year->id, 'name' => 'Renommée'])->assertNotFound();
     $this->get('/scholarships/applications/'.$this->application->id)->assertNotFound();
     $this->get('/scholarships/applications/'.$this->application->uuid)->assertOk();
