@@ -38,6 +38,11 @@ class AnalyzeStudentImportRequest extends FormRequest
             if (is_array($mapping) && count($mapping) !== count(array_unique($mapping, SORT_REGULAR))) {
                 $validator->errors()->add('mapping', 'Une colonne ne peut être utilisée deux fois.');
             }
+            /** @var StudentImport $import */
+            $import = $this->route('student_import');
+            if ($import->establishment_id === null && is_array($mapping) && ! isset($mapping['establishment_code']) && ! isset($mapping['establishment'])) {
+                $validator->errors()->add('mapping', 'Import pour tous les établissements : associez la colonne Code établissement (ou École / Institut).');
+            }
         }];
     }
 
