@@ -433,7 +433,7 @@ export default function Reception({
                                         className="text-xs text-muted-foreground"
                                     >
                                         {campaign
-                                            ? `Campagne : ${campaign.name} — année ${campaign.academic_year}. Saisissez au moins deux caractères ; 20 résultats au plus sont affichés.`
+                                            ? `Campagne : ${campaign.name} (année ${campaign.academic_year}). Saisissez au moins deux caractères ; 20 résultats au plus sont affichés.`
                                             : 'Choisissez d’abord la campagne ouverte concernée.'}
                                     </p>
                                 </div>
