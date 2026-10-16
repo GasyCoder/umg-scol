@@ -12,7 +12,7 @@ void createInertiaApp({
     // The configured portal name (settings → Plateforme), falling back to the build-time name.
     title: (title, page) => {
         const name = (page.props.name as string | undefined) || appName;
-        return title ? `${title} - ${name}` : name;
+        return title ? `${title} | ${name}` : name;
     },
     layout: (name) => {
         switch (true) {
