@@ -72,14 +72,14 @@ class ReceiveScholarshipApplication
             ->where('student_id', $student->id)->where('academic_year_id', $campaign->academic_year_id)->lockForUpdate()->get();
         $active = $records->filter(fn (StudentRecord $record) => $record->status->value === 'active');
         if ($records->isEmpty()) {
-            $this->fail('student_id', 'Aucune déclaration de cet étudiant pour l’année universitaire de la campagne : l’établissement doit d’abord le déclarer.');
+            $this->fail('student_id', 'Aucune situation de cet étudiant pour l’année universitaire de la campagne : l’établissement doit d’abord le déclarer.');
         }
         if ($active->count() !== 1) {
-            $this->fail('student_id', $active->isEmpty() ? 'La déclaration de l’année de la campagne est inactive : contactez l’établissement.' : 'Plusieurs déclarations actives : situation à régulariser avant réception.');
+            $this->fail('student_id', $active->isEmpty() ? 'La situation de l’année de la campagne est inactive : contactez l’établissement.' : 'Plusieurs situations actives pour l’année : à régulariser avant réception.');
         }
         $record = $active->first();
         if (! $record->establishment->is_active || ! $record->level->is_active || ($record->program !== null && ($record->program->establishment_id !== $record->establishment_id || ! $record->program->is_active))) {
-            $this->fail('student_id', 'La déclaration annuelle référence un établissement, un niveau ou un parcours inactif ou incohérent.');
+            $this->fail('student_id', 'La situation de l’année référence un établissement, un niveau ou un parcours inactif ou incohérent.');
         }
 
         return $record;
