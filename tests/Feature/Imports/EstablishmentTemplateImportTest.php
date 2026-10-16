@@ -4,7 +4,9 @@ use App\Actions\Imports\AnalyzeStudentImport;
 use App\Enums\RepeatCode;
 use App\Enums\StudentImportRowStatus as RowStatus;
 use App\Enums\StudentImportStatus as ImportStatus;
+use App\Enums\TrainingType;
 use App\Models\AcademicYear;
+use App\Models\Activity;
 use App\Models\Domain;
 use App\Models\Establishment;
 use App\Models\Level;
@@ -185,9 +187,7 @@ it('rejects descriptive columns that disagree with the referentials', function (
     'unknown training type' => [['Type de formation' => 'À distance'], 'training_type:training_type_mismatch'],
     'other sector' => [['Institution' => 'Privée'], 'sector:sector_mismatch'],
     'unknown sector' => [['Institution' => 'Mixte'], 'sector:sector_mismatch'],
-    'unknown mention' => [['Mention' => 'Philosophie'], 'mention:unknown_or_ambiguous'],
     'mention without program' => [['Parcours' => null], 'program:missing_program'],
-    'program outside the mention' => [['Parcours' => 'Archéologie'], 'program:unknown_or_ambiguous'],
     'unknown repeat code' => [['CODE DE REDOUBLEMENT' => 'Q (Quadruplant)'], 'repeat_code:invalid_repeat_code'],
     'missing sex' => [['SEXE' => null], 'sex:invalid_sex'],
     'unlisted nationality' => [['NATIONALITÉ' => 'Martienne'], 'nationality:invalid_nationality'],
@@ -196,7 +196,57 @@ it('rejects descriptive columns that disagree with the referentials', function (
 
 it('rejects an ambiguous program name when no mention is given', function () {
     $import = analyzeTemplate($this, [templateRow(['Mention' => null, 'Domaine' => null])]);
-    expect(rowErrorCodes($import))->toContain('program:unknown_or_ambiguous');
+    expect(rowErrorCodes($import))->toContain('program:ambiguous');
+});
+
+it('creates the missing mention and program in the import establishment, with the domain and training type of the file', function () {
+    $import = analyzeTemplate($this, [
+        templateRow(['Mention' => 'Droit', 'Parcours' => 'Tronc Commun', 'Type de formation' => 'Professionnalisant']),
+        templateRow(['NOM' => 'RABE', 'CIN' => 413012049889, 'NUMERO TELEPHONE' => 327407097, 'ADRESSE MAIL' => 'rabe@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0002', 'Mention' => ' droit ', 'Parcours' => 'Droit Privé', 'Type de formation' => 'Professionnalisant']),
+        // Existing mention, missing program inside it.
+        templateRow(['NOM' => 'RAVELO', 'CIN' => 413012049890, 'NUMERO TELEPHONE' => 327407098, 'ADRESSE MAIL' => 'ravelo@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0003', 'Parcours' => 'Linguistique']),
+    ]);
+    expect($import->valid_rows)->toBe(3)
+        ->and($import->reference_changes)->toBe(['levels' => [], 'domains' => [], 'mentions' => ['Droit'], 'programs' => ['Droit › Tronc Commun', 'droit › Droit Privé', 'Lettres modernes › Linguistique'], 'created' => false]);
+    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->where('rows.data.0.notices', [
+        'Nouvelle mention « Droit » : elle sera créée dans l’établissement.', 'Nouveau parcours « Tronc Commun » : il sera créé dans l’établissement.',
+    ]));
+    expect(Mention::query()->where('name', 'Droit')->exists())->toBeFalse();
+    $audited = Activity::query()->where('log_name', 'references')->where('event', 'created')->count();
+
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $law = Mention::query()->where('establishment_id', $this->establishment->id)->where('name', 'Droit')->sole();
+    expect($law->domain_id)->toBe($this->alsh->id)
+        ->and($law->programs()->orderBy('name')->pluck('name')->all())->toBe(['Droit Privé', 'Tronc Commun'])
+        ->and($law->programs()->first()->training_type)->toBe(TrainingType::Professional)
+        ->and($this->letters->programs()->where('name', 'Linguistique')->exists())->toBeTrue()
+        ->and(StudentRecord::query()->whereNull('program_id')->exists())->toBeFalse()
+        ->and($import->fresh()->reference_changes['created'])->toBeTrue()
+        ->and($import->fresh()->reference_changes['mentions'])->toBe(['Droit'])
+        ->and(Activity::query()->where('log_name', 'references')->where('event', 'created')->count() - $audited)->toBe(4);
+});
+
+it('creates a domain given as "(CODE) Name" with the new mention, and rejects an unreadable unknown domain', function () {
+    $import = analyzeTemplate($this, [
+        templateRow(['Mention' => 'Économie', 'Parcours' => 'Gestion', 'Domaine' => '(DEG) Droit, Économie et Gestion']),
+        templateRow(['NOM' => 'RABE', 'CIN' => 413012049889, 'NUMERO TELEPHONE' => 327407097, 'ADRESSE MAIL' => 'rabe@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0002', 'Mention' => 'Sociologie', 'Parcours' => 'Général', 'Domaine' => 'Sciences sociales']),
+    ]);
+    expect($import->valid_rows)->toBe(1)->and(rowErrorCodes($import, 1))->toContain('domain:unknown_domain');
+
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $domain = Domain::query()->where('code', 'DEG')->sole();
+    expect($domain->name)->toBe('Droit, Économie et Gestion')
+        ->and(Mention::query()->where('name', 'Économie')->sole()->domain_id)->toBe($domain->id)
+        ->and(Mention::query()->where('name', 'Sociologie')->exists())->toBeFalse();
+});
+
+it('never duplicates an inactive mention or program', function () {
+    $this->letters->update(['is_active' => false]);
+    $import = analyzeTemplate($this, [templateRow()]);
+    expect(rowErrorCodes($import))->toContain('mention:inactive');
+    $this->letters->update(['is_active' => true]);
+    $this->lettersCommon->update(['is_active' => false]);
+    expect(rowErrorCodes(analyzeTemplate($this, [templateRow()])))->toContain('program:inactive');
 });
 
 it('accepts the referential checks once the referentials leave them open', function () {
@@ -243,3 +293,45 @@ it('rejects a request reference already given in the establishment for the year'
     $import = analyzeTemplate($this, [templateRow()]);
     expect(rowErrorCodes($import))->toBe(['scholarship_request_reference:reference_used']);
 });
+
+it('creates a missing standard LMD level, never an unknown one', function () {
+    $import = analyzeTemplate($this, [
+        templateRow(['Niveau' => 'L3']),
+        templateRow(['NOM' => 'RABE', 'CIN' => 413012049889, 'NUMERO TELEPHONE' => 327407097, 'ADRESSE MAIL' => 'rabe@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0002', 'Niveau' => 'Licence 3']),
+        templateRow(['NOM' => 'RAVELO', 'CIN' => 413012049890, 'NUMERO TELEPHONE' => 327407098, 'ADRESSE MAIL' => 'ravelo@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0003', 'Niveau' => 'Doctorat X']),
+    ]);
+    expect($import->valid_rows)->toBe(2)->and($import->reference_changes['levels'])->toBe(['L3'])->and(rowErrorCodes($import, 2))->toContain('level:unknown_or_ambiguous');
+
+    $this->post('/imports/'.$import->uuid.'/commit')->assertSessionHasNoErrors();
+    $level = Level::query()->where('code', 'L3')->sole();
+    expect($level->name)->toBe('Licence 3')->and($level->sort_order)->toBe(3)
+        ->and(StudentRecord::query()->where('level_id', $level->id)->count())->toBe(2)
+        ->and($import->fresh()->reference_changes['levels'])->toBe(['L3']);
+});
+
+it('summarises why rows cannot be imported, with the referential values of the file, and announces creations only on importable rows', function () {
+    $import = analyzeTemplate($this, [
+        templateRow(['Ecole / Institut' => 'Ecole de Droit (EDSP)', 'Mention' => 'Droit']),
+        templateRow(['NOM' => 'RABE', 'CIN' => 413012049889, 'NUMERO TELEPHONE' => 327407097, 'ADRESSE MAIL' => 'pas un email', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0002', 'Ecole / Institut' => 'Ecole de Droit (EDSP)']),
+    ]);
+    expect($import->rejected_rows)->toBe(2)
+        ->and($import->issue_summary[0])->toMatchArray(['field' => 'establishment', 'code' => 'other_establishment', 'severity' => 'error', 'rows' => 2, 'values' => ['Ecole de Droit (EDSP)']])
+        ->and(collect($import->issue_summary)->firstWhere('field', 'email'))->toMatchArray(['rows' => 1, 'values' => []])
+        ->and($import->reference_changes['mentions'])->toBe([]);
+    $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->where('rows.data.0.notices', [])->where('import.issue_summary.0.rows', 2));
+});
+
+it('recognises the establishment of the import however the file writes it', function (string $written, bool $same) {
+    $this->establishment->update(['code' => 'EDSP', 'name' => 'Ecole de Droit et Science Politique (Antsohihy)']);
+    $import = analyzeTemplate($this, [templateRow(['Ecole / Institut' => $written])]);
+    expect(in_array('establishment:other_establishment', rowErrorCodes($import), true))->toBe(! $same);
+})->with([
+    'official file' => ['Ecole de Droit et Science Politique Antsohihy (EDSP Antsohihy)', true],
+    'exact name' => ['Ecole de Droit et Science Politique (Antsohihy)', true],
+    'accents and case' => ['ÉCOLE DE DROIT ET SCIENCE POLITIQUE ANTSOHIHY', true],
+    'acronym' => ['EDSP', true],
+    'name and acronym' => ['Ecole de Droit et Science Politique (EDSP)', true],
+    'another city' => ['Ecole de Droit et Science Politique Mahajanga (EDSP Mahajanga)', false],
+    'another school' => ['Faculté des Sciences (FST)', false],
+    'part of the name' => ['Ecole de Droit', false],
+]);
