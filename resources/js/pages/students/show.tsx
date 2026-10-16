@@ -93,7 +93,7 @@ const eligibilityTones: Record<Eligibility['status'], Tone> = {
 };
 const eligibilityLabel = (eligibility: Eligibility) =>
     eligibility.status === 'eligible'
-        ? `Éligible — taux ${eligibility.rate}`
+        ? `Éligible au taux de ${eligibility.rate}`
         : eligibility.status === 'not_eligible'
           ? 'Non éligible'
           : 'Indéterminé';
