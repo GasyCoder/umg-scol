@@ -234,8 +234,8 @@ function ImportDialog({
                             </span>
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            XLSX ou CSV (séparateur « ; » ou « , », UTF-8) — 2
-                            Mo et {MAX_ROWS} lignes au maximum
+                            XLSX ou CSV (séparateur « ; » ou « , », UTF-8). 2 Mo
+                            et {MAX_ROWS} lignes au maximum
                         </span>
                         <input
                             ref={input}
