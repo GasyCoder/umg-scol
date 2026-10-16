@@ -28,7 +28,8 @@ class RequestEmailOtp
             return $challenge->id;
         }, 5);
         try {
-            Mail::to($email)->send(new StudentOtpMail($code));
+            // Queued (encrypted): the student gets the next screen at once, the worker sends the email.
+            Mail::to($email)->queue(new StudentOtpMail($code));
         } catch (\Throwable) {
             EmailOtpChallenge::query()->whereKey($id)->update(['consumed_at' => now()]);
             abort(503, 'Le service email est indisponible.');
