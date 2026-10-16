@@ -68,8 +68,8 @@ const blockReason = (result: Result, record: DeclarationRecord | undefined) => {
         return 'Fiche étudiant inactive : réception impossible.';
     if (!record)
         return result.records.length === 0
-            ? 'Aucune déclaration pour l’année de la campagne.'
-            : 'Déclaration inactive pour l’année de la campagne.';
+            ? 'Aucune situation pour l’année de la campagne.'
+            : 'Situation inactive pour l’année de la campagne.';
     return null;
 };
 
@@ -159,7 +159,7 @@ type StepState = 'done' | 'current' | 'todo';
 function Stepper({ states }: { states: StepState[] }) {
     const steps = [
         { title: 'Rechercher', hint: 'Trouver l’étudiant qui dépose' },
-        { title: 'Vérifier', hint: 'Identité et déclaration active' },
+        { title: 'Vérifier', hint: 'Identité et situation active' },
         { title: 'Enregistrer', hint: 'Saisir le N° DDB et valider' },
     ];
     return (
@@ -306,7 +306,7 @@ export default function Reception({
             <PageHeader
                 icon={Inbox}
                 title="Réception des dossiers papier"
-                description="Recherchez l’étudiant qui dépose son dossier, vérifiez qu’il s’agit de la bonne personne, puis enregistrez la réception. Le dossier est rattaché à la déclaration annuelle de l’année de la campagne."
+                description="Recherchez l’étudiant qui dépose son dossier, vérifiez qu’il s’agit de la bonne personne, puis enregistrez la réception. Le dossier est rattaché à la situation de l’étudiant pour l’année de la campagne."
                 meta={
                     campaign && (
                         <ToneBadge tone="success" className="whitespace-normal">
@@ -454,7 +454,7 @@ export default function Reception({
                                         compact
                                         illustration="students"
                                         title="Recherchez l’étudiant qui dépose son dossier"
-                                        description="Les résultats s’affichent ici avec leur déclaration pour l’année de la campagne."
+                                        description="Les résultats s’affichent ici avec leur situation pour l’année de la campagne."
                                     />
                                 </div>
                             ) : results.length === 0 ? (
@@ -578,7 +578,7 @@ export default function Reception({
                                         icon={ShieldCheck}
                                         title="Réception possible"
                                     >
-                                        Fiche active et déclaration active pour{' '}
+                                        Fiche active et situation active pour{' '}
                                         {campaign.academic_year}.
                                     </SoftAlert>
                                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
@@ -709,7 +709,7 @@ export default function Reception({
                                     <p className="max-w-xs text-sm text-muted-foreground">
                                         Choisissez l’étudiant dans les résultats
                                         pour vérifier son identité et sa
-                                        déclaration, puis saisir le numéro DDB.
+                                        situation, puis saisir le numéro DDB.
                                     </p>
                                 </div>
                             )}
@@ -818,13 +818,13 @@ function ResultCard({
                     <li>
                         {record ? (
                             <ToneBadge tone="success">
-                                Déclaration active
+                                Situation active
                             </ToneBadge>
                         ) : (
                             <ToneBadge tone="warning">
                                 {result.records.length === 0
                                     ? 'Non déclaré'
-                                    : 'Déclaration inactive'}
+                                    : 'Situation inactive'}
                             </ToneBadge>
                         )}
                     </li>
