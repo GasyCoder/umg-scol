@@ -510,7 +510,7 @@ export default function ApplicationShow({
                                                 : 'warning'
                                         }
                                     >
-                                        Déclaration{' '}
+                                        Situation{' '}
                                         {student.record_status === 'active'
                                             ? 'active'
                                             : 'inactive'}
