@@ -64,7 +64,7 @@ class TransitionScholarshipApplication
     {
         $record = $application->studentRecord;
         if (! $application->student->is_active || $record->student_id !== $application->student_id || $record->academic_year_id !== $application->campaign->academic_year_id || $record->status->value !== 'active') {
-            $this->fail('La fiche étudiante ou la déclaration annuelle n’est plus active ou ne correspond plus à la campagne.');
+            $this->fail('La fiche étudiante ou la situation de l’année n’est plus active ou ne correspond plus à la campagne.');
         }
         $incomplete = $application->checks->reject(fn ($check) => $check->status->allowsValidation());
         if ($application->checks->isEmpty() || $incomplete->isNotEmpty()) {
