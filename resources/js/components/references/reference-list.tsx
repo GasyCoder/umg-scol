@@ -1,6 +1,9 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
+    ArrowLeft,
     ArrowRight,
+    BookMarked,
+    ChevronRight,
     Mail,
     Pencil,
     Phone,
@@ -11,9 +14,10 @@ import {
     Search,
     Star,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import InputError from '@/components/input-error';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatNumber } from '@/components/reporting/shared';
@@ -62,12 +66,26 @@ type Paginated = {
     total: number;
     links: { url: string | null; label: string; active: boolean }[];
 };
+/** First step of the mention/program lists: one card per establishment. */
+type EstablishmentCard = {
+    id: number;
+    code: string;
+    name: string;
+    is_active: boolean;
+    logo_url: string | null;
+    mentions_count: number;
+    programs_count: number;
+    active_mentions_count: number;
+    active_programs_count: number;
+};
 export type ReferenceListProps = {
     records: Paginated;
     filters: { search?: string; establishment_id?: string };
     canCreate: boolean;
     establishments?: EstablishmentOption[];
     domains?: DomainOption[];
+    /** Set when a global actor opens the list without establishment nor search. */
+    establishmentCards?: EstablishmentCard[] | null;
 };
 
 function Code({ value }: { value?: string | null }) {
@@ -89,6 +107,7 @@ export default function ReferenceList({
     filters,
     canCreate,
     establishments = [],
+    establishmentCards = null,
 }: ReferenceListProps & { kind: ReferenceKind }) {
     const definition = definitions[kind];
     const articleText = article(kind);
@@ -120,9 +139,22 @@ export default function ReferenceList({
         );
     };
     const byEstablishment = kind === 'programs' || kind === 'mentions';
+    // Mentions and programs are read one establishment at a time: its columns then go without saying.
+    const selectedEstablishment = establishments.find(
+        (option) =>
+            String(option.id) === String(filters.establishment_id ?? ''),
+    );
+    const singleEstablishment =
+        byEstablishment &&
+        (selectedEstablishment !== undefined || establishments.length === 1);
+    const hidden = singleEstablishment ? (kind === 'programs' ? 2 : 1) : 0;
     const filtered = Boolean(filters.search || filters.establishment_id);
     const Icon = referenceIcons[kind];
     const createLabel = `Créer ${articleText} ${definition.singular}`;
+    // Definite form used in row action labels: « l’établissement », « la mention », « le parcours ».
+    const theSingular = /^[aeéèêiouy]/i.test(definition.singular)
+        ? `l’${definition.singular}`
+        : `${articleText === 'une' ? 'la' : 'le'} ${definition.singular}`;
     const name = (row: ReferenceRecord) => (
         <span
             className={cn(
@@ -274,8 +306,9 @@ export default function ReferenceList({
                 description={listDescriptions[kind]}
                 meta={
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground tabular-nums">
-                        {formatNumber(records.total)} résultat(s)
-                        {filtered ? ' filtré(s)' : ''}
+                        {establishmentCards
+                            ? `${formatNumber(establishmentCards.length)} établissement(s)`
+                            : `${formatNumber(records.total)} résultat(s)${filtered ? ' filtré(s)' : ''}`}
                     </span>
                 }
                 actions={
@@ -385,148 +418,282 @@ export default function ReferenceList({
                 />
             </form>
 
-            <section className="surface overflow-hidden">
-                {records.data.length === 0 ? (
-                    filtered ? (
-                        <EmptyState
-                            illustration="search"
-                            title="Aucun résultat"
-                            description="Modifiez la recherche ou les filtres pour élargir la liste."
-                            action={
-                                <Button variant="outline" asChild>
-                                    <Link href={baseUrl(kind)}>
-                                        <RotateCcw aria-hidden="true" />
-                                        Réinitialiser les filtres
-                                    </Link>
-                                </Button>
-                            }
+            {byEstablishment &&
+                selectedEstablishment &&
+                establishments.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <Button variant="ghost" size="sm" asChild>
+                            <Link href={baseUrl(kind)}>
+                                <ArrowLeft aria-hidden="true" />
+                                Tous les établissements
+                            </Link>
+                        </Button>
+                        <ChevronRight
+                            className="size-4 text-muted-foreground"
+                            aria-hidden="true"
                         />
-                    ) : (
+                        <Code value={selectedEstablishment.code} />
+                        <span className="font-semibold text-foreground">
+                            {selectedEstablishment.name}
+                        </span>
+                    </div>
+                )}
+
+            {establishmentCards ? (
+                establishmentCards.length === 0 ? (
+                    <section className="surface">
                         <EmptyState
                             illustration="inbox"
-                            title="Aucun élément pour le moment"
-                            description={
-                                canCreate
-                                    ? 'Créez le premier élément de ce référentiel pour le proposer dans les formulaires.'
-                                    : 'Les éléments de ce référentiel apparaîtront ici.'
-                            }
-                            action={
-                                canCreate && (
-                                    <Button asChild>
-                                        <Link href={`${baseUrl(kind)}/create`}>
-                                            <Plus aria-hidden="true" />
-                                            {createLabel}
-                                        </Link>
-                                    </Button>
-                                )
-                            }
+                            title="Aucun établissement"
+                            description="Créez d’abord un établissement dans les référentiels."
                         />
-                    )
+                    </section>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="data-table min-w-[44rem]">
-                            <caption className="sr-only">
-                                {definition.title}
-                            </caption>
-                            <thead>
-                                <tr>
-                                    {columns.map((column) => (
-                                        <th scope="col" key={column}>
-                                            {column}
-                                        </th>
-                                    ))}
-                                    <th scope="col">Statut</th>
-                                    <th scope="col" className="text-right">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {records.data.map((row) => (
-                                    <tr key={row.id}>
-                                        {cells(row).map((cell, index) => (
-                                            <td key={index}>{cell}</td>
-                                        ))}
-                                        <td>
+                    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {establishmentCards.map((card) => (
+                            <li key={card.id}>
+                                <Link
+                                    href={`${baseUrl(kind)}?establishment_id=${card.id}`}
+                                    className="surface group flex h-full items-center gap-4 p-4 transition-shadow hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    <LogoTile
+                                        src={card.logo_url}
+                                        code={card.code}
+                                        className="size-12 shrink-0 rounded-xl text-xs"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-semibold text-foreground">
+                                            {card.name}
+                                        </span>
+                                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                                            {card.code}
+                                            {!card.is_active && ' · inactif'}
+                                        </span>
+                                        <span className="mt-2 flex flex-wrap gap-1.5">
                                             <ToneBadge
                                                 tone={
-                                                    row.is_active
-                                                        ? 'success'
+                                                    kind === 'mentions'
+                                                        ? 'primary'
                                                         : 'neutral'
                                                 }
                                             >
-                                                {row.is_active
-                                                    ? 'Actif'
-                                                    : 'Inactif'}
+                                                {card.mentions_count} mention
+                                                {card.mentions_count > 1
+                                                    ? 's'
+                                                    : ''}
                                             </ToneBadge>
-                                        </td>
-                                        <td>
-                                            <div
-                                                className="flex flex-wrap items-center justify-end gap-1.5"
-                                                role="group"
-                                                aria-label={`Actions pour ${row.name}`}
+                                            <ToneBadge
+                                                tone={
+                                                    kind === 'programs'
+                                                        ? 'primary'
+                                                        : 'neutral'
+                                                }
                                             >
-                                                {kind === 'academic-years' &&
-                                                    !row.is_current &&
-                                                    row.is_active && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="text-primary hover:text-primary"
-                                                            onClick={() =>
-                                                                open(row, true)
-                                                            }
-                                                        >
-                                                            <Star aria-hidden="true" />
-                                                            Définir comme année
-                                                            courante
-                                                        </Button>
-                                                    )}
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`${baseUrl(kind)}/${row.uuid}/edit`}
-                                                    >
-                                                        <Pencil aria-hidden="true" />
-                                                        Modifier
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => open(row)}
-                                                >
-                                                    {row.is_active ? (
-                                                        <PowerOff aria-hidden="true" />
-                                                    ) : (
-                                                        <Power aria-hidden="true" />
-                                                    )}
-                                                    {row.is_active
-                                                        ? 'Désactiver'
-                                                        : 'Activer'}
-                                                </Button>
-                                                {/* Domains have no trash support (no soft delete on the server). */}
-                                                {kind !== 'domains' && (
-                                                    <TrashButton
-                                                        kind={kind}
-                                                        uuid={row.uuid}
-                                                        label={row.name}
-                                                    />
-                                                )}
-                                            </div>
-                                        </td>
+                                                {card.programs_count} parcours
+                                            </ToneBadge>
+                                        </span>
+                                    </span>
+                                    <ChevronRight
+                                        className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                                        aria-hidden="true"
+                                    />
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )
+            ) : (
+                <section className="surface overflow-hidden">
+                    {records.data.length === 0 ? (
+                        filtered ? (
+                            <EmptyState
+                                illustration="search"
+                                title="Aucun résultat"
+                                description="Modifiez la recherche ou les filtres pour élargir la liste."
+                                action={
+                                    <Button variant="outline" asChild>
+                                        <Link href={baseUrl(kind)}>
+                                            <RotateCcw aria-hidden="true" />
+                                            Réinitialiser les filtres
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        ) : (
+                            <EmptyState
+                                illustration="inbox"
+                                title="Aucun élément pour le moment"
+                                description={
+                                    canCreate
+                                        ? 'Créez le premier élément de ce référentiel pour le proposer dans les formulaires.'
+                                        : 'Les éléments de ce référentiel apparaîtront ici.'
+                                }
+                                action={
+                                    canCreate && (
+                                        <Button asChild>
+                                            <Link
+                                                href={`${baseUrl(kind)}/create`}
+                                            >
+                                                <Plus aria-hidden="true" />
+                                                {createLabel}
+                                            </Link>
+                                        </Button>
+                                    )
+                                }
+                            />
+                        )
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="data-table min-w-[44rem]">
+                                <caption className="sr-only">
+                                    {definition.title}
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        {columns.slice(hidden).map((column) => (
+                                            <th scope="col" key={column}>
+                                                {column}
+                                            </th>
+                                        ))}
+                                        <th scope="col">Statut</th>
+                                        <th scope="col" className="text-right">
+                                            Actions
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </section>
+                                </thead>
+                                <tbody>
+                                    {records.data.map((row, index) => (
+                                        <Fragment key={row.id}>
+                                            {singleEstablishment &&
+                                                kind === 'programs' &&
+                                                (index === 0 ||
+                                                    records.data[index - 1]
+                                                        .mention?.id !==
+                                                        row.mention?.id) && (
+                                                    <tr className="bg-muted/40 hover:bg-muted/40">
+                                                        <th
+                                                            scope="colgroup"
+                                                            colSpan={
+                                                                columns.length -
+                                                                hidden +
+                                                                2
+                                                            }
+                                                            className="px-4 py-2 text-left text-xs font-bold tracking-wide text-foreground uppercase"
+                                                        >
+                                                            <span className="inline-flex items-center gap-2">
+                                                                <BookMarked
+                                                                    className="size-3.5 text-primary"
+                                                                    aria-hidden="true"
+                                                                />
+                                                                {row.mention
+                                                                    ?.name ??
+                                                                    'Sans mention'}
+                                                                <span className="font-medium text-muted-foreground normal-case">
+                                                                    ·{' '}
+                                                                    {
+                                                                        records.data.filter(
+                                                                            (
+                                                                                other,
+                                                                            ) =>
+                                                                                other
+                                                                                    .mention
+                                                                                    ?.id ===
+                                                                                row
+                                                                                    .mention
+                                                                                    ?.id,
+                                                                        ).length
+                                                                    }{' '}
+                                                                    parcours
+                                                                </span>
+                                                            </span>
+                                                        </th>
+                                                    </tr>
+                                                )}
+                                            <tr>
+                                                {cells(row)
+                                                    .slice(hidden)
+                                                    .map((cell, cellIndex) => (
+                                                        <td key={cellIndex}>
+                                                            {cell}
+                                                        </td>
+                                                    ))}
+                                                <td>
+                                                    <ToneBadge
+                                                        tone={
+                                                            row.is_active
+                                                                ? 'success'
+                                                                : 'neutral'
+                                                        }
+                                                    >
+                                                        {row.is_active
+                                                            ? 'Actif'
+                                                            : 'Inactif'}
+                                                    </ToneBadge>
+                                                </td>
+                                                <td>
+                                                    <div
+                                                        className="flex items-center justify-end gap-1"
+                                                        role="group"
+                                                        aria-label={`Actions pour ${row.name}`}
+                                                    >
+                                                        {kind ===
+                                                            'academic-years' &&
+                                                            !row.is_current &&
+                                                            row.is_active && (
+                                                                <IconAction
+                                                                    icon={Star}
+                                                                    label="Définir comme année courante"
+                                                                    onClick={() =>
+                                                                        open(
+                                                                            row,
+                                                                            true,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            )}
+                                                        <IconAction
+                                                            icon={Pencil}
+                                                            label={`Modifier ${theSingular}`}
+                                                            href={`${baseUrl(kind)}/${row.uuid}/edit`}
+                                                        />
+                                                        <IconAction
+                                                            icon={
+                                                                row.is_active
+                                                                    ? PowerOff
+                                                                    : Power
+                                                            }
+                                                            label={`${row.is_active ? 'Désactiver' : 'Activer'} ${theSingular}`}
+                                                            tone={
+                                                                row.is_active
+                                                                    ? 'default'
+                                                                    : 'success'
+                                                            }
+                                                            onClick={() =>
+                                                                open(row)
+                                                            }
+                                                        />
+                                                        {/* Domains have no trash support (no soft delete on the server). */}
+                                                        {kind !== 'domains' && (
+                                                            <TrashButton
+                                                                iconOnly
+                                                                kind={kind}
+                                                                uuid={row.uuid}
+                                                                label={row.name}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+            )}
 
-            {records.data.length > 0 && (
+            {!establishmentCards && records.data.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-muted-foreground">
                         {formatNumber(records.total)} résultat(s)
