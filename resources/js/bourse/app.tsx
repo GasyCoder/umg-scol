@@ -27,6 +27,7 @@ import { createRoot } from 'react-dom/client';
 import { Toaster, toast } from 'sonner';
 import type { Root } from 'react-dom/client';
 import { BrandMark } from '@/components/brand-mark';
+import { StudentPortalSkeleton } from '@/components/loading/page-skeleton';
 import { EmptyState } from '@/components/empty-state';
 import {
     ScholarshipIllustration,
@@ -692,13 +693,7 @@ function Portal() {
                                 </Button>
                             </div>
                         ) : (
-                            <div
-                                role="status"
-                                className="surface flex flex-col items-center gap-3 px-6 py-12 text-sm text-muted-foreground"
-                            >
-                                <Spinner className="size-6 text-primary" />
-                                Chargement…
-                            </div>
+                            <StudentPortalSkeleton />
                         )}
                     </div>
                 )}
@@ -1266,6 +1261,26 @@ function Portal() {
                         )}
                     </div>
                 )}
+
+                {session?.authenticated &&
+                    session.linked &&
+                    !student &&
+                    (loadFailed ? (
+                        <div
+                            role="alert"
+                            className="surface space-y-4 p-6 text-sm"
+                        >
+                            <p>Vos informations n’ont pas pu être chargées.</p>
+                            <Button
+                                variant="outline"
+                                onClick={() => window.location.reload()}
+                            >
+                                Réessayer
+                            </Button>
+                        </div>
+                    ) : (
+                        <StudentPortalSkeleton profile />
+                    ))}
 
                 {student && (
                     <div className="space-y-6">
