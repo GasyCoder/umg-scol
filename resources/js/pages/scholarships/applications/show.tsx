@@ -275,7 +275,7 @@ export default function ApplicationShow({
             <PageHeader
                 icon={FileText}
                 title={`Dossier ${application.application_number}`}
-                description={`${fullName} — ${application.campaign.name}`}
+                description={`${fullName}, campagne ${application.campaign.name}`}
                 meta={
                     <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge
@@ -581,7 +581,7 @@ export default function ApplicationShow({
                                 ['N° DDB', application.ddb_number],
                                 [
                                     'Campagne',
-                                    `${application.campaign.name} (${application.campaign.academic_year}) — ${application.campaign.status_label}`,
+                                    `${application.campaign.name} (${application.campaign.academic_year}), ${application.campaign.status_label}`,
                                 ],
                                 ['Statut', application.status_label],
                                 [
@@ -737,7 +737,7 @@ export default function ApplicationShow({
                                     id="reason-hint"
                                     className="text-xs text-muted-foreground"
                                 >
-                                    {form.data.reason.length}/1000 caractères —
+                                    {form.data.reason.length}/1000 caractères,
                                     10 au minimum.
                                 </p>
                             )}
