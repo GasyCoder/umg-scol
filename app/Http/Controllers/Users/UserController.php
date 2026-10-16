@@ -30,7 +30,7 @@ class UserController extends Controller
     private const DESCRIPTIONS = [
         'superadmin' => 'Administration fonctionnelle globale : référentiels, comptes, droits et campagnes.',
         'central_scholarship_office' => 'Consultation globale des étudiants et traitement des dossiers papier de bourse.',
-        'establishment' => 'Étudiants de son établissement : déclarations, imports, corrections et rattachements.',
+        'establishment' => 'Étudiants de son établissement : situations annuelles, imports, corrections et rattachements.',
         'developer' => 'Support technique privilégié, toujours visible dans le journal d’audit.',
     ];
 
