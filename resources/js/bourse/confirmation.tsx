@@ -1,6 +1,7 @@
 import { AlertCircle, BadgeCheck, CalendarCheck, Info } from 'lucide-react';
 import { useState } from 'react';
 import { ToneBadge } from '@/components/tone-badge';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -49,17 +50,18 @@ export function ConfirmationBadge({
 export function ConfirmationSection({
     state,
     onDone,
+    compact = false,
 }: {
     state: ConfirmationState;
     onDone: (message: string) => Promise<void>;
+    /** Narrow layout of the right sidebar. */
+    compact?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
     const submit = () => {
         if (!state.version) return;
         setBusy(true);
-        setError('');
         api<{ message: string }>('confirmation', { version: state.version })
             .then(async (result) => {
                 setOpen(false);
@@ -67,7 +69,7 @@ export function ConfirmationSection({
             })
             .catch(async (reason: unknown) => {
                 setOpen(false);
-                setError(
+                toast.error(
                     reason instanceof Error
                         ? reason.message
                         : 'La confirmation n’a pas pu être enregistrée.',
@@ -86,17 +88,25 @@ export function ConfirmationSection({
             aria-labelledby="verification-title"
             className="surface scroll-mt-24 overflow-hidden"
         >
-            <header className="flex flex-wrap items-start gap-x-4 gap-y-3 border-b bg-muted/30 px-5 py-4 sm:px-6">
-                <span
-                    className={
-                        confirmed
-                            ? 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-foreground'
-                            : 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary'
-                    }
-                    aria-hidden="true"
-                >
-                    <BadgeCheck className="size-5" />
-                </span>
+            <header
+                className={
+                    compact
+                        ? 'flex flex-col gap-2 border-b bg-muted/30 px-5 py-4'
+                        : 'flex flex-wrap items-start gap-x-4 gap-y-3 border-b bg-muted/30 px-5 py-4 sm:px-6'
+                }
+            >
+                {!compact && (
+                    <span
+                        className={
+                            confirmed
+                                ? 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-foreground'
+                                : 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary'
+                        }
+                        aria-hidden="true"
+                    >
+                        <BadgeCheck className="size-5" />
+                    </span>
+                )}
                 <div className="min-w-0 flex-1">
                     <h2
                         id="verification-title"
@@ -108,12 +118,24 @@ export function ConfirmationSection({
                         Confirmez que les informations affichées sont exactes.
                     </p>
                 </div>
-                <div className="order-last basis-full pl-14 sm:order-none sm:basis-auto sm:pl-0">
+                <div
+                    className={
+                        compact
+                            ? ''
+                            : 'order-last basis-full pl-14 sm:order-none sm:basis-auto sm:pl-0'
+                    }
+                >
                     <ConfirmationBadge status={state.status} />
                 </div>
             </header>
 
-            <div className="space-y-4 px-5 py-5 sm:px-6">
+            <div
+                className={
+                    compact
+                        ? 'space-y-4 px-5 py-5'
+                        : 'space-y-4 px-5 py-5 sm:px-6'
+                }
+            >
                 {confirmed && state.confirmed_at && (
                     <p className="flex items-start gap-3 rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-foreground">
                         <CalendarCheck
@@ -146,8 +168,9 @@ export function ConfirmationSection({
                 )}
                 {state.status === 'never_confirmed' && (
                     <p className="text-sm text-foreground">
-                        Après vérification des informations ci-dessus, confirmez
-                        qu’elles sont correctes.
+                        {compact
+                            ? 'Relisez vos informations, puis confirmez qu’elles sont correctes.'
+                            : 'Après vérification des informations ci-dessus, confirmez qu’elles sont correctes.'}
                     </p>
                 )}
 
@@ -189,29 +212,19 @@ export function ConfirmationSection({
                         </p>
                     )
                 )}
-                {error && (
-                    <p
-                        role="alert"
-                        className="flex items-start gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-foreground"
-                    >
-                        <AlertCircle
-                            className="mt-0.5 size-4 shrink-0"
-                            aria-hidden="true"
-                        />
-                        <span>{error}</span>
-                    </p>
-                )}
+
                 {!confirmed && (
                     <Button
-                        className="h-auto min-h-11 w-full py-2.5 font-semibold whitespace-normal sm:w-auto"
+                        className={
+                            compact
+                                ? 'h-auto min-h-11 w-full py-2.5 font-semibold whitespace-normal'
+                                : 'h-auto min-h-11 w-full py-2.5 font-semibold whitespace-normal sm:w-auto'
+                        }
                         disabled={!state.can_confirm || !state.version || busy}
-                        onClick={() => {
-                            setError('');
-                            setOpen(true);
-                        }}
+                        onClick={() => setOpen(true)}
                     >
                         <BadgeCheck aria-hidden="true" />
-                        Je confirme que mes informations sont correctes
+                        Je confirme
                     </Button>
                 )}
             </div>
