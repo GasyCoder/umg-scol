@@ -21,8 +21,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property StudentRecordStatus $status
  * @property RepeatCode|null $repeat_code
  * @property CarbonInterface|null $scholarship_requested_at
+ * @property bool $inactive_with_identity
  */
-#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'declared_by', 'declared_at'])]
+#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'inactive_with_identity', 'declared_by', 'declared_at'])]
 #[Hidden(['active_academic_year_id', 'live_marker'])]
 class StudentRecord extends Model
 {
@@ -33,7 +34,7 @@ class StudentRecord extends Model
 
     protected function casts(): array
     {
-        return ['status' => StudentRecordStatus::class, 'repeat_code' => RepeatCode::class, 'scholarship_requested_at' => 'date', 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
+        return ['status' => StudentRecordStatus::class, 'repeat_code' => RepeatCode::class, 'scholarship_requested_at' => 'date', 'inactive_with_identity' => 'boolean', 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
     }
 
     /** @return BelongsTo<Student, $this> */
