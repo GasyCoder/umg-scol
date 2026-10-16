@@ -6,17 +6,20 @@ use App\Actions\Imports\AnalyzeStudentImport;
 use App\Actions\Imports\CommitStudentImport;
 use App\Actions\Imports\UploadStudentImport;
 use App\Enums\StudentImportRowStatus;
+use App\Exports\Students\EstablishmentTemplateWorkbook;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Imports\AnalyzeStudentImportRequest;
 use App\Http\Requests\Imports\UploadStudentImportRequest;
+use App\Models\AcademicYear;
+use App\Models\Establishment;
 use App\Models\Student;
 use App\Models\StudentImport;
-use App\Support\CsvExport;
 use App\Support\StudentImportColumns;
 use App\Support\StudentReferenceOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -42,7 +45,7 @@ class StudentImportController extends Controller
 
     public function store(UploadStudentImportRequest $request, UploadStudentImport $action): RedirectResponse
     {
-        $import = $action->handle($request->user(), $request->file('file'), (int) $request->validated('establishment_id'), (int) $request->validated('academic_year_id'));
+        $import = $action->handle($request->user(), $request->file('file'), $request->validated('establishment_id') === null ? null : (int) $request->validated('establishment_id'), (int) $request->validated('academic_year_id'));
 
         return to_route('imports.show', $import);
     }
@@ -56,7 +59,13 @@ class StudentImportController extends Controller
         $rows->through(function ($row) use ($visibleIds) {
             $data = $row->normalized_data ?? [];
 
-            return ['id' => $row->id, 'row_number' => $row->row_number, 'status' => $row->status, 'errors' => $row->errors, 'warnings' => $row->warnings, 'resolution' => $row->resolution, 'matched_student_id' => in_array($row->matched_student_id, $visibleIds, true) ? $row->matched_student_id : null, 'data' => array_intersect_key($data, array_flip(['last_name', 'first_names', 'repeat_code', 'level', 'mention', 'program']))];
+            return ['id' => $row->id, 'row_number' => $row->row_number, 'status' => $row->status, 'errors' => $row->errors, 'warnings' => $row->warnings, 'resolution' => $row->resolution, 'matched_student_id' => in_array($row->matched_student_id, $visibleIds, true) ? $row->matched_student_id : null, 'data' => array_intersect_key($data, array_flip(['last_name', 'first_names', 'repeat_code', 'level', 'mention', 'program'])),
+                // Not blocking: references the confirmation will create in the establishment.
+                'notices' => $row->status !== StudentImportRowStatus::Valid ? [] : array_values(array_filter([
+                    filled($data['_new_level'] ?? null) ? 'Nouveau niveau « '.$data['_new_level'].' » : il sera créé.' : null,
+                    filled($data['_new_mention'] ?? null) ? 'Nouvelle mention « '.$data['_new_mention'].' » : elle sera créée dans l’établissement.' : null,
+                    filled($data['_new_program'] ?? null) ? 'Nouveau parcours « '.$data['_new_program'].' » : il sera créé dans l’établissement.' : null,
+                ]))];
         });
 
         return Inertia::render('imports/show', ['import' => $studentImport->load(['establishment:id,code,name', 'academicYear:id,name', 'user:id,name'])->makeHidden(['stored_path', 'disk']), 'rows' => $rows, 'columns' => StudentImportColumns::labels(), 'requiredColumns' => StudentImportColumns::required(), 'filter' => $filters['status'] ?? '', 'canAnalyze' => Gate::allows('analyze', $studentImport), 'canCommit' => Gate::allows('commit', $studentImport), 'canExport' => Gate::allows('exportErrors', $studentImport)]);
@@ -88,7 +97,7 @@ class StudentImportController extends Controller
             fputcsv($stream, ['Ligne', 'Statut', 'Champ', 'Code', 'Message'], ';', '"', '');
             $studentImport->rows()->where('status', '!=', 'valid')->chunkById(200, function ($rows) use ($stream) {
                 foreach ($rows as $row) {
-                    foreach (array_merge($row->errors ?? [], $row->warnings ?? []) ?: [['field' => 'record', 'code' => 'duplicate', 'message' => 'Déclaration identique déjà présente.']] as $issue) {
+                    foreach (array_merge($row->errors ?? [], $row->warnings ?? []) ?: [['field' => 'record', 'code' => 'duplicate', 'message' => 'Situation identique déjà présente.']] as $issue) {
                         $cells = [$row->row_number, $row->status->value, $issue['field'], $issue['code'], $issue['message']];
                         $cells = array_map(fn ($value) => preg_match('/^[=+@\-\t\r]/', (string) $value) ? "'".$value : $value, $cells);
                         fputcsv($stream, $cells, ';', '"', '');
@@ -99,11 +108,18 @@ class StudentImportController extends Controller
         }, 'import-'.$studentImport->id.'-erreurs.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 
-    public function template(): StreamedResponse
+    /**
+     * Empty establishment file (official columns, drop-downs, BOURSIER/TAUX formulas) for the
+     * actor's establishment, or the one chosen by a global actor, and the current academic year.
+     */
+    public function template(Request $request): StreamedResponse
     {
         Gate::authorize('create', StudentImport::class);
+        $establishmentId = $request->user()->hasRole('establishment') ? $request->user()->establishment_id : ($request->integer('establishment_id') ?: null);
+        $establishment = $establishmentId === null ? null : Establishment::query()->find($establishmentId);
+        $year = AcademicYear::query()->where('is_current', true)->where('is_active', true)->first();
+        $book = (new EstablishmentTemplateWorkbook($establishment, $year))->build();
 
-        // French headers (recognised by the column mapping) with a BOM so that spreadsheet software reads accents.
-        return CsvExport::download('modele-import-etudiants.csv', array_values(StudentImportColumns::labels()), fn () => null);
+        return EstablishmentTemplateWorkbook::download($book, 'modele-etudiants'.($establishment === null ? '' : '-'.Str::slug($establishment->code)).'.xlsx');
     }
 }
