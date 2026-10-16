@@ -17,7 +17,6 @@ import {
     Route,
     ShieldCheck,
     Trash2,
-    UserCheck,
     UserCog,
     Users,
 } from 'lucide-react';
@@ -39,7 +38,6 @@ const referenceIcons: Record<ReferenceKind, LucideIcon> = {
 /** Pending task keys (PendingTasks.php) counted on each menu entry. */
 const taskEntries: Record<string, string> = {
     corrections: '/corrections',
-    student_links: '/student-links',
     applications_pending: '/scholarships/applications',
     applications_in_review: '/scholarships/applications',
     imports_ready: '/imports',
@@ -88,10 +86,6 @@ export function useNavigation(): NavGroup[] {
                 ...when(
                     auth.canViewImports,
                     item('Imports de listes', '/imports', FileUp),
-                ),
-                ...when(
-                    auth.permissions.includes('student_links.review'),
-                    item('Rattachements', '/student-links', UserCheck),
                 ),
                 ...when(
                     auth.canViewCorrections,
