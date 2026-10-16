@@ -113,7 +113,7 @@ class TrashManager
                 }
             })->lockForUpdate()->first();
             if ($conflict !== null) {
-                $this->fail('Une déclaration de cette année existe déjà ou une autre déclaration est active.');
+                $this->fail('Une situation de cette année existe déjà ou une autre situation est active.');
             }
         }
         if ($target instanceof Program || $target instanceof Mention) {
@@ -161,7 +161,7 @@ class TrashManager
         if ($target instanceof Student) {
             foreach (StudentRecord::query()->withoutGlobalScope(SoftDeletingScope::class)->where('student_id', $target->id)->orderBy('id')->lockForUpdate()->get() as $record) {
                 if ($record->deleted_at === null) {
-                    $this->fail('Toutes les déclarations doivent être en corbeille.');
+                    $this->fail('Toutes les situations annuelles doivent être en corbeille.');
                 } $this->purge($actor, $record);
             }
         }
