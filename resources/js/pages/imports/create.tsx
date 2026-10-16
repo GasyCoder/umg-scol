@@ -31,7 +31,8 @@ import {
 import { ImportStepper } from './import-ui';
 
 const tips = [
-    'Partez du modèle établissement officiel : déposez-le tel quel, ses colonnes sont reconnues automatiquement.',
+    'Téléchargez le modèle Excel : colonnes A à Z du fichier établissement, listes déroulantes (sexe, nationalité, série, code, niveau, mention, parcours…) et formules BOURSIER/TAUX.',
+    'Le fichier officiel ou un export de la page Étudiants se déposent tels quels : leurs colonnes sont reconnues automatiquement.',
     'La ligne de repères « [ 1 ] [ 2 ]… » et le bloc final « Arrêté au nombre de… » sont ignorés.',
     'Les colonnes BOURSIER et TAUX DE BOURSE (formules) ne sont pas importées : la plateforme applique elle-même la règle.',
     'Un téléphone saisi comme nombre retrouve son 0 initial ; un CIN autre que 12 chiffres est accepté mais signalé.',
@@ -66,9 +67,11 @@ export default function ImportCreate({
         event.preventDefault();
         form.post('/imports', { forceFormData: true });
     };
+    // A global actor may import a file covering several establishments (empty = read on each row).
+    const global = options.fixedEstablishmentId === null;
     const ready =
         form.data.file !== null &&
-        form.data.establishment_id !== '' &&
+        (global || form.data.establishment_id !== '') &&
         form.data.academic_year_id !== '';
     const required = columns.filter((column) => column.required);
     const optional = columns.filter((column) => !column.required);
@@ -84,7 +87,7 @@ export default function ImportCreate({
                     <Button variant="outline" asChild>
                         <a href="/imports/template">
                             <Download aria-hidden="true" />
-                            Télécharger le modèle
+                            Télécharger le modèle Excel
                         </a>
                     </Button>
                 }
@@ -105,20 +108,29 @@ export default function ImportCreate({
                         <FormSection
                             icon={Landmark}
                             title="Destination"
-                            description="Les déclarations seront créées pour cet établissement et cette année."
+                            description="Les situations de l’année seront créées dans l’établissement choisi, ou dans celui indiqué sur chaque ligne du fichier."
                         >
                             <FormField
                                 id="establishment_id"
                                 label="Établissement"
-                                required
+                                required={!global}
+                                hint={
+                                    global && form.data.establishment_id === ''
+                                        ? 'Chaque ligne indique son établissement (colonne « Institution Code » ou « École / Institut »).'
+                                        : undefined
+                                }
                                 error={errors.establishment_id}
                             >
                                 <Select
                                     value={
-                                        form.data.establishment_id || undefined
+                                        form.data.establishment_id ||
+                                        (global ? 'all' : undefined)
                                     }
                                     onValueChange={(value) =>
-                                        form.setData('establishment_id', value)
+                                        form.setData(
+                                            'establishment_id',
+                                            value === 'all' ? '' : value,
+                                        )
                                     }
                                     disabled={
                                         options.fixedEstablishmentId !== null
@@ -131,6 +143,12 @@ export default function ImportCreate({
                                         <SelectValue placeholder="Choisir un établissement" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        {global && (
+                                            <SelectItem value="all">
+                                                Tous les établissements (selon
+                                                le fichier)
+                                            </SelectItem>
+                                        )}
                                         {options.establishments
                                             .filter((item) => item.is_active)
                                             .map((item) => (
@@ -301,7 +319,7 @@ export default function ImportCreate({
                             >
                                 <a href="/imports/template">
                                     <Download aria-hidden="true" />
-                                    Télécharger le modèle
+                                    Télécharger le modèle Excel
                                 </a>
                             </Button>
                         </section>
