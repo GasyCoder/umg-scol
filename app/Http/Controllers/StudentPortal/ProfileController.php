@@ -19,9 +19,9 @@ class ProfileController extends Controller
 
     public function link(LinkStudentRequest $request, LinkStudent $action): JsonResponse
     {
-        $linked = $action->handle($request->user(), $request->validated('cin'), $request->validated('birth_date'));
+        $linked = $action->handle($request->user(), $request->validated('identifier_type'), $request->validated('identifier'), $request->validated('birth_date'), $request->validated('mother_name'));
 
-        return response()->json(['linked' => $linked, 'message' => $linked ? 'Votre compte est rattaché.' : 'Les informations fournies ne permettent pas un rattachement automatique. Une vérification peut être nécessaire.']);
+        return response()->json(['linked' => $linked, 'message' => $linked ? 'Votre fiche est ouverte : vous pouvez consulter vos informations.' : 'Ces informations ne correspondent à aucune fiche disponible. Vérifiez-les, essayez un autre renseignement ou contactez votre établissement.']);
     }
 
     public function me(Request $request): JsonResponse
