@@ -27,8 +27,8 @@ final class StudentConfirmationContext
     private const MESSAGES = [
         'inactive_student' => 'La fiche étudiante est inactive : la confirmation n’est pas disponible.',
         'no_current_year' => 'Aucune année universitaire courante n’est ouverte : la confirmation n’est pas disponible pour le moment.',
-        'no_current_record' => 'Aucune déclaration de votre établissement pour l’année universitaire courante : contactez votre établissement.',
-        'inactive_record' => 'Votre déclaration pour l’année universitaire courante est inactive : contactez votre établissement.',
+        'no_current_record' => 'Aucune situation de votre établissement pour l’année universitaire courante : contactez votre établissement.',
+        'inactive_record' => 'Votre situation pour l’année universitaire courante est inactive : contactez votre établissement.',
         'ambiguous' => 'Votre situation pour l’année universitaire courante doit être régularisée par votre établissement avant confirmation.',
         'pending_corrections' => 'Une ou plusieurs corrections sont encore en attente. Vous pourrez confirmer vos informations après leur traitement ou leur annulation.',
     ];
