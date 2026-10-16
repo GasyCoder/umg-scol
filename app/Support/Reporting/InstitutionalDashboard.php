@@ -8,7 +8,6 @@ use App\Models\ScholarshipApplication;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
-use App\Models\StudentLinkRequest;
 use App\Support\Audit\AuditPresenter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +35,6 @@ final class InstitutionalDashboard
             'students' => Gate::forUser($user)->allows('viewAny', Student::class),
             'imports' => Gate::forUser($user)->allows('viewAny', StudentImport::class),
             'corrections' => Gate::forUser($user)->allows('viewAny', StudentCorrectionRequest::class),
-            'links' => Gate::forUser($user)->allows('viewAny', StudentLinkRequest::class),
             'scholarships' => Gate::forUser($user)->allows('viewAny', ScholarshipApplication::class),
             'activity' => Gate::forUser($user)->allows('viewAny', Activity::class),
             'administration' => $this->scope->isGlobal() && $user->can('users.manage'),
@@ -45,7 +43,6 @@ final class InstitutionalDashboard
         $students = $can['students'] ? $this->metrics->students() : null;
         $imports = $can['imports'] ? $this->metrics->imports() : null;
         $corrections = $can['corrections'] ? $this->metrics->corrections() : null;
-        $links = $can['links'] ? $this->metrics->pendingLinkRequests() : null;
         $confirmations = $can['students'] ? $this->metrics->confirmations() : null;
         $scholarships = $can['scholarships'] ? $this->metrics->scholarships() : null;
         $campaigns = $can['scholarships'] || $user->can('campaigns.manage') ? $this->metrics->campaigns() : null;
@@ -54,8 +51,8 @@ final class InstitutionalDashboard
 
         return [
             'scope' => ['year' => $this->scope->yearSummary(), 'global' => $this->scope->isGlobal(), 'establishment' => $this->scope->isGlobal() ? null : $user->establishment()->value('name')],
-            'kpis' => $this->kpis($students, $imports, $corrections, $links, $scholarships, $establishments, $users),
-            'watch' => $this->watch($imports, $corrections, $links, $scholarships, $confirmations),
+            'kpis' => $this->kpis($students, $imports, $corrections, $scholarships, $establishments, $users),
+            'watch' => $this->watch($imports, $corrections, $scholarships, $confirmations),
             'charts' => [
                 'students_by_level' => $can['students'] ? $this->metrics->studentsByLevel() : null,
                 'students_by_program' => $can['students'] && ! $this->scope->isGlobal() ? $this->metrics->studentsByProgram() : null,
@@ -82,13 +79,13 @@ final class InstitutionalDashboard
      * @param  array{total:int,today:int,by_status:array<string,int>}|null  $scholarships
      * @return array<int,array{key:string,label:string,value:int,hint:string,href:string|null}>
      */
-    private function kpis(?array $students, ?array $imports, ?array $corrections, ?int $links, ?array $scholarships, ?int $establishments, ?int $users): array
+    private function kpis(?array $students, ?array $imports, ?array $corrections, ?array $scholarships, ?int $establishments, ?int $users): array
     {
         $year = $this->scope->year->name ?? 'aucune année courante';
         $cards = [];
         if ($students !== null) {
             $cards[] = ['key' => 'active_students', 'label' => 'Étudiants actifs', 'value' => $students['active_students'], 'hint' => 'Identités actives déclarées en '.$year, 'href' => '/students'];
-            $cards[] = ['key' => 'active_declarations', 'label' => 'Déclarations actives', 'value' => $students['active_declarations'], 'hint' => 'Déclarations annuelles '.$year, 'href' => '/students'];
+            $cards[] = ['key' => 'active_declarations', 'label' => 'Situations actives', 'value' => $students['active_declarations'], 'hint' => 'Situations de l’année '.$year, 'href' => '/students'];
         }
         if ($establishments !== null) {
             $cards[] = ['key' => 'establishments', 'label' => 'Établissements actifs', 'value' => $establishments, 'hint' => 'Référentiel institutionnel', 'href' => null];
@@ -101,9 +98,6 @@ final class InstitutionalDashboard
         if ($corrections !== null) {
             $cards[] = ['key' => 'corrections_pending', 'label' => 'Corrections en attente', 'value' => $corrections['pending'], 'hint' => 'Demandes étudiantes à examiner', 'href' => '/corrections?status=pending'];
         }
-        if ($links !== null) {
-            $cards[] = ['key' => 'links_pending', 'label' => 'Rattachements en attente', 'value' => $links, 'hint' => 'Comptes étudiants à vérifier', 'href' => '/student-links'];
-        }
         if ($imports !== null) {
             $cards[] = ['key' => 'imports_anomalies', 'label' => 'Imports avec anomalies', 'value' => $imports['with_anomalies'], 'hint' => $imports['imports'].' import(s) en '.$year.', '.$imports['failed'].' en échec', 'href' => '/imports'];
         }
@@ -113,9 +107,9 @@ final class InstitutionalDashboard
 
         $cards = collect($cards)->keyBy('key');
         $order = match (true) {
-            ! $this->scope->isGlobal() => ['active_students', 'active_declarations', 'corrections_pending', 'links_pending', 'imports_anomalies'],
+            ! $this->scope->isGlobal() => ['active_students', 'active_declarations', 'corrections_pending', 'imports_anomalies'],
             $users !== null => ['active_students', 'active_declarations', 'establishments', 'internal_users', 'applications', 'applications_pending', 'corrections_pending', 'imports_anomalies'],
-            default => ['active_students', 'active_declarations', 'establishments', 'applications', 'applications_pending', 'applications_today', 'corrections_pending', 'links_pending'],
+            default => ['active_students', 'active_declarations', 'establishments', 'applications', 'applications_pending', 'applications_today', 'corrections_pending'],
         };
 
         return collect($order)->filter(fn ($key) => $cards->has($key))->map(fn ($key) => $cards[$key])->values()->all();
@@ -130,11 +124,10 @@ final class InstitutionalDashboard
      * @param  array{confirmed:int,stale:int,never_confirmed:int,total:int}|null  $confirmations
      * @return array<int,array{label:string,value:int,href:string|null}>
      */
-    private function watch(?array $imports, ?array $corrections, ?int $links, ?array $scholarships, ?array $confirmations): array
+    private function watch(?array $imports, ?array $corrections, ?array $scholarships, ?array $confirmations): array
     {
         return array_values(array_filter([
             ['label' => 'Demandes de correction en attente', 'value' => $corrections['pending'] ?? 0, 'href' => '/corrections?status=pending'],
-            ['label' => 'Demandes de rattachement en attente', 'value' => $links ?? 0, 'href' => '/student-links'],
             ['label' => 'Dossiers reçus non encore vérifiés', 'value' => $scholarships['by_status']['pending'] ?? 0, 'href' => '/scholarships/applications?status=pending'],
             ['label' => 'Dossiers en attente de correction', 'value' => $scholarships['by_status']['needs_correction'] ?? 0, 'href' => '/scholarships/applications?status=needs_correction'],
             ['label' => 'Imports en échec', 'value' => $imports['failed'] ?? 0, 'href' => '/imports'],
