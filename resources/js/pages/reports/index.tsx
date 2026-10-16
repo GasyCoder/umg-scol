@@ -177,9 +177,9 @@ export default function ReportsIndex({
     if (students) {
         kpis.push({
             key: 'students',
-            label: 'Déclarations actives',
+            label: 'Situations actives',
             value: sum(students, 'active'),
-            hint: `${formatNumber(sum(students, 'total'))} déclaration(s) au total`,
+            hint: `${formatNumber(sum(students, 'total'))} situation(s) au total`,
             icon: Users,
             tone: 'primary',
         });
@@ -353,13 +353,13 @@ export default function ReportsIndex({
                         {studentsByEstablishment && (
                             <Panel
                                 icon={Building2}
-                                title="Déclarations actives par établissement"
+                                title="Situations actives par établissement"
                                 description="Année sélectionnée"
                             >
                                 <BarList
-                                    label="Déclarations actives par établissement"
+                                    label="Situations actives par établissement"
                                     items={studentsByEstablishment}
-                                    empty="Aucune déclaration pour cette année."
+                                    empty="Aucune situation pour cette année."
                                 />
                             </Panel>
                         )}
@@ -370,13 +370,13 @@ export default function ReportsIndex({
                     <Panel
                         icon={Table2}
                         title="Étudiants déclarés"
-                        description="Déclarations de l’année par établissement, niveau et parcours"
+                        description="Situations de l’année par établissement, niveau et parcours"
                     >
                         <ReportTable
                             caption="Étudiants déclarés par établissement, niveau et parcours"
                             columns={columns.students}
                             rows={students}
-                            empty="Aucune déclaration pour cette année."
+                            empty="Aucune situation pour cette année."
                         />
                     </Panel>
                 )}
