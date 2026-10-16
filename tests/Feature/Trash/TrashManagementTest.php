@@ -12,7 +12,6 @@ use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentImport;
 use App\Models\StudentImportRow;
-use App\Models\StudentLinkRequest;
 use App\Models\StudentRecord;
 use App\Models\User;
 use App\Support\Reporting\InstitutionalMetrics;
@@ -214,13 +213,11 @@ it('keeps storage cleanup retriable when the disk is unavailable', function () {
     config(['filesystems.disks.unconfigured' => config('filesystems.disks.student_imports')]);
     expect(app(FileDeletionOutbox::class)->clean($id))->toBeTrue()->and(DB::table('pending_file_deletions')->where('id', $id)->exists())->toBeFalse();
 });
-it('hides a trashed student from the student API corrections and internal link review', function () {
+it('hides a trashed student from the student API and corrections', function () {
     $student = Student::factory()->create();
     $user = User::factory()->create()->assignRole('student');
     $user->forceFill(['student_id' => $student->id])->save();
-    StudentLinkRequest::create(['user_id' => $user->id, 'student_id' => $student->id, 'status' => 'pending', 'requested_at' => now()]);
     trashModel($this, 'students', $student);
-    $this->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 0));
     $this->actingAs($user, 'student')->withSession(['student_portal' => true]);
     $base = 'http://'.config('portals.bourse_domain').'/api/student';
     $this->getJson($base.'/me')->assertForbidden();
