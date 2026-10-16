@@ -32,7 +32,8 @@ class CommitStudentImport
                 if ($import->status !== ImportStatus::Ready) {
                     throw ValidationException::withMessages(['import' => 'Cet import doit être analysé avant confirmation.']);
                 }
-                if (! Establishment::query()->sharedLock()->findOrFail($import->establishment_id)->is_active || ! AcademicYear::query()->sharedLock()->findOrFail($import->academic_year_id)->is_active) {
+                // A global import checks the establishment of each row in the re-analysis below.
+                if (($import->establishment_id !== null && ! Establishment::query()->sharedLock()->findOrFail($import->establishment_id)->is_active) || ! AcademicYear::query()->sharedLock()->findOrFail($import->academic_year_id)->is_active) {
                     throw ValidationException::withMessages(['import' => 'L’établissement ou l’année universitaire est désormais inactif.']);
                 }
                 $import->update(['status' => ImportStatus::Committing]);
@@ -43,6 +44,8 @@ class CommitStudentImport
                     }
                 });
                 StudentIdentityLocks::acquire($keys);
+                // Missing mentions/programs first, so that the re-analysis below resolves them.
+                $references = app(CreateImportReferences::class)->handle($import);
                 $analyzer = new AnalyzeStudentRow($import, $actor, true);
                 $created = 0;
                 $updated = 0;
@@ -52,7 +55,8 @@ class CommitStudentImport
                     foreach ($rows as $row) {
                         // Matching, conflicts and referentials are checked again after locks.
                         $result = $analyzer->handle($row->normalized_data ?? []);
-                        if ($result['status'] !== RowStatus::Valid) {
+                        $unresolved = ($result['normalized_data']['establishment_id'] ?? null) === null || filled($result['normalized_data']['_new_level'] ?? null) || filled($result['normalized_data']['_new_mention'] ?? null) || filled($result['normalized_data']['_new_program'] ?? null);
+                        if ($result['status'] !== RowStatus::Valid || $unresolved) {
                             $row->update([...$result, 'resolution' => 'skipped']);
 
                             continue;
@@ -74,7 +78,7 @@ class CommitStudentImport
                             }
                         }
                         $student->save();
-                        $record = StudentRecord::query()->create(['student_id' => $student->id, 'academic_year_id' => $import->academic_year_id, 'establishment_id' => $import->establishment_id, 'level_id' => $values['level_id'], 'program_id' => $values['program_id'], 'repeat_code' => $values['repeat_code'], 'scholarship_requested_at' => $values['scholarship_requested_at'] ?? null, 'scholarship_request_reference' => $values['scholarship_request_reference'] ?? null, 'status' => 'active', 'declared_by' => $actor->id, 'declared_at' => now()]);
+                        $record = StudentRecord::query()->create(['student_id' => $student->id, 'academic_year_id' => $import->academic_year_id, 'establishment_id' => $values['establishment_id'], 'level_id' => $values['level_id'], 'program_id' => $values['program_id'], 'repeat_code' => $values['repeat_code'], 'scholarship_requested_at' => $values['scholarship_requested_at'] ?? null, 'scholarship_request_reference' => $values['scholarship_request_reference'] ?? null, 'status' => 'active', 'declared_by' => $actor->id, 'declared_at' => now()]);
                         $row->update([...$result, 'matched_student_id' => $student->id, 'matched_student_record_id' => $record->id, 'resolution' => 'imported']);
                         $declared++;
                     }
@@ -83,7 +87,7 @@ class CommitStudentImport
                 foreach (RowStatus::cases() as $status) {
                     $import->setAttribute($status->value.'_rows', (int) ($counts[$status->value] ?? 0));
                 }
-                $import->fill(['status' => ImportStatus::Completed, 'created_rows' => $created, 'updated_rows' => $updated, 'declared_rows' => $declared, 'skipped_rows' => $import->total_rows - $declared, 'committed_at' => now()])->save();
+                $import->fill(['reference_changes' => [...$references, 'created' => true], 'status' => ImportStatus::Completed, 'created_rows' => $created, 'updated_rows' => $updated, 'declared_rows' => $declared, 'skipped_rows' => $import->total_rows - $declared, 'committed_at' => now()])->save();
                 $import->audit($actor, 'committed');
             }, 5);
         } catch (Throwable $error) {
