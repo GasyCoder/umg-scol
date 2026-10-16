@@ -51,7 +51,7 @@ it('saves names, logo and favicon and shows them on both portals', function () {
     $this->get('/branding/logo')->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
     $this->get('http://'.config('portals.bourse_domain').'/branding/favicon')->assertOk();
     $bourse = $this->get('http://'.config('portals.bourse_domain').'/')->assertOk();
-    expect($bourse->getContent())->toContain('<title>Bourses UMG — Université de Mahajanga</title>')->toContain('href="'.$branding['favicon_url'].'"')->toContain('data-branding=');
+    expect($bourse->getContent())->toContain('<title>Bourses UMG | Université de Mahajanga</title>')->toContain('href="'.$branding['favicon_url'].'"')->toContain('data-branding=');
     expect($this->get('/login')->getContent())->toContain('href="'.$branding['favicon_url'].'"');
 });
 
