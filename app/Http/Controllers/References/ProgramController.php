@@ -22,10 +22,14 @@ class ProgramController extends Controller
     public function index(ReferenceListRequest $request): Response
     {
         Gate::authorize('viewAny', Program::class);
-        $query = ReferenceTransfer::listQuery('programs', $request->user(), $request->only(['search', 'establishment_id']));
+        $filters = $request->only(['search', 'establishment_id']);
+        $query = ReferenceTransfer::listQuery('programs', $request->user(), $filters);
+        $browse = ReferenceTransfer::browsesEstablishments($request->user(), $filters);
 
         return Inertia::render('references/programs/index', [
-            'records' => $query->paginate(15)->withQueryString(),
+            // One establishment at a time: its whole list fits on a page.
+            'records' => $query->paginate(filled($filters['establishment_id'] ?? null) || $request->user()->hasRole('establishment') ? 100 : 15)->withQueryString(),
+            'establishmentCards' => $browse ? ReferenceTransfer::establishmentCards($request->user()) : null,
             'filters' => $request->only(['search', 'establishment_id']),
             'canCreate' => Gate::allows('create', Program::class), 'establishments' => $this->establishments($request),
         ]);
