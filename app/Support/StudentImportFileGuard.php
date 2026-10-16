@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Exports\Students\EstablishmentTemplateWorkbook;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -31,7 +32,9 @@ class StudentImportFileGuard
         }
         $reader = IOFactory::createReader($xlsx ? 'Xlsx' : 'Csv');
         $sheets = $reader->listWorksheetInfo($file->getPathname());
-        if (count($sheets) !== 1 || $sheets[0]['totalRows'] > (int) config('student_imports.max_rows') + 1 || $sheets[0]['totalColumns'] > (int) config('student_imports.max_columns')) {
+        // The downloadable model adds its drop-down values in a "Listes" sheet after the data sheet; only the first sheet is read.
+        $extra = array_slice($sheets, 1);
+        if ($sheets === [] || $sheets[0]['worksheetName'] === EstablishmentTemplateWorkbook::LISTS_SHEET || count($extra) > 1 || ($extra !== [] && $extra[0]['worksheetName'] !== EstablishmentTemplateWorkbook::LISTS_SHEET) || $sheets[0]['totalRows'] > (int) config('student_imports.max_rows') + 1 || $sheets[0]['totalColumns'] > (int) config('student_imports.max_columns')) {
             $this->reject();
         }
     }
