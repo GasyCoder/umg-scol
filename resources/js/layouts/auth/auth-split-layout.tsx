@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { FolderCheck, ShieldCheck, Users } from 'lucide-react';
+import { PageLoadingBoundary } from '@/components/loading/page-loading-boundary';
 import { BrandMark } from '@/components/brand-mark';
 import { CampusIllustration } from '@/components/illustrations';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -139,7 +140,9 @@ export default function AuthSplitLayout({
                             </p>
                         )}
                     </div>
-                    {children}
+                    <PageLoadingBoundary shell="auth">
+                        {children}
+                    </PageLoadingBoundary>
                 </div>
             </main>
         </div>
