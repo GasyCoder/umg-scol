@@ -1,4 +1,5 @@
 import { AppContent } from '@/components/app-content';
+import { PageLoadingBoundary } from '@/components/loading/page-loading-boundary';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
@@ -10,7 +11,7 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
             <AppSidebar />
             <AppContent variant="sidebar" className="min-w-0 overflow-x-clip">
                 <AppSidebarHeader />
-                {children}
+                <PageLoadingBoundary>{children}</PageLoadingBoundary>
             </AppContent>
         </AppShell>
     );
