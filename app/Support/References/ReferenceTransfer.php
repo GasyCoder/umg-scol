@@ -71,7 +71,33 @@ final class ReferenceTransfer
     {
         return $kind === 'mentions'
             ? self::filter(Mention::query()->with(['establishment:id,code,name', 'domain:id,code,name']), $user, $filters)
-            : self::filter(Program::query()->with(['establishment:id,code,name', 'mention:id,code,name']), $user, $filters);
+            // Programs follow their mention (by name, programs without mention last), so the page can group them.
+            : self::filter(Program::query()->with(['establishment:id,code,name', 'mention:id,code,name']), $user, $filters)->reorder()
+                ->orderBy('programs.establishment_id')->orderByRaw('programs.mention_id is null')
+                ->orderBy(Mention::query()->select('name')->whereColumn('mentions.id', 'programs.mention_id'))->orderBy('programs.name')->orderBy('programs.id');
+    }
+
+    /**
+     * First step of the mention/program lists for a global actor: one card per establishment with its counts.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function establishmentCards(User $user): array
+    {
+        return array_values(self::establishments($user)->orderBy('name')
+            ->withCount(['mentions', 'programs', 'mentions as active_mentions_count' => fn (Builder $q) => $q->where('is_active', true), 'programs as active_programs_count' => fn (Builder $q) => $q->where('is_active', true)])
+            ->get(['id', 'uuid', 'code', 'name', 'is_active', 'logo_path'])
+            ->map(fn (Establishment $establishment) => [...$establishment->only(['id', 'code', 'name', 'is_active', 'mentions_count', 'programs_count', 'active_mentions_count', 'active_programs_count']), 'logo_url' => $establishment->logoUrl()])->all());
+    }
+
+    /**
+     * Global actor without establishment nor search: the list starts with the establishment cards.
+     *
+     * @param  array{search?: string|null, establishment_id?: int|string|null}  $filters
+     */
+    public static function browsesEstablishments(User $user, array $filters): bool
+    {
+        return ! $user->hasRole('establishment') && blank($filters['search'] ?? null) && blank($filters['establishment_id'] ?? null);
     }
 
     /**
