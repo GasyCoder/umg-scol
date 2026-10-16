@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** @property StudentLinkStatus $status */
-#[Fillable(['user_id', 'student_id', 'status', 'requested_at', 'reviewed_at', 'reviewed_by', 'rejection_reason'])]
+/**
+ * @property StudentLinkStatus $status
+ * @property string|null $identifier_type cin, phone, email or last_name: how the student named the record
+ */
+#[Fillable(['user_id', 'student_id', 'identifier_type', 'status', 'requested_at', 'reviewed_at', 'reviewed_by', 'rejection_reason'])]
 class StudentLinkRequest extends Model
 {
     use HasPublicUuid;
