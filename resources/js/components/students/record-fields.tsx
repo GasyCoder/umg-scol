@@ -99,8 +99,8 @@ export default function RecordFields({
     return (
         <FormSection
             icon={GraduationCap}
-            title="Déclaration annuelle"
-            description="Situation de l’étudiant, déjà régulièrement inscrit hors plateforme, pour l’année universitaire."
+            title="Situation de l’année"
+            description="Établissement, niveau et parcours de l’étudiant, déjà régulièrement inscrit hors plateforme, pour l’année universitaire."
         >
             <FormField
                 id="establishment_id"
