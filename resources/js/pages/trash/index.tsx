@@ -19,6 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import InputError from '@/components/input-error';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Pagination, formatDate } from '@/components/scholarships/shared';
@@ -275,36 +276,30 @@ export default function Trash({
                                                 {item.deleted_by ?? 'système'}
                                             </td>
                                             <td>
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <IconAction
+                                                        icon={RotateCcw}
+                                                        label="Restaurer"
+                                                        tone="success"
                                                         onClick={() =>
                                                             choose(
                                                                 item,
                                                                 'restore',
                                                             )
                                                         }
-                                                    >
-                                                        <RotateCcw aria-hidden="true" />
-                                                        Restaurer
-                                                    </Button>
+                                                    />
                                                     {canPurge && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger-foreground"
+                                                        <IconAction
+                                                            icon={Trash2}
+                                                            label="Purger définitivement"
+                                                            tone="danger"
                                                             onClick={() =>
                                                                 choose(
                                                                     item,
                                                                     'purge',
                                                                 )
                                                             }
-                                                        >
-                                                            <Trash2 aria-hidden="true" />
-                                                            Purger
-                                                            définitivement
-                                                        </Button>
+                                                        />
                                                     )}
                                                 </div>
                                             </td>
@@ -347,7 +342,7 @@ export default function Trash({
                         </DialogTitle>
                         <DialogDescription>
                             {selection?.action === 'restore'
-                                ? 'Les dépendances et les conflits seront vérifiés. Un étudiant retrouve uniquement les déclarations déplacées avec lui.'
+                                ? 'Les dépendances et les conflits seront vérifiés. Un étudiant retrouve uniquement les situations annuelles déplacées avec lui.'
                                 : 'Cette action est irréversible. Les données liées et les dossiers déjà traités restent protégés. La purge d’un import supprime le fichier et le staging, jamais les étudiants créés.'}
                         </DialogDescription>
                     </DialogHeader>
