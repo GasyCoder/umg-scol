@@ -76,7 +76,7 @@ it('forbids students and enforces each export permission on the server', functio
 it('exports the same aggregated figures as the page, inside the perimeter and without personal data', function () {
     $csv = $this->actingAs($this->f->staff_a)->get('/reports/students/export')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
     $lines = csvLines($csv);
-    expect($lines[0])->toBe('Établissement;Niveau;Parcours;"Déclarations actives";"Déclarations inactives";Total')->and($lines)->toHaveCount(4)
+    expect($lines[0])->toBe('Établissement;Niveau;Parcours;"Situations actives";"Situations inactives";Total')->and($lines)->toHaveCount(4)
         ->and($csv)->not->toContain('Institut B')->not->toContain('@example.test');
     $files = csvLines($this->actingAs($this->f->central_scholarship_office)->get('/reports/scholarships/export')->assertOk()->streamedContent());
     expect($files)->toHaveCount(3)->and($files[1])->toContain('Faculté A');
