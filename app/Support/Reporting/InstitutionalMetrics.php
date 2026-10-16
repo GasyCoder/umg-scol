@@ -6,14 +6,12 @@ use App\Enums\ScholarshipApplicationStatus;
 use App\Enums\ScholarshipCampaignStatus;
 use App\Enums\StudentCorrectionStatus;
 use App\Enums\StudentImportStatus;
-use App\Enums\StudentLinkStatus;
 use App\Models\Establishment;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipCampaign;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
 use App\Models\StudentInformationConfirmation;
-use App\Models\StudentLinkRequest;
 use App\Models\StudentRecord;
 use App\Models\User;
 use App\Support\StudentConfirmationContext;
@@ -130,11 +128,6 @@ final class InstitutionalMetrics
         $counts = StudentCorrectionRequest::query()->visibleTo($this->scope->user)->toBase()->selectRaw('status, count(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status');
 
         return collect(StudentCorrectionStatus::cases())->mapWithKeys(fn ($status) => [$status->value => (int) ($counts[$status->value] ?? 0)])->all();
-    }
-
-    public function pendingLinkRequests(): int
-    {
-        return StudentLinkRequest::query()->visibleTo($this->scope->user)->where('status', StudentLinkStatus::Pending->value)->count();
     }
 
     /**
