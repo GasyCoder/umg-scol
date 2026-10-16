@@ -24,7 +24,11 @@ use Illuminate\Support\Facades\Validator;
 
 class AnalyzeStudentRow
 {
-    private Establishment $establishment;
+    /** @var Collection<int,Establishment> establishments the import may write to (one, or all for a global import) */
+    private Collection $establishments;
+
+    /** Establishment of the row being analysed. */
+    private ?Establishment $establishment = null;
 
     /** @var Collection<int,Level> */
     private Collection $levels;
@@ -44,19 +48,22 @@ class AnalyzeStudentRow
     /** @var Collection<int,StudentRecord> */
     private Collection $records;
 
-    /** @var array<string,int> request reference => student id, for this establishment and year */
+    /** @var array<string,int> "establishment id|request reference" => student id, for the year */
     private array $references;
 
     public function __construct(private StudentImport $import, private User $actor, bool $lock = false)
     {
-        $this->establishment = Establishment::query()->findOrFail($import->establishment_id);
+        // A global import (no establishment) reads the establishment of each row from the file.
+        $this->establishments = Establishment::query()->when($import->establishment_id !== null, fn ($q) => $q->whereKey($import->establishment_id))->get();
+        $ids = $this->establishments->modelKeys();
         $this->levels = Level::query()->when($lock, fn ($q) => $q->sharedLock())->get();
-        $this->mentions = Mention::query()->where('establishment_id', $import->establishment_id)->when($lock, fn ($q) => $q->sharedLock())->get();
-        $this->programs = Program::query()->where('establishment_id', $import->establishment_id)->when($lock, fn ($q) => $q->sharedLock())->get();
+        $this->mentions = Mention::query()->whereIn('establishment_id', $ids)->when($lock, fn ($q) => $q->sharedLock())->get();
+        $this->programs = Program::query()->whereIn('establishment_id', $ids)->when($lock, fn ($q) => $q->sharedLock())->get();
         $this->domains = Domain::query()->get();
-        $this->references = StudentRecord::query()->where('academic_year_id', $import->academic_year_id)->where('establishment_id', $import->establishment_id)
+        $this->references = StudentRecord::query()->where('academic_year_id', $import->academic_year_id)->whereIn('establishment_id', $ids)
             ->whereNotNull('scholarship_request_reference')->when($lock, fn ($q) => $q->lockForUpdate())
-            ->pluck('student_id', 'scholarship_request_reference')->mapWithKeys(fn ($id, $reference) => [Columns::fold((string) $reference) => (int) $id])->all();
+            ->get(['student_id', 'establishment_id', 'scholarship_request_reference'])
+            ->mapWithKeys(fn (StudentRecord $record) => [$record->establishment_id.'|'.Columns::fold((string) $record->scholarship_request_reference) => $record->student_id])->all();
         $this->students = new Collection;
         $this->records = new Collection;
     }
@@ -94,9 +101,19 @@ class AnalyzeStudentRow
                 $errors[] = $issue($field, 'formula', 'Les formules ne sont pas acceptées.');
             }
         }
+        $this->establishment = $this->resolveEstablishment($data, $issue, $errors);
+        $data['establishment_id'] = $this->establishment?->id;
+        $data['_establishment_code'] = $this->establishment?->code;
+        $establishmentId = $this->establishment?->id;
         // Reuse the manual entry rules and French messages.
         $request = new CreateStudentRequest;
         $rules = $request->importIdentityRules();
+        // Sex and nationality are required only when the file has the column.
+        foreach (['sex', 'nationality'] as $optional) {
+            if (! array_key_exists($optional, $data)) {
+                $rules[$optional] = ['nullable', ...array_filter($rules[$optional], fn ($rule) => $rule !== 'required')];
+            }
+        }
         $validator = Validator::make($data, [...$rules, ...StudentInput::declarationRules()], $request->messages(), $request->attributes());
         foreach ($validator->errors()->messages() as $field => $messages) {
             foreach ($messages as $message) {
@@ -123,7 +140,7 @@ class AnalyzeStudentRow
                 $errors[] = $issue($field, 'already_used', $label.' est déjà utilisé(e) par un autre étudiant.');
             }
         }
-        if ($reference !== null && isset($this->references[$reference]) && $this->references[$reference] !== $student?->id) {
+        if ($reference !== null && isset($this->references[$establishmentId.'|'.$reference]) && $this->references[$establishmentId.'|'.$reference] !== $student?->id) {
             $errors[] = $issue('scholarship_request_reference', 'reference_used', 'Cette référence de demande de bourse est déjà attribuée dans l’établissement pour cette année.');
         }
         $record = null;
@@ -156,16 +173,16 @@ class AnalyzeStudentRow
                 if (filled($birth) && filled($issued) && $issued < $birth) {
                     $warnings[] = $issue('cin_issued_at', 'merged_before_birth', 'Les dates proposées sont incompatibles avec les dates officielles.');
                 }
-                $record = $owned->where('academic_year_id', $this->import->academic_year_id)->where('establishment_id', $this->import->establishment_id)->first();
+                $record = $establishmentId === null ? null : $owned->where('academic_year_id', $this->import->academic_year_id)->where('establishment_id', $establishmentId)->first();
                 if ($record !== null) {
                     if ($this->sameDeclaration($record, $data)) {
                         $duplicate = true;
                     } else {
-                        $warnings[] = $issue('record', 'record_conflict', 'Une déclaration de cette année existe avec d’autres valeurs (niveau, parcours, code ou demande de bourse).');
+                        $warnings[] = $issue('record', 'record_conflict', 'Une situation de cette année existe avec d’autres valeurs (niveau, parcours, code ou demande de bourse).');
                     }
                 }
-                if ($owned->where('academic_year_id', $this->import->academic_year_id)->where('establishment_id', '!=', $this->import->establishment_id)->contains(fn ($r) => $r->status->value === 'active')) {
-                    $warnings[] = $issue('record', 'foreign_active_record', 'Une déclaration active existe dans un autre établissement. Aucun transfert automatique.');
+                if ($establishmentId !== null && $owned->where('academic_year_id', $this->import->academic_year_id)->where('establishment_id', '!=', $establishmentId)->contains(fn ($r) => $r->status->value === 'active')) {
+                    $warnings[] = $issue('record', 'foreign_active_record', 'Une situation active existe dans un autre établissement. Aucun transfert automatique.');
                 }
             }
         }
@@ -187,40 +204,77 @@ class AnalyzeStudentRow
     {
         $errors = [];
         $level = $this->resolve($this->levels->all(), $data['level'] ?? null);
-        if ($level === null || ! $level->is_active) {
-            $errors[] = $issue('level', 'unknown_or_ambiguous', 'Le niveau est absent, inconnu, ambigu ou inactif.');
+        $newLevel = null;
+        if ($level === null && $this->matches($this->levels->all(), $data['level'] ?? null) === [] && Level::standardCode($data['level'] ?? null) !== null) {
+            // Standard LMD level (L1 to M2) missing from the platform: created at confirmation.
+            $newLevel = Level::standardCode($data['level']);
+        } elseif ($level === null) {
+            $errors[] = $issue('level', 'unknown_or_ambiguous', 'Niveau inconnu ou ambigu : créez-le dans Référentiels → Niveaux.');
+        } elseif (! $level->is_active) {
+            $errors[] = $issue('level', 'inactive', 'Le niveau existe mais il est inactif : réactivez-le dans les référentiels.');
         }
+        // A mention or program missing from the establishment is created at confirmation, in that
+        // establishment only; an inactive or ambiguous one is never duplicated.
         $mention = null;
-        if (filled($data['mention'] ?? null)) {
-            $mention = $this->resolve($this->mentions->all(), $data['mention']);
-            if ($mention === null || ! $mention->is_active) {
-                $errors[] = $issue('mention', 'unknown_or_ambiguous', 'La mention est inconnue, ambiguë, inactive ou appartient à un autre établissement.');
+        $newMention = null;
+        if (filled($data['mention'] ?? null) && $this->establishment !== null) {
+            $found = $this->matches($this->mentions->where('establishment_id', $this->establishment->id)->all(), $data['mention']);
+            if (count($found) === 1) {
+                $mention = $found[0];
+                if (! $mention->is_active) {
+                    $errors[] = $issue('mention', 'inactive', 'La mention existe mais elle est inactive : réactivez-la dans les référentiels.');
+                }
+            } elseif (count($found) > 1) {
+                $errors[] = $issue('mention', 'ambiguous', 'Plusieurs mentions de l’établissement correspondent à ce nom ou code.');
+            } else {
+                $newMention = (string) preg_replace('/\s+/u', ' ', trim((string) $data['mention']));
             }
         }
         $program = null;
-        if (filled($data['program'] ?? null)) {
+        $newProgram = null;
+        if ($this->establishment === null) {
+            // Unknown establishment: its mentions and programs cannot be resolved (already reported).
+        } elseif (filled($data['program'] ?? null)) {
             // A program name (e.g. "Tronc Commun") is only unique inside its mention.
-            $candidates = $mention === null ? $this->programs->all() : $this->programs->where('mention_id', $mention->id)->all();
-            $program = $this->resolve($candidates, $data['program']);
-            if ($program === null || ! $program->is_active) {
-                $errors[] = $issue('program', 'unknown_or_ambiguous', $mention === null ? 'Le parcours est inconnu, ambigu, inactif ou appartient à un autre établissement.' : 'Le parcours est inconnu, ambigu ou inactif dans cette mention.');
+            $candidates = match (true) {
+                $mention !== null => $this->programs->where('mention_id', $mention->id)->all(),
+                $newMention !== null => [],
+                default => $this->programs->where('establishment_id', $this->establishment->id)->all(),
+            };
+            $found = $this->matches($candidates, $data['program']);
+            if (count($found) === 1) {
+                $program = $found[0];
+                if (! $program->is_active) {
+                    $errors[] = $issue('program', 'inactive', 'Le parcours existe mais il est inactif : réactivez-le dans les référentiels.');
+                }
+            } elseif (count($found) > 1) {
+                $errors[] = $issue('program', 'ambiguous', 'Plusieurs parcours de l’établissement correspondent : précisez la mention.');
+            } else {
+                $newProgram = (string) preg_replace('/\s+/u', ' ', trim((string) $data['program']));
             }
-        } elseif ($mention !== null) {
+        } elseif ($mention !== null || $newMention !== null) {
             $errors[] = $issue('program', 'missing_program', 'Le parcours est obligatoire lorsque la mention est renseignée.');
         }
-        if (filled($data['establishment'] ?? null) && ! $this->namesEstablishment((string) $data['establishment'])) {
-            $errors[] = $issue('establishment', 'other_establishment', 'L’école ou institut du fichier ne correspond pas à l’établissement de l’import.');
-        }
-        if (filled($data['sector'] ?? null)) {
+        if (filled($data['sector'] ?? null) && $this->establishment !== null) {
             $sector = $this->enumFromLabel(EstablishmentSector::cases(), (string) $data['sector']);
             if ($sector === null || ($this->establishment->sector !== null && $sector !== $this->establishment->sector)) {
                 $errors[] = $issue('sector', 'sector_mismatch', 'L’institution (publique/privée) est inconnue ou ne correspond pas à l’établissement.');
             }
         }
+        $newDomain = null;
+        $mentionDomain = null;
         if (filled($data['domain'] ?? null) && $mention?->domain_id !== null) {
             $domain = $this->domains->firstWhere('id', $mention->domain_id);
             if ($domain === null || ! $this->namesDomain($domain, (string) $data['domain'])) {
                 $errors[] = $issue('domain', 'domain_mismatch', 'Le domaine ne correspond pas au domaine de la mention.');
+            }
+        } elseif (filled($data['domain'] ?? null) && $newMention !== null) {
+            // The new mention takes the domain of the file: an existing one, or "(CODE) Name" created with it.
+            $mentionDomain = $this->domains->first(fn (Domain $domain) => $this->namesDomain($domain, (string) $data['domain']));
+            if ($mentionDomain === null && preg_match('/^\(\s*([A-Za-z0-9._-]{1,30})\s*\)\s*(\S.*)$/u', trim((string) $data['domain']), $parts) === 1) {
+                $newDomain = ['code' => strtoupper($parts[1]), 'name' => (string) preg_replace('/\s+/u', ' ', trim($parts[2]))];
+            } elseif ($mentionDomain === null) {
+                $errors[] = $issue('domain', 'unknown_domain', 'Domaine inconnu : indiquez-le sous la forme « (CODE) Nom », par exemple « (ALSH) Arts, Lettres et Sciences Humaines ».');
             }
         }
         if (filled($data['training_type'] ?? null)) {
@@ -231,6 +285,13 @@ class AnalyzeStudentRow
         }
         $data['level_id'] = $level?->id;
         $data['program_id'] = $program?->id;
+        // References to create at confirmation (kept with the row, read back by the commit).
+        $data['_new_level'] = $newLevel;
+        $data['_new_mention'] = $newMention;
+        $data['_new_program'] = $newProgram;
+        $data['_mention_domain_id'] = $mentionDomain?->id;
+        $data['_new_domain'] = $newDomain;
+        $data['_training_type'] = filled($data['training_type'] ?? null) ? $this->enumFromLabel(TrainingType::cases(), (string) $data['training_type'])?->value : null;
 
         return $errors;
     }
@@ -244,15 +305,89 @@ class AnalyzeStudentRow
             && Columns::fold((string) $record->scholarship_request_reference) === Columns::fold((string) ($data['scholarship_request_reference'] ?? ''));
     }
 
-    /** Name, code, "Name (CODE)" or "CODE - Name" of the establishment of the import. */
-    private function namesEstablishment(string $value): bool
+    /**
+     * Establishment of the row. A fixed import checks that the file names it (code or name);
+     * a global import finds it by code first ("Institution Code"), else by name ("École / Institut").
+     *
+     * @param  array<string,mixed>  $data
+     * @param  callable(string,string,string): array<string,string>  $issue
+     * @param  list<array<string,string>>  $errors
+     */
+    private function resolveEstablishment(array $data, callable $issue, array &$errors): ?Establishment
     {
-        $folded = Columns::fold($value);
-        $name = Columns::fold($this->establishment->name);
-        $code = Columns::fold($this->establishment->code);
-        preg_match('/\(([^)]*)\)\s*$/', $folded, $parts);
+        $code = filled($data['establishment_code'] ?? null) ? implode('', self::words((string) $data['establishment_code'])) : null;
+        $name = filled($data['establishment'] ?? null) ? (string) $data['establishment'] : null;
+        $byCode = fn (Establishment $establishment) => implode('', self::words($establishment->code)) === $code;
+        if ($this->import->establishment_id !== null) {
+            $establishment = $this->establishments->first();
+            if ($establishment === null) {
+                return null;
+            }
+            if ($code !== null && ! $byCode($establishment)) {
+                $errors[] = $issue('establishment_code', 'other_establishment', 'Le code établissement du fichier ne correspond pas à l’établissement de l’import.');
+            } elseif ($code === null && $name !== null && ! $this->namesEstablishment($establishment, $name)) {
+                $errors[] = $issue('establishment', 'other_establishment', 'L’école ou institut du fichier ne correspond pas à l’établissement de l’import.');
+            }
 
-        return in_array($folded, [$name, $code], true) || str_starts_with($folded, $name.' (') || (isset($parts[1]) && Columns::fold($parts[1]) === $code);
+            return $establishment;
+        }
+        if ($code === null && $name === null) {
+            $errors[] = $issue('establishment_code', 'missing_establishment', 'Établissement absent : renseignez le code établissement ou le nom de l’école ou institut.');
+
+            return null;
+        }
+        $found = $code !== null ? $this->establishments->filter($byCode) : $this->establishments->filter(fn (Establishment $establishment) => $this->namesEstablishment($establishment, (string) $name));
+        if ($found->count() !== 1) {
+            $errors[] = $issue($code !== null ? 'establishment_code' : 'establishment', 'unknown_establishment', 'Établissement introuvable : aucun établissement de la plateforme ne porte ce code ou ce nom.');
+
+            return null;
+        }
+        $establishment = $found->first();
+        if (! $establishment->is_active) {
+            $errors[] = $issue($code !== null ? 'establishment_code' : 'establishment', 'inactive_establishment', 'L’établissement existe mais il est inactif.');
+        }
+
+        return $establishment;
+    }
+
+    /**
+     * Words of a label, without case, accents or punctuation.
+     *
+     * @return list<string>
+     */
+    private static function words(string $text): array
+    {
+        return array_values(array_unique(array_filter(preg_split('/[^a-z0-9]+/', Columns::fold($text)) ?: [])));
+    }
+
+    /**
+     * The school/institute column names the establishment of the import: same words as its name
+     * (order, accents, case and punctuation ignored, with or without the bracketed part), or its
+     * acronym alone or among the bracketed words. "Ecole de Droit et Science Politique Antsohihy
+     * (EDSP Antsohihy)" names "Ecole de Droit et Science Politique (Antsohihy)", acronym EDSP.
+     */
+    private function namesEstablishment(Establishment $establishment, string $value): bool
+    {
+        $words = fn (string $text): array => self::words($text);
+        $same = function (array $a, array $b): bool {
+            sort($a);
+            sort($b);
+
+            return $a !== [] && $a === $b;
+        };
+        $outside = fn (string $text): string => (string) preg_replace('/\([^)]*\)/u', ' ', $text);
+        preg_match_all('/\(([^)]*)\)/u', $value, $brackets);
+        $name = $establishment->name;
+        $code = implode('', $words($establishment->code));
+
+        return $same($words($value), $words($name))
+            || $same($words($outside($value)), $words($outside($name)))
+            || $same($words($outside($value)), $words($name))
+            || $same($words($value), $words($outside($name)))
+            || implode('', $words($value)) === $code
+            // Acronym among the bracketed words: every other word must still belong to the name (no other city).
+            || (in_array($code, $words(implode(' ', $brackets[1])), true)
+                && array_diff([...$words($outside($value)), ...array_diff($words(implode(' ', $brackets[1])), [$code])], $words($name)) === []);
     }
 
     /** "(ALSH) Arts, Lettres et Sciences Humaines", "ALSH" or the domain name. */
@@ -293,14 +428,29 @@ class AnalyzeStudentRow
      */
     private function resolve(array $items, mixed $value): Level|Mention|Program|null
     {
+        $matches = $this->matches($items, $value);
+
+        return count($matches) === 1 ? $matches[0] : null;
+    }
+
+    /**
+     * Items named by the value: by code first, then by exact name (case and accents ignored).
+     *
+     * @template T of Level|Mention|Program
+     *
+     * @param  array<int,T>  $items
+     * @return list<T>
+     */
+    private function matches(array $items, mixed $value): array
+    {
         if (! is_string($value) || ! filled($value)) {
-            return null;
+            return [];
         }
         $matches = array_filter($items, fn ($item) => filled($item->code) && Columns::fold($item->code) === Columns::fold($value));
         if ($matches === []) {
             $matches = array_filter($items, fn ($item) => Columns::fold($item->name) === Columns::fold($value));
         }
 
-        return count($matches) === 1 ? array_values($matches)[0] : null;
+        return array_values($matches);
     }
 }
