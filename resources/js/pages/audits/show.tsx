@@ -75,7 +75,7 @@ export default function AuditShow({ activity }: { activity: Detail }) {
     ];
     return (
         <>
-            <Head title={`Audit — ${activity.event_label}`} />
+            <Head title={`Audit : ${activity.event_label}`} />
             <PageBody>
                 <PageHeader
                     icon={ScrollText}
