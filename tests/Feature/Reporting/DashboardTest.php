@@ -55,7 +55,7 @@ it('never counts or reveals establishment B on the dashboard of A', function () 
     $json = json_encode($props['dashboard']);
     expect($json)->not->toContain('Institut B')
         ->and($props['dashboard']['corrections']['pending'])->toBe(1)
-        ->and(kpi($props, 'links_pending'))->toBe(1)
+        ->and(kpi($props, 'links_pending'))->toBeNull()
         ->and($props['dashboard']['imports'])->toMatchArray(['imports' => 2, 'failed' => 1, 'with_anomalies' => 1, 'total_rows' => 15, 'rejected_rows' => 2, 'declared_rows' => 7])
         ->and(collect($props['dashboard']['imports']['recent'])->pluck('establishment')->unique()->all())->toBe(['Faculté A']);
     // B sees its own figures only.
@@ -117,8 +117,8 @@ it('counts student confirmations with the portal rule: current, stale and never 
 });
 it('lists items needing attention with non-zero counters only', function () {
     $watch = collect(dashboardData($this, $this->f->central_scholarship_office)['dashboard']['watch'])->pluck('value', 'label')->all();
-    expect($watch)->toMatchArray(['Demandes de correction en attente' => 2, 'Demandes de rattachement en attente' => 2, 'Dossiers reçus non encore vérifiés' => 1])
-        ->and($watch)->not->toHaveKey('Dossiers en attente de correction');
+    expect($watch)->toMatchArray(['Demandes de correction en attente' => 2, 'Dossiers reçus non encore vérifiés' => 1])
+        ->and($watch)->not->toHaveKey('Dossiers en attente de correction')->and($watch)->not->toHaveKey('Demandes de rattachement en attente');
 });
 it('keeps the number of queries bounded whatever the volume (no N+1)', function () {
     $count = function (): int {
