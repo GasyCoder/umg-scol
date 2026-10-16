@@ -280,7 +280,7 @@ export default function ImportShow({
 
     return (
         <PageBody>
-            <Head title={`Import — ${item.original_filename}`} />
+            <Head title={`Import du fichier ${item.original_filename}`} />
             <PageHeader
                 icon={showMapping ? Columns3 : FileSpreadsheet}
                 title={
