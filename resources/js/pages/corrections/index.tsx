@@ -1,8 +1,9 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ChevronRight, FilePenLine, RotateCcw, Search } from 'lucide-react';
+import { Eye, FilePenLine, RotateCcw, Search } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { CorrectionStatusBadge } from '@/components/corrections/status-badge';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/scholarships/shared';
 import type { PageLink } from '@/components/scholarships/shared';
@@ -313,19 +314,14 @@ export default function CorrectionsIndex({
                                                     label={item.status_label}
                                                 />
                                             </td>
-                                            <td className="text-right">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
+                                            <td>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <IconAction
+                                                        icon={Eye}
+                                                        label="Examiner la demande"
                                                         href={`/corrections/${item.uuid}`}
-                                                    >
-                                                        Examiner
-                                                        <ChevronRight aria-hidden="true" />
-                                                    </Link>
-                                                </Button>
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
