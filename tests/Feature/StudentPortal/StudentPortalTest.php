@@ -3,10 +3,9 @@
 use App\Actions\StudentPortal\AuthenticateGoogleStudent;
 use App\Actions\StudentPortal\LinkStudent;
 use App\Actions\StudentPortal\RequestEmailOtp;
-use App\Actions\StudentPortal\ReviewStudentLink;
 use App\Actions\StudentPortal\VerifyEmailOtp;
-use App\Enums\StudentLinkStatus;
 use App\Mail\StudentOtpMail;
+use App\Mail\StudentPortalLinkedMail;
 use App\Models\AcademicYear;
 use App\Models\Activity;
 use App\Models\EmailOtpChallenge;
@@ -18,6 +17,7 @@ use App\Models\StudentRecord;
 use App\Models\User;
 use App\Support\PortalEmailLock;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Validation\ValidationException;
-use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\User as GoogleUser;
@@ -47,7 +46,7 @@ beforeEach(function () {
     $this->year = AcademicYear::factory()->create(['is_current' => true]);
     $this->student = Student::factory()->create(['cin' => '401001001001', 'sex' => 'F', 'birth_date' => '2001-01-01', 'email' => 'student@example.test']);
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id]);
-    $this->link = ['cin' => '401001001001', 'birth_date' => '2001-01-01'];
+    $this->link = ['identifier_type' => 'cin', 'identifier' => '401001001001', 'birth_date' => '2001-01-01'];
 });
 
 function portalStudent(TestCase $test, ?User $user = null): void
@@ -57,20 +56,13 @@ function portalStudent(TestCase $test, ?User $user = null): void
 function portalOtp(TestCase $test, string $email = 'new@example.test'): array
 {
     $response = $test->postJson($test->base.'/api/student/auth/otp/request', ['email' => $email])->assertOk();
-    $mail = Mail::sent(StudentOtpMail::class)->last();
+    $mail = Mail::queued(StudentOtpMail::class)->last();
 
     return ['challenge_id' => $response->json('challenge_id'), 'code' => $mail->code];
 }
 function googleStudent(string $email = 'google@example.test', string $id = '123456789012345678901', bool $verified = true): GoogleUser
 {
     return (new GoogleUser)->setRaw(['email_verified' => $verified])->map(['id' => $id, 'email' => $email, 'name' => 'Untrusted Google name']);
-}
-function pendingPortalLink(TestCase $test): StudentLinkRequest
-{
-    $test->student->update(['email' => null]);
-    app(LinkStudent::class)->handle($test->studentUser, '401001001001', '2001-01-01');
-
-    return StudentLinkRequest::sole();
 }
 
 it('serves each portal only on its own configured domain', function () {
@@ -96,7 +88,7 @@ it('generates front-end route URLs relative to the current portal, without the p
 });
 it('rejects students on all internal auth and settings routes', function (string $url) {
     $this->actingAs($this->studentUser, 'web')->get($url)->assertForbidden();
-})->with(['/dashboard', '/settings/profile', '/settings/appearance', '/students', '/student-links']);
+})->with(['/dashboard', '/settings/profile', '/settings/appearance', '/students']);
 it('does not authenticate students through Fortify passwords or password recovery', function () {
     $this->post('/login', ['email' => $this->studentUser->email, 'password' => 'password'])->assertSessionHasErrors('email');
     $this->assertGuest('web');
@@ -165,7 +157,7 @@ it('consumes an OTP only once', function () {
 it('enforces the attempt ceiling in the transactional verifier', function () {
     $binding = 'binding';
     $id = app(RequestEmailOtp::class)->handle('new@example.test', $binding);
-    $correct = Mail::sent(StudentOtpMail::class)->last()->code;
+    $correct = Mail::queued(StudentOtpMail::class)->last()->code;
     $wrong = $correct === '111111' ? '222222' : '111111';
     for ($i = 0; $i < 5; $i++) {
         try {
@@ -230,6 +222,13 @@ it('never sends an OTP through a logging mail transport', function () {
     $this->postJson($this->base.'/api/student/auth/otp/request', ['email' => 'new@example.test'])->assertStatus(503);
     expect(EmailOtpChallenge::count())->toBe(0);
     Mail::assertNothingSent();
+    Mail::assertNothingQueued();
+});
+it('queues the code encrypted, so that the page answers without waiting for the mail server', function () {
+    $this->postJson($this->base.'/api/student/auth/otp/request', ['email' => 'new@example.test'])->assertOk();
+    Mail::assertQueued(StudentOtpMail::class, fn (StudentOtpMail $mail) => $mail->hasTo('new@example.test') && preg_match('/^\d{6}$/', $mail->code) === 1);
+    expect(new StudentOtpMail('123456'))->toBeInstanceOf(ShouldBeEncrypted::class)
+        ->and((new StudentOtpMail('123456'))->render())->toContain('123456')->toContain('10 minutes');
 });
 it('cleans expired and consumed challenges', function () {
     portalOtp($this);
@@ -269,13 +268,13 @@ it('uses stateful Socialite redirects and rejects invalid state', function () {
 });
 it('automatically links only an exact official identity and verified email', function (string $cin) {
     portalStudent($this);
-    $this->postJson($this->base.'/api/student/link', [...$this->link, 'cin' => $cin])->assertOk()->assertJsonPath('linked', true);
+    $this->postJson($this->base.'/api/student/link', [...$this->link, 'identifier' => $cin])->assertOk()->assertJsonPath('linked', true);
     expect($this->studentUser->fresh()->student_id)->toBe($this->student->id)->and(StudentLinkRequest::count())->toBe(0)->and($this->studentUser->fresh()->student->id)->toBe($this->student->id)->and($this->student->user->id)->toBe($this->studentUser->id);
 })->with(['401001001001', ' 401 001 001 001 ', '401.001.001.001']);
 it('returns the same generic response for missing ambiguous inactive taken and email-conflicting identities', function (string $case) {
     portalStudent($this);
     if ($case === 'missing') {
-        $this->link['cin'] = '401001001002';
+        $this->link['identifier'] = '401001001002';
     }
     if ($case === 'ambiguous') {
         Student::factory()->create(['cin' => '401001001001', 'birth_date' => '2001-01-01']);
@@ -289,82 +288,40 @@ it('returns the same generic response for missing ambiguous inactive taken and e
     if ($case === 'taken') {
         User::factory()->create()->assignRole('student')->forceFill(['student_id' => $this->student->id])->save();
     }
-    if ($case === 'email') {
-        $this->student->update(['email' => 'other@example.test']);
-    }
-    if ($case === 'no-email') {
-        $this->student->update(['email' => null]);
-    }
-    $response = $this->postJson($this->base.'/api/student/link', $this->link)->assertOk()->assertExactJson(['linked' => false, 'message' => 'Les informations fournies ne permettent pas un rattachement automatique. Une vérification peut être nécessaire.']);
+    $response = $this->postJson($this->base.'/api/student/link', $this->link)->assertOk()->assertExactJson(['linked' => false, 'message' => 'Ces informations ne correspondent à aucune fiche disponible. Vérifiez-les, essayez un autre renseignement ou contactez votre établissement.']);
     expect($response->getContent())->not->toContain($this->student->last_name, 'other@example.test', '401001001001');
     $this->getJson($this->base.'/api/student/link/status')->assertExactJson(['linked' => false, 'status' => 'verification_required']);
-})->with(['missing', 'birth', 'ambiguous', 'inactive', 'taken', 'email', 'no-email']);
-it('creates a minimal pending manual request without persisting submitted PII', function () {
-    $request = pendingPortalLink($this);
-    expect($request->status)->toBe(StudentLinkStatus::Pending)->and($request->student_id)->toBe($this->student->id)->and($request->toJson())->not->toContain('401001001001', '2001-01-01');
-    app(LinkStudent::class)->handle($this->studentUser, '401001001001', '2001-01-01');
-    expect(StudentLinkRequest::count())->toBe(1);
-});
-it('scopes establishment review to the active declaration in the current year', function () {
-    $request = pendingPortalLink($this);
-    $staff = User::factory()->create()->assignRole('establishment');
-    $staff->forceFill(['establishment_id' => $this->b->id])->save();
-    StudentRecord::factory()->create(['student_id' => $this->student->id, 'establishment_id' => $this->b->id, 'status' => 'inactive']);
-    $this->actingAs($staff, 'web')->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 0));
-    $this->post('/student-links/'.$request->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
-    $staff->forceFill(['establishment_id' => $this->a->id])->save();
-    $this->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 1));
-});
-it('allows central global review but never a student', function () {
-    $request = pendingPortalLink($this);
+})->with(['missing', 'birth', 'ambiguous', 'inactive', 'taken']);
+it('links at once without staff review when the official email differs, and alerts the official address', function (?string $official) {
+    $this->student->update(['email' => $official]);
+    portalStudent($this);
+
+    $this->postJson($this->base.'/api/student/link', $this->link)->assertOk()->assertJsonPath('linked', true);
+    expect($this->studentUser->fresh()->student_id)->toBe($this->student->id)->and(StudentLinkRequest::count())->toBe(0);
+    if ($official === null) {
+        Mail::assertNotQueued(StudentPortalLinkedMail::class);
+    } else {
+        Mail::assertQueued(StudentPortalLinkedMail::class, fn ($mail) => $mail->hasTo($official));
+    }
+})->with(['other official email' => ['officiel@example.test'], 'no official email' => [null]]);
+it('lets the staff detach a wrong portal account from the record', function () {
+    app(LinkStudent::class)->handle($this->studentUser, 'cin', '401001001001', '2001-01-01');
     $central = User::factory()->create()->assignRole('central_scholarship_office');
-    $this->actingAs($central, 'web')->get('/student-links')->assertInertia(fn (Assert $page) => $page->has('requests.data', 1));
-    $this->actingAs($this->studentUser, 'web')->post('/student-links/'.$request->uuid.'/review', ['decision' => 'approve'])->assertForbidden();
+    $this->actingAs($central, 'web')->delete('/students/'.$this->student->uuid.'/portal')->assertRedirect();
+    expect($this->studentUser->fresh()->student_id)->toBeNull()
+        ->and(Activity::query()->where('event', 'portal_detached')->sole()->causer_id)->toBe($central->id);
+    $this->actingAs($this->studentUser, 'web')->delete('/students/'.$this->student->uuid.'/portal')->assertForbidden();
 });
-it('approves atomically and makes a repeated approval a no-op', function () {
-    $request = pendingPortalLink($this);
-    app(ReviewStudentLink::class)->handle($this->admin, $request, true, null);
-    $count = Activity::count();
-    app(ReviewStudentLink::class)->handle($this->admin, $request, true, null);
-    expect($request->fresh()->status)->toBe(StudentLinkStatus::Approved)->and($request->fresh()->reviewed_by)->toBe($this->admin->id)->and($this->studentUser->fresh()->student_id)->toBe($this->student->id)->and(Activity::count())->toBe($count);
-});
-it('requires a rejection reason and leaves the account unlinked', function () {
-    $request = pendingPortalLink($this);
-    $this->actingAs($this->admin, 'web')->post('/student-links/'.$request->uuid.'/review', ['decision' => 'reject'])->assertSessionHasErrors('rejection_reason');
-    $this->post('/student-links/'.$request->uuid.'/review', ['decision' => 'reject', 'rejection_reason' => 'Justificatifs insuffisants.'])->assertSessionHasNoErrors();
-    expect($request->fresh()->status)->toBe(StudentLinkStatus::Rejected)->and($this->studentUser->fresh()->student_id)->toBeNull();
-});
-it('refuses approval if the account role identity activity or association changed', function (string $case) {
-    $request = pendingPortalLink($this);
-    if ($case === 'role') {
-        $this->studentUser->assignRole('superadmin');
-    }
-    if ($case === 'inactive') {
-        $this->student->update(['is_active' => false]);
-    }
-    if ($case === 'taken') {
-        User::factory()->create()->assignRole('student')->forceFill(['student_id' => $this->student->id])->save();
-    }
-    expect(fn () => app(ReviewStudentLink::class)->handle($this->admin, $request, true, null))->toThrow(ValidationException::class);
-    expect($request->fresh()->status)->toBe(StudentLinkStatus::Pending);
-})->with(['role', 'inactive', 'taken']);
 it('allows only one account to link an identity and enforces it in SQL too', function () {
-    app(LinkStudent::class)->handle($this->studentUser, '401001001001', '2001-01-01');
+    app(LinkStudent::class)->handle($this->studentUser, 'cin', '401001001001', '2001-01-01');
     $other = User::factory()->create(['email' => 'other@example.test'])->assignRole('student');
-    expect(app(LinkStudent::class)->handle($other, '401001001001', '2001-01-01'))->toBeFalse();
+    expect(app(LinkStudent::class)->handle($other, 'cin', '401001001001', '2001-01-01'))->toBeFalse();
     expect(fn () => DB::table('users')->where('id', $other->id)->update(['student_id' => $this->student->id]))->toThrow(QueryException::class);
-});
-it('protects against a manual approval after a concurrent automatic link', function () {
-    $request = pendingPortalLink($this);
-    $this->student->update(['email' => 'student@example.test']);
-    app(LinkStudent::class)->handle($this->studentUser, '401001001001', '2001-01-01');
-    expect($request->fresh()->status)->toBe(StudentLinkStatus::Cancelled);
-    expect(fn () => app(ReviewStudentLink::class)->handle($this->admin, $request, true, null))->toThrow(ValidationException::class);
 });
 it('requires linkage and returns only the linked profile with controlled annual data', function () {
     portalStudent($this);
     $this->getJson($this->base.'/api/student/me')->assertForbidden();
-    app(LinkStudent::class)->handle($this->studentUser, '401001001001', '2001-01-01');
+    app(LinkStudent::class)->handle($this->studentUser, 'cin', '401001001001', '2001-01-01');
     $this->studentUser->refresh();
     $other = Student::factory()->create(['last_name' => 'OTHER SECRET']);
     StudentRecord::factory()->create(['student_id' => $other->id]);
@@ -388,7 +345,7 @@ it('audits account creation authentication linkage and logout without sensitive 
 it('blocks link brute force and unverified accounts', function () {
     portalStudent($this);
     for ($i = 0; $i < 3; $i++) {
-        $this->postJson($this->base.'/api/student/link', [...$this->link, 'cin' => 'missing'])->assertOk();
+        $this->postJson($this->base.'/api/student/link', [...$this->link, 'identifier' => 'missing'])->assertOk();
     }
     $this->postJson($this->base.'/api/student/link', $this->link)->assertTooManyRequests();
     $this->studentUser->forceFill(['email_verified_at' => null])->save();
@@ -412,4 +369,35 @@ it('enforces CSRF for state changing student endpoints', function () {
 it('rejects cross-portal origins even with a valid session', function () {
     portalStudent($this);
     $this->withHeader('Origin', 'http://scol.umg.test')->postJson($this->base.'/api/student/logout', [])->assertStatus(419);
+});
+
+it('links a student without CIN by phone, email or last name, with the birth date', function (string $type, string $identifier) {
+    $this->student->update(['cin' => null, 'phone' => '0341112233', 'email' => 'student@example.test', 'last_name' => 'RAZAFY']);
+    portalStudent($this);
+
+    $this->student->update(['mother_name' => 'RASOA Marie']);
+    $this->postJson($this->base.'/api/student/link', ['identifier_type' => $type, 'identifier' => $identifier, 'birth_date' => '2001-01-01', 'mother_name' => 'rasoa  marie'])->assertOk()->assertJsonPath('linked', true);
+    expect($this->studentUser->fresh()->student_id)->toBe($this->student->id);
+})->with([
+    'phone written with spaces and +261' => ['phone', '+261 34 11 122 33'],
+    'email in capitals' => ['email', 'STUDENT@example.test'],
+    'last name without accents or case' => ['last_name', 'razafy'],
+]);
+
+it('asks the mother\'s name with the last name, and refuses a wrong one', function () {
+    $this->student->update(['cin' => null, 'last_name' => 'RAZAFY', 'mother_name' => 'RASOA Marie']);
+    portalStudent($this);
+
+    $this->postJson($this->base.'/api/student/link', ['identifier_type' => 'last_name', 'identifier' => 'Razafy', 'birth_date' => '2001-01-01'])->assertUnprocessable()->assertJsonValidationErrors('mother_name');
+    $this->postJson($this->base.'/api/student/link', ['identifier_type' => 'last_name', 'identifier' => 'Razafy', 'birth_date' => '2001-01-01', 'mother_name' => 'RABE Lalao'])->assertOk()->assertJsonPath('linked', false);
+    expect($this->studentUser->fresh()->student_id)->toBeNull()->and(StudentLinkRequest::query()->exists())->toBeFalse();
+});
+it('never links by name when two records share the name, the birth date and the mother\'s name', function () {
+    $this->student->update(['last_name' => 'RAZAFY', 'mother_name' => 'RASOA Marie']);
+    Student::factory()->create(['last_name' => 'Razafy', 'birth_date' => '2001-01-01', 'mother_name' => 'Rasoa Marie']);
+    portalStudent($this);
+
+    $this->postJson($this->base.'/api/student/link', ['identifier_type' => 'last_name', 'identifier' => 'RAZAFY', 'birth_date' => '2001-01-01', 'mother_name' => 'RASOA Marie'])->assertOk()->assertJsonPath('linked', false);
+    expect(StudentLinkRequest::query()->exists())->toBeFalse()->and($this->studentUser->fresh()->student_id)->toBeNull();
+    $this->postJson($this->base.'/api/student/link', ['identifier_type' => 'matricule', 'identifier' => 'X', 'birth_date' => '2001-01-01'])->assertUnprocessable();
 });
