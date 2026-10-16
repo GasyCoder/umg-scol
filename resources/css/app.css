@@ -2,6 +2,9 @@
 
 @import 'tw-animate-css';
 
+/* Only placeholders: keep Skeleton's global theme and form resets out of UMG. */
+@import '../../node_modules/@skeletonlabs/skeleton/src/utilities/placeholders.css';
+
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
@@ -217,6 +220,16 @@
 }
 
 @layer components {
+    /* Adapt Skeleton Labs placeholders to the existing light/dark UMG palette. */
+    [data-slot='skeleton'] {
+        --color-surface-200-800: color-mix(
+            in oklab,
+            var(--muted-foreground) 15%,
+            transparent
+        );
+        --radius-base: var(--radius-md);
+    }
+
     /* Card surface shared by panels, tables and forms. */
     .surface {
         @apply rounded-xl border bg-card text-card-foreground shadow-card;
