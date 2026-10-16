@@ -41,7 +41,7 @@ class SaveStudentRecord
                 Gate::forUser($actor)->authorize($record === null ? 'create' : 'update', $record === null ? [StudentRecord::class, $lockedStudent] : $target);
             }
             if ($record !== null && ($target->student_id !== $student->id || (isset($data['academic_year_id']) && (int) $data['academic_year_id'] !== $target->academic_year_id) || (isset($data['establishment_id']) && (int) $data['establishment_id'] !== $target->establishment_id))) {
-                throw ValidationException::withMessages(['academic_year_id' => 'L’année et l’établissement d’une déclaration existante ne peuvent pas être remplacés. Créez une autre déclaration.']);
+                throw ValidationException::withMessages(['academic_year_id' => 'L’année et l’établissement d’une situation existante ne peuvent pas être remplacés. Créez une autre situation.']);
             }
             if ($actor->hasRole('establishment')) {
                 if (isset($data['establishment_id']) && (int) $data['establishment_id'] !== $actor->establishment_id) {
@@ -50,6 +50,10 @@ class SaveStudentRecord
                 $data['establishment_id'] = $actor->establishment_id;
             }
             $target->fill($data);
+            if ($target->isDirty('status')) {
+                // A status chosen by hand is no longer the one set by the identity (de)activation.
+                $target->inactive_with_identity = false;
+            }
             $target->student_id = $lockedStudent->id;
             if ($record === null) {
                 $target->declaredBy()->associate($actor);
@@ -57,7 +61,7 @@ class SaveStudentRecord
             }
             $isActivating = $target->status === StudentRecordStatus::Active && ($record === null || $target->isDirty('status'));
             if ($isActivating && ! $lockedStudent->is_active) {
-                throw ValidationException::withMessages(['status' => 'Réactivez l’identité avant d’activer une déclaration.']);
+                throw ValidationException::withMessages(['status' => 'Réactivez l’identité avant d’activer une situation.']);
             }
             foreach (['academic_year_id' => AcademicYear::class, 'establishment_id' => Establishment::class, 'level_id' => Level::class, 'program_id' => Program::class] as $field => $model) {
                 $id = $target->getAttribute($field);
@@ -66,7 +70,7 @@ class SaveStudentRecord
                 }
                 $reference = $model::query()->lockForUpdate()->whereKey($id)->first();
                 if ($reference === null || (($record === null || $target->isDirty($field) || $isActivating) && ! $reference->is_active)) {
-                    throw ValidationException::withMessages([$field => 'Le référentiel doit exister et être actif pour cette déclaration.']);
+                    throw ValidationException::withMessages([$field => 'Le référentiel doit exister et être actif pour cette situation.']);
                 }
                 if ($reference instanceof Program && $reference->establishment_id !== $target->establishment_id) {
                     throw ValidationException::withMessages(['program_id' => 'Le parcours doit appartenir à l’établissement déclaré.']);
@@ -78,7 +82,7 @@ class SaveStudentRecord
             }
             $others = StudentRecord::query()->where('student_id', $student->id)->where('academic_year_id', $target->academic_year_id)->when($target->exists, fn ($q) => $q->where('id', '!=', $target->id));
             if ((clone $others)->where('establishment_id', $target->establishment_id)->exists() || ($target->status === StudentRecordStatus::Active && (clone $others)->where('status', 'active')->exists())) {
-                throw ValidationException::withMessages(['academic_year_id' => 'Une déclaration existe déjà pour cette année. Aucun remplacement automatique n’est autorisé.']);
+                throw ValidationException::withMessages(['academic_year_id' => 'Une situation existe déjà pour cette année. Aucun remplacement automatique n’est autorisé.']);
             }
             $target->save();
 
