@@ -293,7 +293,7 @@ export default function ReportsIndex({
                                         {reportLabels[report]}
                                         <span className="sr-only">
                                             {' '}
-                                            — exporter (CSV)
+                                            : exporter au format CSV
                                         </span>
                                     </a>
                                 </Button>
