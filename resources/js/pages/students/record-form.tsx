@@ -54,14 +54,14 @@ export default function AnnualRecordForm({
     const fullName = `${student.last_name} ${student.first_names ?? ''}`.trim();
     return (
         <>
-            <Head title="Déclaration annuelle" />
+            <Head title="Situation de l’année" />
             <PageBody className="pb-0 md:pb-0 lg:pb-0">
                 <PageHeader
                     icon={record ? CalendarCog : CalendarPlus}
                     title={
                         record
-                            ? 'Modifier la déclaration annuelle'
-                            : 'Ajouter une déclaration annuelle'
+                            ? 'Modifier la situation de l’année'
+                            : 'Ajouter la situation de l’année'
                     }
                     description={`${fullName} — ${record ? 'l’établissement et l’année ne changent pas ; niveau, parcours, code de redoublement et demande de bourse peuvent être corrigés.' : 'nouvelle situation d’un étudiant déjà régulièrement inscrit.'}`}
                 />
@@ -123,8 +123,8 @@ export default function AnnualRecordForm({
                             submitIcon={record ? Save : CalendarPlus}
                             submitLabel={
                                 record
-                                    ? 'Enregistrer la déclaration'
-                                    : 'Ajouter la déclaration'
+                                    ? 'Enregistrer la situation'
+                                    : 'Ajouter la situation'
                             }
                             cancelHref={`/students/${student.uuid}`}
                         />
