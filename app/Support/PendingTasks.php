@@ -5,11 +5,9 @@ namespace App\Support;
 use App\Enums\ScholarshipApplicationStatus;
 use App\Enums\StudentCorrectionStatus;
 use App\Enums\StudentImportStatus;
-use App\Enums\StudentLinkStatus;
 use App\Models\ScholarshipApplication;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
-use App\Models\StudentLinkRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -32,11 +30,6 @@ class PendingTasks
         if ($gate->allows('viewAny', StudentCorrectionRequest::class) && $user->can('corrections.review')) {
             $tasks[] = [['key' => 'corrections', 'label' => 'Corrections à examiner', 'description' => 'Demandes de correction signalées par des étudiants.', 'href' => '/corrections?status=pending'],
                 StudentCorrectionRequest::query()->visibleTo($user)->where('status', StudentCorrectionStatus::Pending)];
-        }
-
-        if ($gate->allows('viewAny', StudentLinkRequest::class)) {
-            $tasks[] = [['key' => 'student_links', 'label' => 'Rattachements à valider', 'description' => 'Comptes étudiants en attente de rattachement à une fiche.', 'href' => '/student-links'],
-                StudentLinkRequest::query()->visibleTo($user)->where('status', StudentLinkStatus::Pending)];
         }
 
         if ($gate->allows('viewAny', ScholarshipApplication::class) && $user->can('scholarships.review')) {
