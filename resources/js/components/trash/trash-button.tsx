@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { IconAction } from '@/components/icon-action';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,11 +17,14 @@ export function TrashButton({
     uuid,
     label,
     redirect,
+    iconOnly = false,
 }: {
     kind: string;
     uuid: string;
     label: string;
     redirect?: string;
+    /** Table rows: icon with tooltip, no text. */
+    iconOnly?: boolean;
 }) {
     const { auth } = usePage().props;
     const [open, setOpen] = useState(false);
@@ -29,18 +33,30 @@ export function TrashButton({
     if (!auth.canManageTrash) return null;
     return (
         <>
-            <Button
-                size="sm"
-                variant="outline"
-                className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger-foreground"
-                onClick={() => {
-                    setError('');
-                    setOpen(true);
-                }}
-            >
-                <Trash2 className="size-4" aria-hidden="true" />
-                Supprimer
-            </Button>
+            {iconOnly ? (
+                <IconAction
+                    icon={Trash2}
+                    label="Supprimer"
+                    tone="danger"
+                    onClick={() => {
+                        setError('');
+                        setOpen(true);
+                    }}
+                />
+            ) : (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger-foreground"
+                    onClick={() => {
+                        setError('');
+                        setOpen(true);
+                    }}
+                >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    Supprimer
+                </Button>
+            )}
             <Dialog
                 open={open}
                 onOpenChange={(value) => {
@@ -59,8 +75,8 @@ export function TrashButton({
                         <DialogDescription>
                             « {label} » disparaîtra des listes courantes et
                             pourra être restauré. Les éléments utilisés peuvent
-                            être protégés. Pour un étudiant, ses déclarations
-                            visibles sont déplacées avec lui.
+                            être protégés. Pour un étudiant, ses situations
+                            annuelles visibles sont déplacées avec lui.
                         </DialogDescription>
                     </DialogHeader>
                     <InputError message={error} />
