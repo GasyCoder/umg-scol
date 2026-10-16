@@ -84,7 +84,7 @@ La séparation des domaines ne remplace pas les contrôles serveur. L'API étudi
 
 Le rôle étudiant ne reçoit aucune permission de modification directe des données officielles. Il peut soumettre une demande de correction, traitée par l'établissement, et confirmer ses propres informations affichées (sans nouvelle permission). L'état de confirmation n'est visible que par lui via l'API et, sur `scol`, par le personnel qui peut consulter la fiche (`StudentPolicy::view`). Le compte `student` n'utilise aucune permission Spatie sur `bourse` : l'accès est déterminé par le garde `student`, le rôle `student` seul, l'email vérifié, le marqueur de session du portail et `users.student_id`. Un compte portant un autre rôle (même en plus de `student`) est refusé sur l'API étudiante ; un compte `student` est refusé sur toutes les routes de `scol`, y compris Fortify et passkeys.
 
-Revue des rattachements (`/student-links`) : permission `student_links.review` + compte interne avec contexte valide. `establishment` ne voit et ne traite que les demandes dont l'étudiant a une déclaration `active` dans son établissement sur l'année courante active ; `central_scholarship_office`, `superadmin` et `developer` ont une revue globale. La Policy recontrôle ce périmètre sur l'ID de la demande et l'Action le revérifie sous verrou.
+Comptes portail (`student_links.review`) : le rattachement d'un compte étudiant à sa fiche est automatique (ADR-073). La permission sert à **détacher** un compte portail depuis la fiche étudiant, pour une fiche que l'acteur peut consulter (`StudentPolicy::view` : un établissement seulement pour ses étudiants) ; action auditée `portal_detached`.
 
 ## Pilotage : tableaux de bord, rapports, audit
 
