@@ -3,9 +3,9 @@ import {
     BadgeCheck,
     CalendarRange,
     ChartColumn,
-    ChevronRight,
     Database,
     Download,
+    Eye,
     FileCheck2,
     FilePenLine,
     FileUp,
@@ -23,6 +23,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import InputError from '@/components/input-error';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatDate, Pagination } from '@/components/scholarships/shared';
@@ -378,19 +379,14 @@ export default function AuditIndex({
                                                     ? `${row.subject_type} n° ${row.subject_id}`
                                                     : '—'}
                                             </td>
-                                            <td className="text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
+                                            <td>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <IconAction
+                                                        icon={Eye}
+                                                        label="Voir le détail de l’action"
                                                         href={`/audits/${row.uuid}`}
-                                                    >
-                                                        Détail
-                                                        <ChevronRight aria-hidden="true" />
-                                                    </Link>
-                                                </Button>
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
