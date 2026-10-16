@@ -463,7 +463,7 @@ export default function EstablishmentForm({
                                         </p>
                                         <p className="text-sm text-muted-foreground">
                                             {form.data.logo
-                                                ? `${form.data.logo.name} · ${Math.ceil(form.data.logo.size / 1024)} Ko — enregistré avec le formulaire`
+                                                ? `${form.data.logo.name} · ${Math.ceil(form.data.logo.size / 1024)} Ko (enregistré avec le formulaire)`
                                                 : form.data.remove_logo
                                                   ? 'Le logo sera retiré à l’enregistrement.'
                                                   : 'ou choisissez une image sur votre appareil.'}
