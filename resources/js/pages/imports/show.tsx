@@ -193,6 +193,28 @@ function IssueChip({
     );
 }
 
+const causeLabels: Record<string, string> = {
+    identity: 'Identité',
+    record: 'Situation de l’année',
+};
+
+/** What to do for the causes that are not fixed in the file itself. */
+const causeHint = (code: string): string | null =>
+    ({
+        other_establishment:
+            'Créez l’établissement du fichier (Référentiels → Établissements), puis lancez un nouvel import en le choisissant.',
+        unknown_or_ambiguous:
+            'Créez la valeur manquante dans les référentiels, puis relancez l’analyse.',
+        inactive:
+            'Réactivez la valeur dans les référentiels, puis relancez l’analyse.',
+        domain_mismatch:
+            'Corrigez le domaine dans le fichier ou celui de la mention dans les référentiels.',
+        sector_mismatch:
+            'Corrigez l’institution dans le fichier ou celle de l’établissement dans les référentiels.',
+        training_type_mismatch:
+            'Corrigez le type de formation dans le fichier ou celui du parcours dans les référentiels.',
+    })[code] ?? null;
+
 export default function ImportShow({
     import: item,
     rows,
@@ -235,6 +257,12 @@ export default function ImportShow({
             { preserveState: true },
         );
     const commitError = (commit.errors as Record<string, string>).import;
+    const referenceCount = item.reference_changes
+        ? (item.reference_changes.levels?.length ?? 0) +
+          item.reference_changes.domains.length +
+          item.reference_changes.mentions.length +
+          item.reference_changes.programs.length
+        : 0;
     const mappingErrors = mapping.errors as Record<string, string>;
     const mappedCount = Object.keys(columns).filter(
         (field) => mapping.data.mapping[field] !== undefined,
@@ -274,7 +302,8 @@ export default function ImportShow({
                         <ImportStatusBadge status={item.status} />
                         <span className="inline-flex items-center gap-1.5">
                             <Landmark className="size-3.5" aria-hidden="true" />
-                            {item.establishment.name}
+                            {item.establishment?.name ??
+                                'Tous les établissements'}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                             <CalendarDays
@@ -616,7 +645,7 @@ export default function ImportShow({
                                 {[
                                     ['identités créées', item.created_rows],
                                     ['identités complétées', item.updated_rows],
-                                    ['déclarations créées', item.declared_rows],
+                                    ['situations créées', item.declared_rows],
                                     ['lignes ignorées', item.skipped_rows],
                                 ].map(([label, value]) => (
                                     <div
@@ -682,6 +711,135 @@ export default function ImportShow({
                             );
                         })}
                     </div>
+
+                    {referenceCount > 0 && item.reference_changes && (
+                        <section
+                            className="flex gap-3 rounded-xl border border-info/30 bg-info-soft p-4 text-sm text-info-foreground"
+                            aria-labelledby="reference-changes"
+                        >
+                            <Landmark
+                                className="mt-0.5 size-5 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <div className="min-w-0 space-y-1.5">
+                                <h2
+                                    id="reference-changes"
+                                    className="font-bold"
+                                >
+                                    {item.reference_changes.created
+                                        ? 'Référentiels créés automatiquement'
+                                        : 'Référentiels qui seront créés à la confirmation'}{' '}
+                                    —{' '}
+                                    {item.establishment?.name ??
+                                        'Tous les établissements'}
+                                </h2>
+                                {(
+                                    [
+                                        [
+                                            'Niveaux',
+                                            item.reference_changes.levels ?? [],
+                                        ],
+                                        [
+                                            'Domaines',
+                                            item.reference_changes.domains,
+                                        ],
+                                        [
+                                            'Mentions',
+                                            item.reference_changes.mentions,
+                                        ],
+                                        [
+                                            'Parcours',
+                                            item.reference_changes.programs,
+                                        ],
+                                    ] as const
+                                )
+                                    .filter(([, values]) => values.length > 0)
+                                    .map(([label, values]) => (
+                                        <p key={label}>
+                                            <span className="font-semibold">
+                                                {label} ({values.length}) :
+                                            </span>{' '}
+                                            {values.join(', ')}
+                                        </p>
+                                    ))}
+                                <p className="text-xs opacity-80">
+                                    Ils sont rattachés à cet établissement
+                                    uniquement et restent modifiables dans
+                                    Référentiels → Mentions et Parcours.
+                                </p>
+                            </div>
+                        </section>
+                    )}
+
+                    {item.status !== 'completed' &&
+                        (item.issue_summary?.length ?? 0) > 0 && (
+                            <section
+                                className="surface p-4 sm:p-5"
+                                aria-labelledby="issue-summary"
+                            >
+                                <h2
+                                    id="issue-summary"
+                                    className="flex items-center gap-2 text-sm font-bold text-foreground"
+                                >
+                                    <AlertTriangle
+                                        className="size-4 text-warning"
+                                        aria-hidden="true"
+                                    />
+                                    Pourquoi des lignes ne sont pas importables
+                                </h2>
+                                <ul className="mt-3 divide-y rounded-lg border">
+                                    {item.issue_summary?.map((cause) => (
+                                        <li
+                                            key={`${cause.severity}-${cause.field}-${cause.code}`}
+                                            className="flex flex-col gap-1 px-3 py-2.5 text-sm sm:flex-row sm:items-start sm:gap-3"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'inline-flex w-fit shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums',
+                                                    cause.severity === 'error'
+                                                        ? 'bg-danger-soft text-danger-foreground'
+                                                        : 'bg-warning-soft text-warning-foreground',
+                                                )}
+                                            >
+                                                {formatNumber(cause.rows)} ligne
+                                                {cause.rows > 1 ? 's' : ''}
+                                            </span>
+                                            <span className="min-w-0">
+                                                <span className="font-semibold text-foreground">
+                                                    {columns[cause.field] ??
+                                                        causeLabels[
+                                                            cause.field
+                                                        ] ??
+                                                        cause.field}{' '}
+                                                    :
+                                                </span>{' '}
+                                                {cause.message}
+                                                {cause.values.length > 0 && (
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        Dans le fichier :{' '}
+                                                        {cause.values
+                                                            .map(
+                                                                (value) =>
+                                                                    `« ${value} »`,
+                                                            )
+                                                            .join(', ')}
+                                                        {cause.code ===
+                                                            'other_establishment' &&
+                                                            ` — établissement choisi pour l’import : « ${item.establishment?.name ?? 'Tous les établissements'} »`}
+                                                    </span>
+                                                )}
+                                                {causeHint(cause.code) && (
+                                                    <span className="mt-0.5 block text-xs font-medium text-foreground">
+                                                        →{' '}
+                                                        {causeHint(cause.code)}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
 
                     <section className="surface overflow-hidden">
                         <header className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -823,7 +981,9 @@ export default function ImportShow({
                                                     </td>
                                                     <td className="min-w-64">
                                                         {errors.length +
-                                                            warnings.length >
+                                                            warnings.length +
+                                                            (row.notices
+                                                                ?.length ?? 0) >
                                                             0 ||
                                                         (row.status ===
                                                             'duplicate' &&
@@ -876,12 +1036,31 @@ export default function ImportShow({
                                                                         />
                                                                     ),
                                                                 )}
+                                                                {(
+                                                                    row.notices ??
+                                                                    []
+                                                                ).map(
+                                                                    (
+                                                                        notice,
+                                                                    ) => (
+                                                                        <IssueChip
+                                                                            key={
+                                                                                notice
+                                                                            }
+                                                                            tone="info"
+                                                                            label="Référentiel"
+                                                                            message={
+                                                                                notice
+                                                                            }
+                                                                        />
+                                                                    ),
+                                                                )}
                                                                 {row.status ===
                                                                     'duplicate' &&
                                                                     !warnings.length && (
                                                                         <IssueChip
                                                                             tone="info"
-                                                                            message="Déclaration identique déjà présente."
+                                                                            message="Situation identique déjà présente."
                                                                         />
                                                                     )}
                                                             </ul>
