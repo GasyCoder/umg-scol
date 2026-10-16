@@ -31,6 +31,7 @@ class StudentImportColumns
             'address' => 'Adresse exacte', 'phone' => 'Numéro téléphone', 'email' => 'Adresse mail',
             'sector' => 'Institution', 'domain' => 'Domaine', 'mention' => 'Mention', 'program' => 'Parcours',
             'training_type' => 'Type de formation', 'level' => 'Niveau', 'establishment' => 'École / Institut',
+            'establishment_code' => 'Code établissement',
         ];
     }
 
@@ -41,7 +42,8 @@ class StudentImportColumns
      */
     public static function required(): array
     {
-        return ['last_name', 'sex', 'birth_date', 'nationality', 'repeat_code', 'level'];
+        // Sex and nationality are checked when the file has them; some establishment files do not.
+        return ['last_name', 'birth_date', 'repeat_code', 'level'];
     }
 
     public static function fold(string $value): string
@@ -67,7 +69,10 @@ class StudentImportColumns
             'date_de_depot_du_demande_de_bourse' => 'scholarship_requested_at', 'date_de_depot_de_la_demande_de_bourse' => 'scholarship_requested_at',
             'reference_demande_de_bourse' => 'scholarship_request_reference', 'reference_de_la_demande_de_bourse' => 'scholarship_request_reference',
             'adresse' => 'address', 'telephone' => 'phone', 'numero_telephone' => 'phone', 'email' => 'email', 'mail' => 'email',
-            'ecole_institut' => 'establishment', 'etablissement' => 'establishment',
+            'ecole_institut' => 'establishment', 'etablissement' => 'establishment', 'nom_etablissement' => 'establishment',
+            'institution_code' => 'establishment_code', 'code_institution' => 'establishment_code', 'code_etablissement' => 'establishment_code', 'sigle' => 'establishment_code', 'sigle_etablissement' => 'establishment_code',
+            'nom_mere' => 'mother_name', 'numero_cin' => 'cin', 'n_cin' => 'cin', 'numero_de_telephone' => 'phone', 'e_mail' => 'email', 'courriel' => 'email',
+            'date_naissance' => 'birth_date', 'prenoms_etudiant' => 'first_names',
         ];
         foreach (self::labels() as $field => $label) {
             $aliases[self::header($label)] = $field;
@@ -79,6 +84,12 @@ class StudentImportColumns
             if ($field !== null && ! isset($mapping[$field])) {
                 $mapping[$field] = $index;
             }
+        }
+
+        // "Institution" next to "Institution Code" names the establishment, not public/private.
+        if (isset($mapping['establishment_code'], $mapping['sector']) && ! isset($mapping['establishment']) && self::header($headers[$mapping['sector']]) === 'institution') {
+            $mapping['establishment'] = $mapping['sector'];
+            unset($mapping['sector']);
         }
 
         return $mapping;
