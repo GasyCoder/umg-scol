@@ -31,7 +31,27 @@ export type ImportItem = {
     failure_reason: string | null;
     headers: string[];
     mapping: Record<string, number>;
-    establishment: { name: string };
+    /** Referentials created in the establishment: planned at analysis, actual once created is true. */
+    reference_changes: {
+        levels?: string[];
+        domains: string[];
+        mentions: string[];
+        programs: string[];
+        created: boolean;
+    } | null;
+    /** Main causes of the rows that cannot be imported, with the referential values of the file. */
+    issue_summary:
+        | {
+              field: string;
+              code: string;
+              message: string;
+              severity: 'error' | 'warning';
+              rows: number;
+              values: string[];
+          }[]
+        | null;
+    /** Null for an import covering several establishments. */
+    establishment: { name: string } | null;
     academic_year: { name: string };
     user: { name: string };
 };
@@ -42,6 +62,8 @@ export type ImportRow = {
     status: RowStatus;
     errors: { field: string; code: string; message: string }[] | null;
     warnings: { field: string; code: string; message: string }[] | null;
+    /** Information only (references to create), never blocking. */
+    notices?: string[];
     matched_student_id: number | null;
     resolution: string | null;
     data: Record<string, string | null>;
