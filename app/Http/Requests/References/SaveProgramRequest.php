@@ -39,7 +39,7 @@ class SaveProgramRequest extends ReferenceRequest
         return [function (Validator $validator): void {
             $program = $this->route('program');
             if ($program instanceof Program && $program->establishment_id !== $this->integer('establishment_id') && $program->studentRecords()->withTrashed()->exists()) {
-                $validator->errors()->add('establishment_id', 'Un parcours utilisé par des déclarations annuelles ne peut pas changer d’établissement.');
+                $validator->errors()->add('establishment_id', 'Un parcours utilisé par des situations annuelles ne peut pas changer d’établissement.');
             }
         }];
     }
