@@ -528,7 +528,7 @@ export default function Campaigns({
                             id="notes"
                             label="Notes internes"
                             error={errors.notes}
-                            hint={`${form.data.notes.length}/1000 caractères — visibles uniquement par le personnel.`}
+                            hint={`${form.data.notes.length}/1000 caractères. Ces notes sont visibles uniquement par le personnel.`}
                         >
                             <textarea
                                 id="notes"
