@@ -1,5 +1,5 @@
 export type StudentSex = 'M' | 'F';
-export type RepeatCode = 'N' | 'R' | 'T+';
+export type RepeatCode = 'N' | 'P' | 'R' | 'T+';
 export type Student = {
     id: number;
     /** Public identifier used in every URL. */
@@ -71,6 +71,8 @@ export type AnnualRecord = {
     program?: Option | null;
     declared_by?: { id: number; name: string };
     eligibility?: Eligibility;
+    /** Deactivated together with the identity; restored when the identity is reactivated. */
+    inactive_with_identity?: boolean;
     canUpdate?: boolean;
 };
 
@@ -105,6 +107,7 @@ export const SEX_LABELS: Record<StudentSex, string> = {
 };
 export const REPEAT_CODE_LABELS: Record<RepeatCode, string> = {
     N: 'N (Nouveau)',
+    P: 'P (Passant)',
     R: 'R (Redoublant)',
     'T+': 'T+ (Triplant ou plus)',
 };
