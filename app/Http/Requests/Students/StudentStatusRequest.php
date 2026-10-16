@@ -28,6 +28,6 @@ class StudentStatusRequest extends FormRequest
     /** @return array<string,string> */
     public function messages(): array
     {
-        return ['required' => 'Le statut est obligatoire.', 'boolean' => 'Le statut d’identité est invalide.', 'enum' => 'Le statut de déclaration doit être active ou inactive.'];
+        return ['required' => 'Le statut est obligatoire.', 'boolean' => 'Le statut d’identité est invalide.', 'enum' => 'Le statut de la situation doit être active ou inactive.'];
     }
 }
