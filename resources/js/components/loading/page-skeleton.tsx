@@ -3,14 +3,7 @@ import type { PageSkeletonSpec } from '@/lib/page-loading';
 import { cn } from '@/lib/utils';
 
 function Line({ className }: { className?: string }) {
-    return (
-        <Skeleton
-            className={cn(
-                'h-4 bg-muted-foreground/15 motion-reduce:animate-none',
-                className,
-            )}
-        />
-    );
+    return <Skeleton className={cn('h-4', className)} />;
 }
 
 function Header({ compact = false }: { compact?: boolean }) {
