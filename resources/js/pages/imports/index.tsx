@@ -1,8 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowRight,
     Download,
+    Eye,
     FileSpreadsheet,
     FileUp,
     History,
@@ -10,6 +10,7 @@ import {
     Upload,
 } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatNumber } from '@/components/reporting/shared';
 import { Pagination } from '@/components/scholarships/shared';
@@ -86,7 +87,7 @@ function CreateActions({ className }: { className?: string }) {
             <Button variant="outline" asChild>
                 <a href="/imports/template">
                     <Download aria-hidden="true" />
-                    Télécharger le modèle
+                    Télécharger le modèle Excel
                 </a>
             </Button>
             <Button asChild>
@@ -270,11 +271,10 @@ export default function ImportsIndex({
                                                                 }
                                                             </Link>
                                                             <p className="max-w-[18rem] truncate text-xs text-muted-foreground">
-                                                                {
-                                                                    item
-                                                                        .establishment
-                                                                        .name
-                                                                }{' '}
+                                                                {item
+                                                                    .establishment
+                                                                    ?.name ??
+                                                                    'Tous les établissements'}{' '}
                                                                 ·{' '}
                                                                 {
                                                                     item
@@ -340,28 +340,18 @@ export default function ImportsIndex({
                                                         value={
                                                             item.declared_rows
                                                         }
-                                                        detail={`${formatNumber(item.declared_rows)} déclaration(s), ${formatNumber(item.created_rows)} identité(s) créée(s), ${formatNumber(item.updated_rows)} complétée(s), ${formatNumber(item.skipped_rows)} ligne(s) ignorée(s)`}
+                                                        detail={`${formatNumber(item.declared_rows)} situation(s), ${formatNumber(item.created_rows)} identité(s) créée(s), ${formatNumber(item.updated_rows)} complétée(s), ${formatNumber(item.skipped_rows)} ligne(s) ignorée(s)`}
                                                     />
                                                 </td>
                                                 <td>
-                                                    <div className="flex items-center justify-end gap-1.5">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/imports/${item.uuid}`}
-                                                                aria-label={`Ouvrir l’import ${item.original_filename}`}
-                                                            >
-                                                                Ouvrir
-                                                                <ArrowRight
-                                                                    className="size-4"
-                                                                    aria-hidden="true"
-                                                                />
-                                                            </Link>
-                                                        </Button>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <IconAction
+                                                            icon={Eye}
+                                                            label="Consulter l’import"
+                                                            href={`/imports/${item.uuid}`}
+                                                        />
                                                         <TrashButton
+                                                            iconOnly
                                                             kind="imports"
                                                             uuid={item.uuid}
                                                             label={
