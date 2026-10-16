@@ -1487,7 +1487,7 @@ function Portal() {
                                                                             Boolean,
                                                                         )
                                                                         .join(
-                                                                            ' — ',
+                                                                            ', ',
                                                                         )}
                                                                 </p>
                                                                 {record.repeat_code && (
