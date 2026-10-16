@@ -8,7 +8,7 @@ return [
      */
     'checks' => [
         'identity' => 'Identité conforme à la fiche officielle',
-        'enrollment' => 'Déclaration annuelle conforme (établissement, niveau, parcours)',
+        'enrollment' => 'Situation de l’année conforme (établissement, niveau, parcours)',
         'bac' => 'Informations BAC conformes',
         'contact' => 'Coordonnées vérifiées',
         'complete' => 'Dossier papier complet',
