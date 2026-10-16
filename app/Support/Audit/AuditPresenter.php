@@ -26,7 +26,7 @@ final class AuditPresenter
     public const MODULES = [
         'notifications' => 'Notifications',
         'authentication' => 'Connexions', 'identity' => 'Comptes internes', 'access' => 'Rôles et permissions', 'references' => 'Référentiels',
-        'students' => 'Identités étudiantes', 'student_records' => 'Déclarations annuelles', 'student_imports' => 'Imports',
+        'students' => 'Identités étudiantes', 'student_records' => 'Situations annuelles', 'student_imports' => 'Imports',
         'student_portal' => 'Portail étudiant', 'student_corrections' => 'Corrections', 'student_confirmations' => 'Confirmations étudiantes',
         'scholarship_campaigns' => 'Campagnes de bourse', 'scholarships' => 'Dossiers de bourse', 'audits' => 'Audit', 'reports' => 'Rapports', 'trash' => 'Corbeille', 'platform' => 'Plateforme',
     ];
@@ -40,11 +40,11 @@ final class AuditPresenter
         'campaign_created' => 'Campagne créée', 'campaign_updated' => 'Campagne modifiée', 'campaign_status_changed' => 'Statut de campagne modifié',
         'application_received' => 'Dossier reçu', 'review_started' => 'Vérification commencée', 'check_updated' => 'Contrôle enregistré',
         'application_validated' => 'Dossier validé', 'application_needs_correction' => 'Correction de dossier demandée', 'application_rejected' => 'Dossier rejeté',
-        'applications_exported' => 'Export des dossiers', 'audits_exported' => 'Export de l’audit', 'reports_exported' => 'Export de rapport',
+        'applications_exported' => 'Export des dossiers', 'students_exported' => 'Export des étudiants', 'audits_exported' => 'Export de l’audit', 'reports_exported' => 'Export de rapport',
         'role_permissions_updated' => 'Permissions du rôle modifiées', 'user_permissions_updated' => 'Droits du compte modifiés',
         'user_created' => 'Compte interne créé', 'user_updated' => 'Compte interne modifié', 'user_suspended' => 'Compte suspendu', 'user_reactivated' => 'Compte réactivé', 'user_invitation_sent' => 'Invitation envoyée', 'branding_updated' => 'Identité de la plateforme modifiée', 'trashed' => 'Déplacé dans la corbeille', 'restored' => 'Restauré', 'purged' => 'Purgé définitivement',
         'references_imported' => 'Import de référentiels', 'references_exported' => 'Export de référentiels',
-        'link_requested' => 'Rattachement demandé', 'link_approved' => 'Rattachement approuvé', 'link_rejected' => 'Rattachement rejeté', 'automatic_link' => 'Rattachement automatique',
+        'link_requested' => 'Rattachement demandé', 'portal_detached' => 'Compte portail détaché', 'link_approved' => 'Rattachement approuvé', 'link_rejected' => 'Rattachement rejeté', 'automatic_link' => 'Rattachement automatique',
         'account_created' => 'Compte étudiant créé', 'google_associated' => 'Compte Google associé',
         'roles.attached' => 'Rôle attribué', 'roles.detached' => 'Rôle retiré', 'permissions.attached' => 'Permission attribuée', 'permissions.detached' => 'Permission retirée',
     ];
