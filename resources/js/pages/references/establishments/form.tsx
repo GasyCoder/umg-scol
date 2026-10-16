@@ -604,7 +604,7 @@ export default function EstablishmentForm({
                         <FormSection
                             icon={Power}
                             title="Statut"
-                            description="Un établissement inactif n’est plus proposé pour les nouvelles déclarations."
+                            description="Un établissement inactif n’est plus proposé pour les nouvelles situations annuelles."
                             columns={1}
                         >
                             <button
@@ -632,7 +632,7 @@ export default function EstablishmentForm({
                                     </span>
                                     <span className="block text-sm text-muted-foreground">
                                         {form.data.is_active
-                                            ? 'Disponible pour les déclarations, imports et comptes.'
+                                            ? 'Disponible pour les situations annuelles, imports et comptes.'
                                             : 'Conservé pour l’historique, masqué des nouveaux choix.'}
                                     </span>
                                 </span>
