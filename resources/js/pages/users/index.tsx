@@ -1,8 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ChevronRight,
     RotateCcw,
     Search,
+    UserCog,
     UserPlus,
     UserRoundX,
     UsersRound,
@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatNumber } from '@/components/reporting/shared';
 import { Pagination } from '@/components/scholarships/shared';
@@ -360,20 +361,14 @@ export default function UsersIndex({
                                                     active={user.is_active}
                                                 />
                                             </td>
-                                            <td className="text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <Link
+                                            <td>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <IconAction
+                                                        icon={UserCog}
+                                                        label="Gérer le compte"
                                                         href={`/users/${user.uuid}`}
-                                                        aria-label={`Gérer le compte de ${user.name}`}
-                                                    >
-                                                        Gérer
-                                                        <ChevronRight aria-hidden="true" />
-                                                    </Link>
-                                                </Button>
+                                                    />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
