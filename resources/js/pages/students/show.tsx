@@ -1,29 +1,25 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    AlertTriangle,
     ArrowLeft,
     BadgeCheck,
-    BookMarked,
-    Building2,
-    CalendarDays,
     CalendarRange,
     GraduationCap,
     HandCoins,
+    History,
     IdCard,
-    Layers,
     Mail,
     Pencil,
     Phone,
     Plus,
     Power,
-    RotateCcw,
-    Route,
     ShieldCheck,
     UserRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { ToneBadge, toneFor } from '@/components/tone-badge';
 import type { Tone } from '@/components/tone-badge';
@@ -69,8 +65,10 @@ type Pending = {
     url: string;
     data: Record<string, string | boolean>;
     title: string;
+    description?: string;
+    method?: 'patch' | 'delete';
 } | null;
-type Tab = 'informations' | 'declarations' | 'verification';
+type Tab = 'informations' | 'verification';
 
 const confirmationLabels: Record<StudentConfirmation['status'], string> = {
     never_confirmed: 'Jamais confirmée',
@@ -84,7 +82,6 @@ const confirmationTones: Record<StudentConfirmation['status'], Tone> = {
 };
 const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
     { key: 'informations', label: 'Informations', icon: IdCard },
-    { key: 'declarations', label: 'Déclarations', icon: CalendarDays },
     { key: 'verification', label: 'Vérification', icon: BadgeCheck },
 ];
 const date = (value: string | null | undefined) =>
@@ -214,39 +211,26 @@ function SideRow({
 }
 
 /** Indicative scholarship rule of a declaration, with the reasons when it is not granted. */
-function EligibilityCell({ eligibility }: { eligibility: Eligibility }) {
-    return (
-        <div className="max-w-[16rem] space-y-1">
-            <ToneBadge tone={eligibilityTones[eligibility.status]}>
-                {eligibilityLabel(eligibility)}
-            </ToneBadge>
-            {eligibility.reasons.length > 0 && (
-                <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
-                    {eligibility.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
-}
-
 export default function StudentShow({
     student,
     records,
     confirmation: studentConfirmation,
     portalLinked,
+    canDetachPortal,
     canUpdate,
     canDeactivate,
     canCreateRecord,
+    currentYear,
 }: {
     student: Student & { cin_is_standard: boolean };
     records: DeclarationRow[];
     confirmation: StudentConfirmation;
     portalLinked: boolean;
+    canDetachPortal: boolean;
     canUpdate: boolean;
     canDeactivate: boolean;
     canCreateRecord: boolean;
+    currentYear: { id: number; name: string } | null;
 }) {
     const [tab, setTab] = useState<Tab>('informations');
     const [pending, setPending] = useState<Pending>(null);
@@ -256,7 +240,13 @@ export default function StudentShow({
         if (!pending) return;
         setProcessing(true);
         setError('');
-        router.patch(pending.url, pending.data, {
+        const send =
+            pending.method === 'delete'
+                ? (url: string, options: Parameters<typeof router.delete>[1]) =>
+                      router.delete(url, options)
+                : (url: string, options: Parameters<typeof router.delete>[1]) =>
+                      router.patch(url, pending.data, options);
+        send(pending.url, {
             preserveScroll: true,
             onSuccess: () => setPending(null),
             onError: (errors) =>
@@ -267,14 +257,28 @@ export default function StudentShow({
         });
     };
     const fullName = `${student.last_name} ${student.first_names ?? ''}`.trim();
-    const current =
+    // Situation of the current year (the active one first), then the previous years as history.
+    const situation =
         records.find(
             (record) =>
                 record.academic_year?.is_current && record.status === 'active',
-        ) ?? null;
-    const activeCount = records.filter(
-        (record) => record.status === 'active',
-    ).length;
+        ) ??
+        records.find((record) => record.academic_year?.is_current) ??
+        null;
+    const previous = records.filter((record) => record !== situation);
+    const yearCount = new Set(records.map((record) => record.academic_year_id))
+        .size;
+    const toggleSituation = (record: DeclarationRow) =>
+        setPending({
+            url: `/student-records/${record.uuid}/status`,
+            data: {
+                status: record.status === 'active' ? 'inactive' : 'active',
+            },
+            title:
+                record.status === 'active'
+                    ? `Désactiver la situation ${record.academic_year?.name ?? ''}`
+                    : `Réactiver la situation ${record.academic_year?.name ?? ''}`,
+        });
     const birth = [
         student.sex ? SEX_LABELS[student.sex] : null,
         student.birth_date
@@ -354,8 +358,11 @@ export default function StudentShow({
                                                 is_active: !student.is_active,
                                             },
                                             title: student.is_active
-                                                ? 'Désactiver l’identité'
-                                                : 'Réactiver l’identité',
+                                                ? 'Désactiver l’étudiant'
+                                                : 'Réactiver l’étudiant',
+                                            description: student.is_active
+                                                ? 'L’étudiant et sa situation de l’année courante passeront à « Inactive ». Les années précédentes sont conservées.'
+                                                : 'L’étudiant redevient actif, ainsi que la situation de l’année désactivée en même temps que lui.',
                                         })
                                     }
                                 >
@@ -436,126 +443,33 @@ export default function StudentShow({
                             <div className="grid grid-cols-2 divide-x border-t bg-muted/30 text-center">
                                 <div className="p-3">
                                     <p className="font-heading text-xl font-extrabold text-foreground tabular-nums">
-                                        {records.length}
+                                        {yearCount}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Déclaration
-                                        {records.length > 1 ? 's' : ''}
+                                        Année{yearCount > 1 ? 's' : ''}{' '}
+                                        enregistrée{yearCount > 1 ? 's' : ''}
                                     </p>
                                 </div>
                                 <div className="p-3">
-                                    <p className="font-heading text-xl font-extrabold text-success tabular-nums">
-                                        {activeCount}
+                                    <p
+                                        className={cn(
+                                            'font-heading text-xl font-extrabold',
+                                            situation?.status === 'active'
+                                                ? 'text-success'
+                                                : 'text-muted-foreground',
+                                        )}
+                                    >
+                                        {situation
+                                            ? situation.status === 'active'
+                                                ? 'Active'
+                                                : 'Inactive'
+                                            : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Active{activeCount > 1 ? 's' : ''}
+                                        Situation {currentYear?.name ?? ''}
                                     </p>
                                 </div>
                             </div>
-                        </section>
-
-                        <section
-                            className="surface p-5"
-                            aria-labelledby="current-title"
-                        >
-                            <div className="mb-2 flex items-center justify-between gap-2">
-                                <h2
-                                    id="current-title"
-                                    className="flex items-center gap-2 text-sm font-bold text-foreground"
-                                >
-                                    <span
-                                        className="flex size-8 items-center justify-center rounded-lg bg-accent text-primary"
-                                        aria-hidden="true"
-                                    >
-                                        <CalendarRange className="size-4" />
-                                    </span>
-                                    Année courante
-                                </h2>
-                                {current && (
-                                    <ToneBadge tone="success">Active</ToneBadge>
-                                )}
-                            </div>
-                            {current ? (
-                                <dl className="divide-y">
-                                    <SideRow
-                                        icon={CalendarDays}
-                                        label="Année universitaire"
-                                        value={current.academic_year?.name}
-                                    />
-                                    <SideRow
-                                        icon={Building2}
-                                        label="Établissement"
-                                        value={current.establishment?.name}
-                                    />
-                                    <SideRow
-                                        icon={Layers}
-                                        label="Niveau"
-                                        value={current.level?.name}
-                                    />
-                                    <SideRow
-                                        icon={BookMarked}
-                                        label="Mention"
-                                        value={
-                                            current.program?.mention?.name ??
-                                            'Sans mention'
-                                        }
-                                    />
-                                    <SideRow
-                                        icon={Route}
-                                        label="Parcours"
-                                        value={
-                                            current.program?.name ??
-                                            'Sans parcours'
-                                        }
-                                    />
-                                    <SideRow
-                                        icon={RotateCcw}
-                                        label="Code de redoublement"
-                                        value={
-                                            current.repeat_code
-                                                ? REPEAT_CODE_LABELS[
-                                                      current.repeat_code
-                                                  ]
-                                                : null
-                                        }
-                                    />
-                                    {current.eligibility && (
-                                        <div className="flex items-start gap-3 py-2.5">
-                                            <span
-                                                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
-                                                aria-hidden="true"
-                                            >
-                                                <HandCoins className="size-3.5" />
-                                            </span>
-                                            <div className="min-w-0">
-                                                <dt className="text-xs text-muted-foreground">
-                                                    Bourse (indicatif)
-                                                </dt>
-                                                <dd className="mt-0.5">
-                                                    <ToneBadge
-                                                        tone={
-                                                            eligibilityTones[
-                                                                current
-                                                                    .eligibility
-                                                                    .status
-                                                            ]
-                                                        }
-                                                    >
-                                                        {eligibilityLabel(
-                                                            current.eligibility,
-                                                        )}
-                                                    </ToneBadge>
-                                                </dd>
-                                            </div>
-                                        </div>
-                                    )}
-                                </dl>
-                            ) : (
-                                <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
-                                    Aucune déclaration active visible pour
-                                    l’année courante.
-                                </p>
-                            )}
                         </section>
                     </aside>
 
@@ -600,18 +514,6 @@ export default function StudentShow({
                                             aria-hidden="true"
                                         />
                                         {item.label}
-                                        {item.key === 'declarations' && (
-                                            <span
-                                                className={cn(
-                                                    'rounded-full px-2 text-xs tabular-nums',
-                                                    selected
-                                                        ? 'bg-accent text-accent-foreground'
-                                                        : 'bg-secondary text-muted-foreground',
-                                                )}
-                                            >
-                                                {records.length}
-                                            </span>
-                                        )}
                                     </button>
                                 );
                             })}
@@ -634,6 +536,207 @@ export default function StudentShow({
                                         passent par une revue.
                                     </p>
                                 </div>
+                                <section
+                                    className="rounded-xl border bg-card p-4 shadow-card sm:p-5"
+                                    aria-labelledby="situation-title"
+                                >
+                                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                                        <h3
+                                            id="situation-title"
+                                            className="flex items-center gap-2.5 text-sm font-bold text-foreground"
+                                        >
+                                            <span
+                                                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                                                aria-hidden="true"
+                                            >
+                                                <CalendarRange className="size-4" />
+                                            </span>
+                                            Situation{' '}
+                                            {situation?.academic_year?.name ??
+                                                currentYear?.name ??
+                                                'de l’année'}
+                                            {situation && (
+                                                <ToneBadge
+                                                    tone={toneFor(
+                                                        situation.status,
+                                                    )}
+                                                >
+                                                    {situation.status ===
+                                                    'active'
+                                                        ? 'Active'
+                                                        : 'Inactive'}
+                                                </ToneBadge>
+                                            )}
+                                        </h3>
+                                        {situation?.canUpdate && (
+                                            <div className="flex items-center gap-1">
+                                                <IconAction
+                                                    icon={Pencil}
+                                                    label="Modifier la situation de l’année"
+                                                    href={`/student-records/${situation.uuid}/edit`}
+                                                />
+                                                <IconAction
+                                                    icon={Power}
+                                                    tone={
+                                                        situation.status ===
+                                                        'active'
+                                                            ? 'default'
+                                                            : 'success'
+                                                    }
+                                                    label={
+                                                        situation.status ===
+                                                        'active'
+                                                            ? 'Désactiver la situation'
+                                                            : 'Réactiver la situation'
+                                                    }
+                                                    onClick={() =>
+                                                        toggleSituation(
+                                                            situation,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                    {situation ? (
+                                        <div className="space-y-4">
+                                            {!situation.repeat_code && (
+                                                <p className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-foreground">
+                                                    <AlertTriangle
+                                                        className="size-4 shrink-0"
+                                                        aria-hidden="true"
+                                                    />
+                                                    À compléter : le code de
+                                                    redoublement n’est pas
+                                                    renseigné.
+                                                    {situation.canUpdate && (
+                                                        <Link
+                                                            href={`/student-records/${situation.uuid}/edit`}
+                                                            className="font-semibold underline underline-offset-4"
+                                                        >
+                                                            Compléter
+                                                        </Link>
+                                                    )}
+                                                </p>
+                                            )}
+                                            <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                                                <Field
+                                                    label="Établissement"
+                                                    value={
+                                                        situation.establishment
+                                                            ?.name
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Niveau"
+                                                    value={
+                                                        situation.level?.name
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Mention"
+                                                    value={
+                                                        situation.program
+                                                            ?.mention?.name ??
+                                                        'Sans mention'
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Parcours"
+                                                    value={
+                                                        situation.program
+                                                            ?.name ??
+                                                        'Sans parcours'
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Code de redoublement"
+                                                    value={
+                                                        situation.repeat_code
+                                                            ? REPEAT_CODE_LABELS[
+                                                                  situation
+                                                                      .repeat_code
+                                                              ]
+                                                            : null
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Demande de bourse"
+                                                    value={
+                                                        situation.scholarship_request_reference
+                                                            ? `Réf. ${situation.scholarship_request_reference}${situation.scholarship_requested_at ? ` · déposée le ${date(situation.scholarship_requested_at)}` : ''}`
+                                                            : 'Aucune demande'
+                                                    }
+                                                />
+                                            </dl>
+                                            {situation.eligibility && (
+                                                <div className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg bg-muted/40 px-3 py-2">
+                                                    <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                                        <HandCoins
+                                                            className="size-4"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Bourse (indicatif)
+                                                    </span>
+                                                    <ToneBadge
+                                                        tone={
+                                                            eligibilityTones[
+                                                                situation
+                                                                    .eligibility
+                                                                    .status
+                                                            ]
+                                                        }
+                                                    >
+                                                        {eligibilityLabel(
+                                                            situation.eligibility,
+                                                        )}
+                                                    </ToneBadge>
+                                                    {situation.eligibility
+                                                        .reasons.length > 0 && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {situation.eligibility.reasons.join(
+                                                                ' · ',
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {situation.inactive_with_identity && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Désactivée en même temps que
+                                                    l’étudiant ; elle sera
+                                                    réactivée avec lui.
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed bg-muted/30 p-4">
+                                            <p className="text-sm text-muted-foreground">
+                                                Aucune situation enregistrée
+                                                pour{' '}
+                                                {currentYear
+                                                    ? currentYear.name
+                                                    : 'l’année courante'}
+                                                . Elle est créée par l’import du
+                                                fichier de l’année ou par
+                                                l’ajout d’un étudiant.
+                                            </p>
+                                            {canCreateRecord &&
+                                                student.is_active &&
+                                                currentYear && (
+                                                    <Button size="sm" asChild>
+                                                        <Link
+                                                            href={`/students/${student.uuid}/records/create`}
+                                                        >
+                                                            <Plus aria-hidden="true" />
+                                                            Ajouter la situation{' '}
+                                                            {currentYear.name}
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                        </div>
+                                    )}
+                                </section>
                                 <div className="grid gap-4 2xl:grid-cols-2">
                                     <Section title="Identité" icon={UserRound}>
                                         <Field
@@ -711,267 +814,69 @@ export default function StudentShow({
                                         />
                                     </Section>
                                 </div>
-                            </div>
-                        )}
-
-                        {tab === 'declarations' && (
-                            <div
-                                role="tabpanel"
-                                id="panel-declarations"
-                                aria-labelledby="tab-declarations"
-                            >
-                                <div className="flex flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
-                                    <div>
-                                        <h2 className="text-lg font-bold text-foreground">
-                                            Déclarations annuelles
-                                        </h2>
-                                        <p className="text-sm text-muted-foreground">
-                                            Une déclaration active ne constitue
-                                            pas une inscription universitaire.
-                                            L’éligibilité affichée est
-                                            indicative : le dossier papier reste
-                                            décidé par la Scolarité Centrale.
-                                        </p>
-                                    </div>
-                                    {canCreateRecord && student.is_active && (
-                                        <Button asChild>
-                                            <Link
-                                                href={`/students/${student.uuid}/records/create`}
+                                {previous.length > 0 && (
+                                    <section
+                                        className="rounded-xl border bg-muted/20 p-4 sm:p-5"
+                                        aria-labelledby="previous-title"
+                                    >
+                                        <h3
+                                            id="previous-title"
+                                            className="mb-3 flex items-center gap-2.5 text-sm font-bold text-foreground"
+                                        >
+                                            <span
+                                                className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                                                aria-hidden="true"
                                             >
-                                                <Plus aria-hidden="true" />
-                                                Ajouter une déclaration
-                                            </Link>
-                                        </Button>
-                                    )}
-                                </div>
-                                {records.length === 0 ? (
-                                    <EmptyState
-                                        compact
-                                        illustration="inbox"
-                                        title="Aucune déclaration visible."
-                                        description="Les déclarations annuelles de l’établissement apparaîtront ici."
-                                        className="border-t"
-                                    />
-                                ) : (
-                                    <div className="overflow-x-auto border-t">
-                                        <table className="data-table min-w-[64rem]">
-                                            <caption className="sr-only">
-                                                Déclarations annuelles de
-                                                l’étudiant
-                                            </caption>
-                                            <thead>
-                                                <tr>
-                                                    {[
-                                                        'Année',
-                                                        'Établissement',
-                                                        'Niveau',
-                                                        'Mention · parcours',
-                                                        'Redoublement',
-                                                        'Demande de bourse',
-                                                        'Bourse (indicatif)',
-                                                        'Statut',
-                                                    ].map((label) => (
-                                                        <th
-                                                            key={label}
-                                                            scope="col"
-                                                        >
-                                                            {label}
-                                                        </th>
-                                                    ))}
-                                                    <th scope="col">
-                                                        <span className="sr-only">
-                                                            Actions
-                                                        </span>
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {records.map((record) => (
-                                                    <tr
-                                                        key={record.id}
-                                                        className={cn(
+                                                <History className="size-4" />
+                                            </span>
+                                            Années précédentes
+                                        </h3>
+                                        <ul className="divide-y rounded-lg border bg-card">
+                                            {previous.map((record) => (
+                                                <li
+                                                    key={record.id}
+                                                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-sm"
+                                                >
+                                                    <span className="w-24 font-semibold text-foreground">
+                                                        {
                                                             record.academic_year
-                                                                ?.is_current &&
-                                                                'bg-accent/30',
+                                                                ?.name
+                                                        }
+                                                    </span>
+                                                    <span
+                                                        className="font-medium"
+                                                        title={
+                                                            record.establishment
+                                                                ?.name
+                                                        }
+                                                    >
+                                                        {record.establishment
+                                                            ?.code ??
+                                                            record.establishment
+                                                                ?.name}
+                                                    </span>
+                                                    <span className="inline-flex rounded-md bg-secondary px-1.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+                                                        {record.level?.code ??
+                                                            record.level?.name}
+                                                    </span>
+                                                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                                                        {record.program?.name ??
+                                                            'Sans parcours'}
+                                                    </span>
+                                                    <ToneBadge
+                                                        tone={toneFor(
+                                                            record.status,
                                                         )}
                                                     >
-                                                        <td>
-                                                            <span className="flex items-center gap-2 font-semibold text-foreground">
-                                                                {
-                                                                    record
-                                                                        .academic_year
-                                                                        ?.name
-                                                                }
-                                                                {record
-                                                                    .academic_year
-                                                                    ?.is_current && (
-                                                                    <span className="rounded-full bg-primary px-1.5 py-px text-[10px] font-bold tracking-wide text-primary-foreground uppercase">
-                                                                        Courante
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                            <span className="block text-xs text-muted-foreground">
-                                                                le{' '}
-                                                                {date(
-                                                                    record.declared_at,
-                                                                )}{' '}
-                                                                par{' '}
-                                                                {record
-                                                                    .declared_by
-                                                                    ?.name ??
-                                                                    '—'}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            {
-                                                                record
-                                                                    .establishment
-                                                                    ?.name
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            {record.level?.name}
-                                                        </td>
-                                                        <td>
-                                                            {record.program ? (
-                                                                <>
-                                                                    <span className="block text-xs text-muted-foreground">
-                                                                        {record
-                                                                            .program
-                                                                            .mention
-                                                                            ?.name ??
-                                                                            'Sans mention'}
-                                                                    </span>
-                                                                    {
-                                                                        record
-                                                                            .program
-                                                                            .name
-                                                                    }
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    Sans
-                                                                    parcours
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            {record.repeat_code ? (
-                                                                REPEAT_CODE_LABELS[
-                                                                    record
-                                                                        .repeat_code
-                                                                ]
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    Non
-                                                                    renseigné
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            {record.scholarship_request_reference ? (
-                                                                <>
-                                                                    <span className="block font-mono text-sm font-semibold text-foreground">
-                                                                        {
-                                                                            record.scholarship_request_reference
-                                                                        }
-                                                                    </span>
-                                                                    <span className="block text-xs text-muted-foreground">
-                                                                        {record.scholarship_requested_at
-                                                                            ? `déposée le ${date(record.scholarship_requested_at)}`
-                                                                            : 'Date non renseignée'}
-                                                                    </span>
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    Aucune
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            {record.eligibility ? (
-                                                                <EligibilityCell
-                                                                    eligibility={
-                                                                        record.eligibility
-                                                                    }
-                                                                />
-                                                            ) : (
-                                                                '—'
-                                                            )}
-                                                        </td>
-                                                        <td>
-                                                            <ToneBadge
-                                                                tone={toneFor(
-                                                                    record.status,
-                                                                )}
-                                                            >
-                                                                {record.status ===
-                                                                'active'
-                                                                    ? 'Active'
-                                                                    : 'Inactive'}
-                                                            </ToneBadge>
-                                                        </td>
-                                                        <td>
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                {record.canUpdate && (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            asChild
-                                                                        >
-                                                                            <Link
-                                                                                href={`/student-records/${record.uuid}/edit`}
-                                                                            >
-                                                                                <Pencil aria-hidden="true" />
-                                                                                Modifier
-                                                                            </Link>
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                setPending(
-                                                                                    {
-                                                                                        url: `/student-records/${record.uuid}/status`,
-                                                                                        data: {
-                                                                                            status:
-                                                                                                record.status ===
-                                                                                                'active'
-                                                                                                    ? 'inactive'
-                                                                                                    : 'active',
-                                                                                        },
-                                                                                        title:
-                                                                                            record.status ===
-                                                                                            'active'
-                                                                                                ? 'Désactiver la déclaration'
-                                                                                                : 'Réactiver la déclaration',
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <Power aria-hidden="true" />
-                                                                            {record.status ===
-                                                                            'active'
-                                                                                ? 'Désactiver'
-                                                                                : 'Réactiver'}
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                                <TrashButton
-                                                                    kind="student-records"
-                                                                    uuid={
-                                                                        record.uuid
-                                                                    }
-                                                                    label="Déclaration annuelle"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                        {record.status ===
+                                                        'active'
+                                                            ? 'Active'
+                                                            : 'Inactive'}
+                                                    </ToneBadge>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </section>
                                 )}
                             </div>
                         )}
@@ -1077,6 +982,33 @@ export default function StudentShow({
                                         }
                                     />
                                 </dl>
+                                {portalLinked && canDetachPortal && (
+                                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                                        <p className="text-muted-foreground">
+                                            Un compte qui ne serait pas celui de
+                                            l’étudiant peut être détaché ; le
+                                            bon étudiant ouvrira de nouveau sa
+                                            fiche avec ses informations.
+                                        </p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger-foreground"
+                                            onClick={() =>
+                                                setPending({
+                                                    url: `/students/${student.uuid}/portal`,
+                                                    data: {},
+                                                    method: 'delete',
+                                                    title: 'Détacher le compte portail',
+                                                    description:
+                                                        'Le compte portail ne verra plus cette fiche. Il n’est pas supprimé, et l’étudiant pourra rouvrir sa fiche en vérifiant ses informations.',
+                                                })
+                                            }
+                                        >
+                                            Détacher le compte portail
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1092,10 +1024,8 @@ export default function StudentShow({
                         <DialogHeader>
                             <DialogTitle>{pending?.title}</DialogTitle>
                             <DialogDescription>
-                                Confirmez cette modification. L’identité, les
-                                déclarations et leur historique seront
-                                conservés. Les statuts de l’identité et des
-                                déclarations sont distincts.
+                                {pending?.description ??
+                                    'Confirmez cette modification. La situation et son historique seront conservés.'}
                             </DialogDescription>
                         </DialogHeader>
                         <InputError message={error} />
