@@ -28,7 +28,7 @@ class ProfileDeleteRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             if ($this->user()->declaredStudentRecords()->exists()) {
-                $validator->errors()->add('password', 'Ce compte est lié à des déclarations administratives et doit être conservé.');
+                $validator->errors()->add('password', 'Ce compte a déclaré des situations annuelles d’étudiants et doit être conservé.');
             }
         }];
     }
