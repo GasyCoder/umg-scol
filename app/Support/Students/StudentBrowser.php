@@ -12,14 +12,19 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Drill-down of declared students: establishment → level → mention → program → list.
- * Every step counts the declarations of the selected academic year (current year by default)
- * inside the actor's perimeter; an establishment account always starts from its own establishment.
+ * Two ways through the declared students, inside the actor's perimeter and for one academic year
+ * (the current one by default, or all years in the list):
+ * - cards, step by step: establishment → level → mention → program → list;
+ * - the whole list at once ("Tous les étudiants", view=list), with every filter (also used by the export).
+ * A search, a status or « all years » always shows the list. An establishment account starts at its own establishment.
  */
 final class StudentBrowser
 {
     public const NONE = 'none';
 
+    public const ALL_YEARS = 'all';
+
+    /** Null when every year is listed (requested, or no current year defined). */
     public readonly ?AcademicYear $year;
 
     public readonly ?int $establishmentId;
@@ -30,23 +35,36 @@ final class StudentBrowser
 
     public readonly ?string $program;
 
+    public readonly ?string $status;
+
+    public readonly string $search;
+
+    /** The whole list was asked for, instead of the cards. */
+    public readonly bool $listView;
+
     /** @param array<string,mixed> $filters validated StudentListRequest data */
-    public function __construct(private readonly User $user, private readonly array $filters)
+    public function __construct(private readonly User $user, array $filters)
     {
-        $this->year = isset($filters['academic_year_id'])
-            ? AcademicYear::query()->find((int) $filters['academic_year_id'], ['id', 'name', 'is_current'])
-            : AcademicYear::query()->where('is_current', true)->where('is_active', true)->first(['id', 'name', 'is_current']);
+        $this->listView = ($filters['view'] ?? null) === 'list';
+        $requestedYear = $filters['academic_year_id'] ?? null;
+        $this->year = match (true) {
+            $requestedYear === self::ALL_YEARS => null,
+            $requestedYear !== null => AcademicYear::query()->find((int) $requestedYear, ['id', 'name', 'is_current']),
+            default => AcademicYear::query()->where('is_current', true)->where('is_active', true)->first(['id', 'name', 'is_current']),
+        };
         $this->establishmentId = $user->hasRole('establishment') ? (int) $user->establishment_id : (isset($filters['establishment_id']) ? (int) $filters['establishment_id'] : null);
         $this->levelId = isset($filters['level_id']) ? (int) $filters['level_id'] : null;
         $this->mention = isset($filters['mention_id']) ? (string) $filters['mention_id'] : null;
         $this->program = isset($filters['program_id']) ? (string) $filters['program_id'] : null;
+        $this->status = isset($filters['status']) ? (string) $filters['status'] : null;
+        $this->search = trim((string) ($filters['search'] ?? ''));
     }
 
-    /** Which screen to show: a card step, or the paginated list. */
+    /** Which screen to show: a card step, or the list. */
     public function step(): string
     {
         return match (true) {
-            filled($this->filters['search'] ?? null) || ($this->filters['view'] ?? null) === 'list' => 'list',
+            $this->listView || $this->search !== '' || $this->status !== null || $this->year === null => 'list',
             $this->establishmentId === null => 'establishments',
             $this->levelId === null => 'levels',
             $this->program !== null => 'list',
@@ -64,7 +82,7 @@ final class StudentBrowser
     }
 
     /**
-     * Cards of the current step with active/inactive declaration counts.
+     * Cards of the current step with active/inactive situation counts.
      *
      * @return array<int,array{id:int|string,label:string,code:string|null,active:int,inactive:int}>
      */
@@ -107,25 +125,7 @@ final class StudentBrowser
     }
 
     /**
-     * Filters for the final list (Eloquent query of StudentController).
-     *
-     * @param  Builder<StudentRecord>  $query
-     * @return Builder<StudentRecord>
-     */
-    public function applyToList(Builder $query): Builder
-    {
-        // The list is limited to a year only when one is requested (the screens always send it); a direct search spans all years.
-        return $query->when($this->year !== null && isset($this->filters['academic_year_id']), fn ($q) => $q->where('academic_year_id', $this->year->id))
-            ->when($this->establishmentId !== null, fn ($q) => $q->where('establishment_id', $this->establishmentId))
-            ->when($this->levelId !== null, fn ($q) => $q->where('level_id', $this->levelId))
-            ->when($this->mention === self::NONE, fn ($q) => $q->where(fn ($inner) => $inner->whereNull('program_id')->orWhereHas('program', fn ($p) => $p->whereNull('mention_id'))))
-            ->when($this->mention !== null && $this->mention !== self::NONE, fn ($q) => $q->whereHas('program', fn ($p) => $p->where('mention_id', (int) $this->mention)))
-            ->when($this->program === self::NONE, fn ($q) => $q->whereNull('program_id'))
-            ->when($this->program !== null && $this->program !== self::NONE, fn ($q) => $q->where('program_id', (int) $this->program));
-    }
-
-    /**
-     * Breadcrumb of the drill-down; each entry carries the query parameters of its step.
+     * Breadcrumb of the card steps; each entry carries the query parameters of its step.
      *
      * @return array<int,array{label:string,params:array<string,int|string>}>
      */
@@ -146,13 +146,33 @@ final class StudentBrowser
         }
         if ($this->mention !== null) {
             $params['mention_id'] = $this->mention;
-            $trail[] = ['label' => $this->mention === self::NONE ? 'Sans mention' : (string) Mention::query()->whereKey((int) $this->mention)->where('establishment_id', $this->establishmentId)->value('name'), 'params' => $params];
+            $trail[] = ['label' => $this->mention === self::NONE ? 'Sans mention' : (string) Mention::query()->whereKey((int) $this->mention)->value('name'), 'params' => $params];
         }
         if ($this->program !== null) {
             $params['program_id'] = $this->program;
-            $trail[] = ['label' => $this->program === self::NONE ? 'Sans parcours' : (string) Program::query()->whereKey((int) $this->program)->where('establishment_id', $this->establishmentId)->value('name'), 'params' => $params];
+            $trail[] = ['label' => $this->program === self::NONE ? 'Sans parcours' : (string) Program::query()->whereKey((int) $this->program)->value('name'), 'params' => $params];
         }
 
         return $trail;
+    }
+
+    /**
+     * Applies every filter of the list to a StudentRecord query (already limited by visibleTo).
+     *
+     * @param  Builder<StudentRecord>  $query
+     * @return Builder<StudentRecord>
+     */
+    public function applyToList(Builder $query, bool $withStatus = true): Builder
+    {
+        // Qualified: the list and the export join the students table for their order.
+        return $query->when($this->year !== null, fn ($q) => $q->where('student_records.academic_year_id', $this->year?->id))
+            ->when($this->establishmentId !== null, fn ($q) => $q->where('student_records.establishment_id', $this->establishmentId))
+            ->when($this->levelId !== null, fn ($q) => $q->where('student_records.level_id', $this->levelId))
+            ->when($this->mention === self::NONE, fn ($q) => $q->where(fn ($inner) => $inner->whereNull('student_records.program_id')->orWhereHas('program', fn ($p) => $p->whereNull('mention_id'))))
+            ->when($this->mention !== null && $this->mention !== self::NONE, fn ($q) => $q->whereHas('program', fn ($p) => $p->where('mention_id', (int) $this->mention)))
+            ->when($this->program === self::NONE, fn ($q) => $q->whereNull('student_records.program_id'))
+            ->when($this->program !== null && $this->program !== self::NONE, fn ($q) => $q->where('student_records.program_id', (int) $this->program))
+            ->when($withStatus && $this->status !== null, fn ($q) => $q->where('student_records.status', $this->status))
+            ->when($this->search !== '', fn ($q) => $q->whereHas('student', fn ($student) => $student->matching($this->search)));
     }
 }
