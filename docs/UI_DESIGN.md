@@ -7,6 +7,7 @@ Référence de la refonte UI/UX (ADR-062). Toute nouvelle page suit ces règles 
 - Institutionnel et sobre : bleu roi `--primary`, neutres froids, barre latérale marine, accent or (`--brand-gold`) réservé aux repères (logo, entrée active, compteurs).
 - Typographie : Public Sans (texte), Plus Jakarta Sans (`font-heading`, titres et chiffres clés).
 - Rayon `--radius` 0.625rem ; cartes `rounded-xl`, bandeaux `rounded-2xl`.
+- Vocabulaire : dans l'interface, une déclaration annuelle (StudentRecord) s'appelle « situation de l'année » ; le terme « déclaration » reste technique.
 - Mode clair, sombre et système : bascule dans la barre supérieure et sur les écrans de connexion. **Jamais de couleur codée en dur** (`text-green-600`, `bg-zinc-900`, `#xxxxxx`) : uniquement les tokens, pour que le mode sombre suive.
 
 ## Tokens (resources/css/app.css)
