@@ -117,7 +117,7 @@ export default function ImportPreview({
 
     return (
         <PageBody className="pb-0 md:pb-0 lg:pb-0">
-            <Head title={`Import — ${title}`} />
+            <Head title={`Import de ${title}`} />
             <PageHeader
                 icon={FileUp}
                 title={`${title} / Prévisualisation de l’import`}
