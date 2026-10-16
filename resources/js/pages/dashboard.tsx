@@ -118,7 +118,6 @@ const kpiStyles: Record<string, { icon: LucideIcon; tone: Tone }> = {
     applications_pending: { icon: FolderClock, tone: 'warning' },
     applications_today: { icon: Inbox, tone: 'success' },
     corrections_pending: { icon: FilePenLine, tone: 'warning' },
-    links_pending: { icon: UserCheck, tone: 'info' },
     imports_anomalies: { icon: FileUp, tone: 'danger' },
     internal_users: { icon: UserCog, tone: 'neutral' },
 };
@@ -266,12 +265,12 @@ export default function Dashboard({
                             <Panel
                                 icon={Layers}
                                 title="Étudiants par niveau"
-                                description="Déclarations actives de l’année"
+                                description="Situations actives de l’année"
                             >
                                 <BarList
                                     label="Étudiants par niveau"
                                     items={charts.students_by_level}
-                                    empty="Aucune déclaration active pour cette année."
+                                    empty="Aucune situation active pour cette année."
                                 />
                             </Panel>
                         )}
@@ -279,12 +278,12 @@ export default function Dashboard({
                             <Panel
                                 icon={Route}
                                 title="Étudiants par parcours"
-                                description="Déclarations actives de l’année"
+                                description="Situations actives de l’année"
                             >
                                 <BarList
                                     label="Étudiants par parcours"
                                     items={charts.students_by_program}
-                                    empty="Aucune déclaration active pour cette année."
+                                    empty="Aucune situation active pour cette année."
                                 />
                             </Panel>
                         )}
@@ -292,12 +291,12 @@ export default function Dashboard({
                             <Panel
                                 icon={Building2}
                                 title="Étudiants par établissement"
-                                description="Déclarations actives de l’année"
+                                description="Situations actives de l’année"
                             >
                                 <BarList
                                     label="Étudiants par établissement"
                                     items={charts.students_by_establishment}
-                                    empty="Aucune déclaration active pour cette année."
+                                    empty="Aucune situation active pour cette année."
                                 />
                             </Panel>
                         )}
@@ -382,7 +381,7 @@ export default function Dashboard({
                         <Panel
                             icon={UserCheck}
                             title="Confirmations étudiantes"
-                            description={`${formatNumber(data.confirmations.total)} étudiant(s) avec une déclaration active`}
+                            description={`${formatNumber(data.confirmations.total)} étudiant(s) avec une situation active`}
                         >
                             <ConfirmationMeter {...data.confirmations} />
                         </Panel>
