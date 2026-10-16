@@ -1,9 +1,9 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
-    ArrowRight,
     CalendarDays,
     Download,
+    Eye,
     FolderOpen,
     Inbox,
     RotateCcw,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import {
     applicationStatusLabels,
@@ -567,21 +568,14 @@ export default function ApplicationsIndex({
                                             </span>
                                         </td>
                                         <td>
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={`${LIST_URL}/${item.uuid}`}
-                                                        aria-label={`Ouvrir le dossier ${item.application_number}`}
-                                                    >
-                                                        Ouvrir
-                                                        <ArrowRight aria-hidden="true" />
-                                                    </Link>
-                                                </Button>
+                                            <div className="flex items-center justify-end gap-1">
+                                                <IconAction
+                                                    icon={Eye}
+                                                    label="Consulter le dossier"
+                                                    href={`${LIST_URL}/${item.uuid}`}
+                                                />
                                                 <TrashButton
+                                                    iconOnly
                                                     kind="applications"
                                                     uuid={item.uuid}
                                                     label={
