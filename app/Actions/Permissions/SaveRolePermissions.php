@@ -17,7 +17,8 @@ class SaveRolePermissions
     public function handle(User $actor, string $name, array $permissions, string $version): void
     {
         Gate::forUser($actor)->authorize('permissions.manage-ui');
-        abort_unless(array_key_exists($name, config('access.roles')), 404);
+        // Unknown role, or the developer role for an actor who is not a developer: it does not exist here.
+        abort_unless(in_array($name, PermissionCatalogue::visibleRoles($actor), true), 404);
         if (array_diff($permissions, config('access.permissions')) !== [] || ($name === 'student' && array_diff($permissions, PermissionCatalogue::STUDENT) !== []) || ($name === 'superadmin' && array_diff(PermissionCatalogue::PROTECTED, $permissions) !== [])) {
             throw ValidationException::withMessages(['permissions' => 'Cette modification est interdite : protégez les droits du superadmin et limitez le rôle étudiant à son portail.']);
         }
