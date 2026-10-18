@@ -4,6 +4,7 @@ namespace App\Actions\StudentPortal;
 
 use App\Models\User;
 use App\Support\StudentPortalAccess;
+use App\Support\StudentPortalIdentity;
 use Illuminate\Support\Str;
 
 class StudentAccount
@@ -25,6 +26,9 @@ class StudentAccount
 
     public function verified(string $email): ?User
     {
+        if (StudentPortalIdentity::find($email, true) === null) {
+            return null;
+        }
         $user = $this->find($email);
         if ($user === null) {
             return $this->create($email);
