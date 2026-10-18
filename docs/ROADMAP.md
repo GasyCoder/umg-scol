@@ -44,11 +44,12 @@
 
 ## Phase 5 — Bourse
 
-- [x] campagnes
+- [x] dossiers rattachés directement à l’année universitaire (campagnes supprimées, ADR-085)
 - [x] réception dossier papier
-- [x] numéro DDB (saisie libre, doublon par campagne)
+- [x] numéro DDB (généré selon le modèle de la plateforme, doublon par année universitaire, recopié au stylo sur l’étiquette du dossier)
+- [x] fiche d’étiquettes DDB vierges (10 par A4, préfixe imprimé, QR code vers le portail bourse)
 - [x] vérification (checklist générique, à remplacer par la liste officielle)
-- [x] validation/correction/rejet, historique métier, export CSV
+- [x] validation/correction/rejet, historique métier, export Excel
 
 ## Phase 6 — Audit/rapports
 
