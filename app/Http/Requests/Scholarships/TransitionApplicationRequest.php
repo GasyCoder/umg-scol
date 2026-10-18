@@ -20,7 +20,9 @@ class TransitionApplicationRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['status' => ['required', Rule::in(['in_review', 'validated', 'needs_correction', 'rejected'])], 'reason' => ['required_if:status,needs_correction,rejected', 'nullable', 'string', 'min:10', 'max:1000']];
+        return ['status' => ['required', Rule::in(['in_review', 'validated', 'needs_correction', 'rejected'])], 'reason' => ['required_if:status,needs_correction,rejected', 'nullable', 'string', 'min:10', 'max:1000'],
+            // « Demander une correction » : also email the student (ADR-088), when the account may.
+            'notify_student' => ['sometimes', 'boolean'], 'from_list' => ['sometimes', 'boolean']];
     }
 
     /** @return array<string,string> */
