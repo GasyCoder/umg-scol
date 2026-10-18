@@ -10,7 +10,6 @@ use App\Models\Level;
 use App\Models\Mention;
 use App\Models\Program;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentImport;
 use App\Models\StudentRecord;
@@ -122,11 +121,15 @@ class TrashManager
         if ($target instanceof Program) {
             $this->parents($target, ['mention_id' => Mention::class]);
         }
-        if ($target instanceof StudentImport || $target instanceof ScholarshipCampaign) {
+        if ($target instanceof StudentImport) {
             $this->parents($target, ['establishment_id' => Establishment::class, 'academic_year_id' => AcademicYear::class]);
         }
         if ($target instanceof ScholarshipApplication) {
-            $this->parents($target, ['student_id' => Student::class, 'student_record_id' => StudentRecord::class, 'scholarship_campaign_id' => ScholarshipCampaign::class]);
+            $this->parents($target, ['student_id' => Student::class, 'student_record_id' => StudentRecord::class, 'academic_year_id' => AcademicYear::class]);
+            // One scholarship request per student and per academic year.
+            if (ScholarshipApplication::query()->ofStudentYear($target->student_id, $target->academic_year_id)->whereKeyNot($target->id)->lockForUpdate()->exists()) {
+                $this->fail('Cet étudiant a déjà un autre dossier de bourse pour cette année universitaire.');
+            }
         }
         $batch = (string) $target->getAttribute('trash_batch');
         $target->forceFill(['deleted_by' => null]);
@@ -190,11 +193,10 @@ class TrashManager
     {
         $links = match (true) {
             $target instanceof Establishment => [['programs', 'establishment_id'], ['mentions', 'establishment_id'], ['users', 'establishment_id'], ['student_records', 'establishment_id'], ['student_imports', 'establishment_id']],
-            $target instanceof AcademicYear => [['student_records', 'academic_year_id'], ['student_imports', 'academic_year_id'], ['scholarship_campaigns', 'academic_year_id'], ['student_information_confirmations', 'academic_year_id']],
+            $target instanceof AcademicYear => [['student_records', 'academic_year_id'], ['student_imports', 'academic_year_id'], ['scholarship_applications', 'academic_year_id'], ['student_information_confirmations', 'academic_year_id']],
             $target instanceof Level => [['student_records', 'level_id']],
             $target instanceof Mention => [['programs', 'mention_id']],
             $target instanceof Program => [['student_records', 'program_id']],
-            $target instanceof ScholarshipCampaign => [['scholarship_applications', 'scholarship_campaign_id']],
             $target instanceof Student && $purge => [['users', 'student_id'], ['student_link_requests', 'student_id'], ['student_correction_requests', 'student_id'], ['student_information_confirmations', 'student_id'], ['student_import_rows', 'matched_student_id'], ['scholarship_applications', 'student_id']],
             $target instanceof StudentRecord && $purge => [['scholarship_applications', 'student_record_id'], ['student_information_confirmations', 'student_record_id'], ['student_import_rows', 'matched_student_record_id']],
             default => [],
