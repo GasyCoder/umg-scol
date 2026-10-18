@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
-import { NavMain } from '@/components/nav-main';
+import { activeHrefOf, NavMain } from '@/components/nav-main';
 import {
     Sidebar,
     SidebarContent,
@@ -12,6 +12,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useNavigation } from '@/hooks/use-navigation';
 import { dashboard } from '@/routes';
 import { edit } from '@/routes/profile';
@@ -21,6 +22,14 @@ const footerButton =
 
 export function AppSidebar() {
     const groups = useNavigation();
+    const { currentUrl } = useCurrentUrl();
+    // Across all groups, so that only the most specific entry is lit.
+    const activeHref = activeHrefOf(
+        groups.flatMap((group) =>
+            group.items.filter((item) => item.inSidebar !== false),
+        ),
+        currentUrl,
+    );
     const { state, toggleSidebar, isMobile } = useSidebar();
     const collapsed = state === 'collapsed' && !isMobile;
 
@@ -47,13 +56,19 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent className="[scrollbar-width:thin] [scrollbar-color:var(--sidebar-border)_transparent] pb-4">
-                {groups.map((group) => (
-                    <NavMain
-                        key={group.label}
-                        label={group.label}
-                        items={group.items}
-                    />
-                ))}
+                {groups.map((group) => {
+                    const items = group.items.filter(
+                        (item) => item.inSidebar !== false,
+                    );
+                    return items.length > 0 ? (
+                        <NavMain
+                            key={group.label}
+                            label={group.label}
+                            items={items}
+                            activeHref={activeHref}
+                        />
+                    ) : null;
+                })}
             </SidebarContent>
 
             <SidebarFooter className="border-t border-sidebar-border p-3">
