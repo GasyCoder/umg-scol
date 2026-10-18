@@ -10,6 +10,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
+import { cn } from '@/lib/utils';
 import type { Appearance } from '@/hooks/use-appearance';
 
 const options: { value: Appearance; label: string; icon: LucideIcon }[] = [
@@ -19,7 +20,7 @@ const options: { value: Appearance; label: string; icon: LucideIcon }[] = [
 ];
 
 /** Light / dark / system switch in the top bar; the choice is kept in a cookie and localStorage. */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
     const { appearance, updateAppearance } = useAppearance();
 
     return (
@@ -28,7 +29,10 @@ export function ThemeToggle() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="relative size-10 rounded-full border bg-card text-muted-foreground shadow-xs hover:border-primary/40 hover:bg-accent hover:text-primary"
+                    className={cn(
+                        'relative size-10 rounded-full border bg-card text-muted-foreground shadow-xs hover:border-primary/40 hover:bg-accent hover:text-primary',
+                        className,
+                    )}
                     aria-label="Changer le thème (clair, sombre ou système)"
                 >
                     <Sun className="size-5 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
