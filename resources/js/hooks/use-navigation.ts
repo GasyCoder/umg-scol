@@ -4,7 +4,6 @@ import {
     BookMarked,
     Building2,
     CalendarDays,
-    CalendarRange,
     ChartColumn,
     FilePenLine,
     FileUp,
@@ -16,6 +15,7 @@ import {
     Library,
     Route,
     ShieldCheck,
+    Tags,
     Trash2,
     UserCog,
     Users,
@@ -35,31 +35,17 @@ const referenceIcons: Record<ReferenceKind, LucideIcon> = {
     programs: Route,
 };
 
-/** Pending task keys (PendingTasks.php) counted on each menu entry. */
-const taskEntries: Record<string, string> = {
-    corrections: '/corrections',
-    applications_pending: '/scholarships/applications',
-    applications_in_review: '/scholarships/applications',
-    imports_ready: '/imports',
-};
-
 /**
  * Single source of the internal menu, shared by the sidebar and the page search.
  * Entries mirror the server-side abilities shared by HandleInertiaRequests; the server
- * still authorizes every page.
+ * still authorizes every page. Work waiting (PendingTasks.php) is shown by the header bell only.
  */
 export function useNavigation(): NavGroup[] {
-    const { auth, tasks } = usePage().props;
-    const badges: Record<string, number> = {};
-    for (const task of tasks?.items ?? []) {
-        const href = taskEntries[task.key];
-        if (href) badges[href] = (badges[href] ?? 0) + task.count;
-    }
+    const { auth } = usePage().props;
     const item = (title: string, href: string, icon: LucideIcon): NavItem => ({
         title,
         href,
         icon,
-        badge: badges[href],
     });
     const when = (condition: boolean, entry: NavItem) =>
         condition ? [entry] : [];
@@ -68,12 +54,16 @@ export function useNavigation(): NavGroup[] {
         {
             label: 'Général',
             items: [
-                {
+                ...when(auth.canViewDashboard, {
                     title: 'Tableau de bord',
                     href: dashboard(),
                     icon: LayoutGrid,
-                },
-                item('Notifications', '/notifications', Bell),
+                }),
+                // Opened from the bell of the header, not from the menu.
+                ...when(auth.canViewNotifications, {
+                    ...item('Notifications', '/notifications', Bell),
+                    inSidebar: false,
+                }),
             ],
         },
         {
@@ -97,15 +87,19 @@ export function useNavigation(): NavGroup[] {
             label: 'Bourses',
             items: [
                 ...when(
-                    auth.scholarships.campaigns,
-                    item('Campagnes', '/scholarships/campaigns', CalendarRange),
-                ),
-                ...when(
                     auth.scholarships.receive,
                     item(
                         'Réception des dossiers',
                         '/scholarships/reception',
                         Inbox,
+                    ),
+                ),
+                ...when(
+                    auth.scholarships.labels,
+                    item(
+                        'Étiquettes DDB',
+                        '/scholarships/reception/labels',
+                        Tags,
                     ),
                 ),
                 ...when(
