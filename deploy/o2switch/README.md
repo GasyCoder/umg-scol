@@ -52,10 +52,10 @@ Chaque push sur `master` lance `.github/workflows/ci-cd.yml` :
 
 1. **Tests** : formatage et lint, TypeScript, Pint, PHPStan, Pest (MySQL 8).
 2. **Déploiement**, seulement si les tests passent :
-   - construction dans GitHub : `composer install --no-dev`, `npm run build` (le serveur ne lance ni npm ni Composer) ;
-   - autorisation SSH temporaire de la machine GitHub (liste blanche o2switch, via l'API cPanel), retirée à la fin ;
-   - maintenance, envoi par `rsync` dans `~/umg-scol` (sans `.env`, `storage/`, `tests/`, voir `rsync-exclude.txt`) ;
-   - `post-deploy.sh` : migrations, rôles et référentiel, caches, `queue:restart`, remise en ligne.
+    - construction dans GitHub : `composer install --no-dev`, `npm run build` (le serveur ne lance ni npm ni Composer) ;
+    - autorisation SSH temporaire de la machine GitHub (liste blanche o2switch, via l'API cPanel), retirée à la fin ;
+    - maintenance, envoi par `rsync` dans `~/umg-scol` (sans `.env`, `storage/`, `tests/`, voir `rsync-exclude.txt`) ;
+    - `post-deploy.sh` : migrations, rôles et référentiel, caches, `queue:restart`, remise en ligne.
 
 Secrets du dépôt GitHub (Settings › Secrets and variables › Actions) : `DEPLOY_HOST`, `DEPLOY_USER`,
 `DEPLOY_PATH`, `DEPLOY_SSH_KEY` (clé privée dédiée, sa clé publique est dans `~/.ssh/authorized_keys`
