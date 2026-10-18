@@ -33,7 +33,7 @@ final class InstitutionalDashboard
         $user = $this->scope->user;
         $can = [
             'students' => Gate::forUser($user)->allows('viewAny', Student::class),
-            'imports' => Gate::forUser($user)->allows('viewAny', StudentImport::class),
+            'imports' => Gate::forUser($user)->allows('viewAny', StudentImport::class) && $user->can('imports.view'),
             'corrections' => Gate::forUser($user)->allows('viewAny', StudentCorrectionRequest::class),
             'scholarships' => Gate::forUser($user)->allows('viewAny', ScholarshipApplication::class),
             'activity' => Gate::forUser($user)->allows('viewAny', Activity::class),
@@ -45,7 +45,6 @@ final class InstitutionalDashboard
         $corrections = $can['corrections'] ? $this->metrics->corrections() : null;
         $confirmations = $can['students'] ? $this->metrics->confirmations() : null;
         $scholarships = $can['scholarships'] ? $this->metrics->scholarships() : null;
-        $campaigns = $can['scholarships'] || $user->can('campaigns.manage') ? $this->metrics->campaigns() : null;
         $establishments = $this->scope->isGlobal() && $can['students'] ? $this->metrics->activeEstablishments() : null;
         $users = $can['administration'] ? $this->metrics->internalUsers() : null;
 
@@ -59,11 +58,11 @@ final class InstitutionalDashboard
                 'students_by_establishment' => $can['students'] && $this->scope->isGlobal() ? $this->metrics->studentsByEstablishment() : null,
                 'scholarships_by_status' => $scholarships['by_status'] ?? null,
                 'scholarships_by_establishment' => $can['scholarships'] ? $this->metrics->scholarshipsByEstablishment() : null,
+                'scholarships_daily' => $can['scholarships'] ? $this->metrics->scholarshipsDaily() : null,
             ],
             'confirmations' => $confirmations,
             'corrections' => $corrections,
             'imports' => $imports === null ? null : [...$imports, 'recent' => $this->metrics->recentImports()],
-            'campaigns' => $campaigns,
             'scholarships' => $scholarships,
             'technical' => $can['technical'] ? $this->technical() : null,
             'activity' => $can['activity'] ? Activity::query()->with('causer.roles')->latest('id')->limit(8)->get()->map(fn (Activity $a) => AuditPresenter::summary($a))->values()->all() : null,
@@ -91,7 +90,7 @@ final class InstitutionalDashboard
             $cards[] = ['key' => 'establishments', 'label' => 'Établissements actifs', 'value' => $establishments, 'hint' => 'Référentiel institutionnel', 'href' => null];
         }
         if ($scholarships !== null) {
-            $cards[] = ['key' => 'applications', 'label' => 'Dossiers de bourse reçus', 'value' => $scholarships['total'], 'hint' => 'Campagnes '.$year, 'href' => '/scholarships/applications'];
+            $cards[] = ['key' => 'applications', 'label' => 'Dossiers de bourse reçus', 'value' => $scholarships['total'], 'hint' => 'Année universitaire '.$year, 'href' => '/scholarships/applications'];
             $cards[] = ['key' => 'applications_pending', 'label' => 'Dossiers à traiter', 'value' => $scholarships['by_status']['pending'] + $scholarships['by_status']['in_review'] + $scholarships['by_status']['needs_correction'], 'hint' => 'Reçus, en vérification ou en correction', 'href' => '/scholarships/applications'];
             $cards[] = ['key' => 'applications_today', 'label' => 'Reçus aujourd’hui', 'value' => $scholarships['today'], 'hint' => 'Dossiers papier enregistrés ce jour', 'href' => '/scholarships/applications'];
         }
