@@ -25,7 +25,7 @@ beforeEach(function () {
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $year->id, 'establishment_id' => $this->a->id, 'status' => 'active']);
     $studentUser = User::factory()->create()->assignRole('student');
     $studentUser->forceFill(['student_id' => $student->id])->save();
-    app(RequestStudentCorrection::class)->handle($studentUser, StudentCorrectionField::Phone, '0381234567', null);
+    app(RequestStudentCorrection::class)->handle($studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', null);
     $this->staffA = User::factory()->create()->assignRole('establishment');
     $this->staffA->forceFill(['establishment_id' => $this->a->id])->save();
     $this->staffB = User::factory()->create()->assignRole('establishment');
