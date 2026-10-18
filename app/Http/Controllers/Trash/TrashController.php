@@ -25,7 +25,7 @@ class TrashController extends Controller
         $query = $model->newQuery()->withoutGlobalScope(SoftDeletingScope::class)->whereNotNull($model->qualifyColumn('deleted_at'));
         if (filled($filters['search'] ?? null)) {
             $field = match ($kind) {
-                'students' => 'last_name','imports' => 'original_filename','applications' => 'application_number','student-records' => 'uuid',default => 'name'
+                'students' => 'last_name','imports' => 'original_filename','applications' => 'ddb_number','student-records' => 'uuid',default => 'name'
             };
             $query->where($field, 'like', '%'.addcslashes($filters['search'], '%_\\').'%');
         }
@@ -40,7 +40,7 @@ class TrashController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Élément déplacé dans la corbeille.']);
 
         $path = match ($kind) {
-            'students' => '/students', 'imports' => '/imports', 'campaigns' => '/scholarships/campaigns', 'applications' => '/scholarships/applications',
+            'students' => '/students', 'imports' => '/imports', 'applications' => '/scholarships/applications',
             'establishments', 'academic-years', 'levels', 'mentions', 'programs' => '/references/'.$kind, default => null,
         };
 
