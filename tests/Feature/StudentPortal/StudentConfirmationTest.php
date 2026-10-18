@@ -16,7 +16,6 @@ use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Mention;
 use App\Models\Program;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentInformationConfirmation;
 use App\Models\StudentRecord;
@@ -64,7 +63,7 @@ function asConfirmingStudent(TestCase $test, ?User $user = null): TestCase
     // The application survives between requests of a test: drop the user cached by the Sanctum guard.
     app('auth')->forgetGuards();
 
-    return $test->actingAs($user ?? $test->studentUser, 'student')->withSession(['student_portal' => true]);
+    return $test->actingAs($user ?? $test->studentUser, 'student')->withSession(['student_portal' => true, 'student_identity_verified' => ($user ?? $test->studentUser)->student_id]);
 }
 function confirmationState(TestCase $test, ?User $user = null): array
 {
@@ -195,26 +194,26 @@ it('refuses an ambiguous situation instead of guessing', function () {
 // Corrections
 it('blocks the confirmation while a correction is pending', function () {
     $version = confirmationState($this)['version'];
-    app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::Phone, '0381112233', null);
+    app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', null);
     expect(confirmationState($this))->toMatchArray(['can_confirm' => false, 'reason' => 'pending_corrections', 'version' => null, 'message' => 'Une ou plusieurs corrections sont encore en attente. Vous pourrez confirmer vos informations après leur traitement ou leur annulation.']);
     confirmInformation($this, null, $version)->assertUnprocessable()->assertJsonValidationErrors(['confirmation' => 'Une ou plusieurs corrections sont encore en attente.']);
     expect(StudentInformationConfirmation::count())->toBe(0);
 });
 it('allows the confirmation after a cancelled correction', function () {
-    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::Phone, '0381112233', null);
+    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', null);
     app(CancelStudentCorrection::class)->handle($this->studentUser, $correction);
     confirmInformation($this)->assertOk()->assertJsonPath('confirmation.status', 'confirmed');
 });
 it('allows a new confirmation after an approved correction, which made the previous one stale', function () {
     confirmInformation($this)->assertOk();
-    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::Phone, '0381112233', null);
+    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', null);
     app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, true, null);
     expect(confirmationState($this))->toMatchArray(['status' => 'stale', 'can_confirm' => true]);
     confirmInformation($this)->assertOk()->assertJsonPath('confirmation.status', 'confirmed');
     expect(StudentInformationConfirmation::orderBy('sequence')->pluck('sequence')->all())->toBe([1, 2]);
 });
 it('allows the confirmation after a rejected correction', function () {
-    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::Phone, '0381112233', null);
+    $correction = app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', null);
     app(ReviewStudentCorrection::class)->handle($this->staffA, $correction, false, 'Le numéro actuel est le bon.');
     confirmInformation($this)->assertOk()->assertJsonPath('confirmation.status', 'confirmed');
 });
@@ -390,8 +389,7 @@ it('never confirms alongside a correction created concurrently', function () {
 it('never blocks the paper scholarship workflow for a student without account or confirmation', function () {
     $student = Student::factory()->create();
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $this->a->id, 'level_id' => $this->level->id, 'status' => 'active']);
-    $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'status' => 'open']);
-    $application = app(ReceiveScholarshipApplication::class)->handle($this->central, $campaign->id, $student->id, null, null);
+    $application = app(ReceiveScholarshipApplication::class)->handle($this->central, $student->id, null, null);
     foreach (array_keys((array) config('scholarships.checks')) as $key) {
         app(UpdateScholarshipCheck::class)->handle($this->central, $application, $key, ScholarshipCheckStatus::Ok, null);
     }
