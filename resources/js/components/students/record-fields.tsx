@@ -23,12 +23,14 @@ export default function RecordFields({
     errors,
     setData,
     immutable = false,
+    bare = false,
 }: {
     options: Options;
     data: Record<string, string>;
     errors: Record<string, string>;
     setData: (key: string, value: string) => void;
     immutable?: boolean;
+    bare?: boolean;
 }) {
     const programs = options.programs.filter(
         (program) => String(program.establishment_id) === data.establishment_id,
@@ -96,12 +98,8 @@ export default function RecordFields({
         </Select>
     );
 
-    return (
-        <FormSection
-            icon={GraduationCap}
-            title="Situation de l’année"
-            description="Établissement, niveau et parcours de l’étudiant, déjà régulièrement inscrit hors plateforme, pour l’année universitaire."
-        >
+    const fields = (
+        <>
             <FormField
                 id="establishment_id"
                 label="Établissement"
@@ -110,7 +108,9 @@ export default function RecordFields({
                 hint={
                     options.fixedEstablishmentId !== null
                         ? 'Votre établissement.'
-                        : undefined
+                        : immutable
+                          ? undefined
+                          : 'La situation restera « en attente » jusqu’à ce que la liste de cet établissement la confirme.'
                 }
             >
                 {select(
@@ -243,26 +243,34 @@ export default function RecordFields({
             <FormField
                 id="scholarship_request_reference"
                 label="Référence demande de bourse"
-                required={Boolean(data.scholarship_requested_at)}
-                error={errors.scholarship_request_reference}
-                hint="Obligatoire si la date de dépôt est renseignée ; unique par établissement et par année."
+                hint="Donnée par la plateforme à l’enregistrement, dès qu’une date de dépôt est renseignée (code établissement, année, numéro)."
             >
                 <Input
                     id="scholarship_request_reference"
-                    value={data.scholarship_request_reference ?? ''}
-                    onChange={(event) =>
-                        setData(
-                            'scholarship_request_reference',
-                            event.target.value,
-                        )
+                    value={
+                        data.scholarship_request_reference ||
+                        (data.scholarship_requested_at
+                            ? 'Générée à l’enregistrement'
+                            : '—')
                     }
-                    maxLength={50}
-                    autoComplete="off"
-                    aria-invalid={
-                        errors.scholarship_request_reference ? true : undefined
-                    }
+                    readOnly
+                    tabIndex={-1}
+                    className="bg-muted/40 text-muted-foreground"
                 />
             </FormField>
+        </>
+    );
+
+    // Bare: only the fields, for a page that frames the step itself.
+    return bare ? (
+        fields
+    ) : (
+        <FormSection
+            icon={GraduationCap}
+            title="Situation de l’année"
+            description="Établissement, niveau et parcours de l’étudiant, déjà régulièrement inscrit hors plateforme, pour l’année universitaire."
+        >
+            {fields}
         </FormSection>
     );
 }
