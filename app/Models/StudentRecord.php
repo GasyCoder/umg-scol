@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\RepeatCode;
+use App\Enums\SituationSource;
+use App\Enums\SituationVerification;
 use App\Enums\StudentRecordStatus;
 use App\Models\Concerns\HasPublicUuid;
 use App\Models\Concerns\Trashable;
@@ -22,19 +24,22 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property RepeatCode|null $repeat_code
  * @property CarbonInterface|null $scholarship_requested_at
  * @property bool $inactive_with_identity
+ * @property SituationSource $source
+ * @property SituationVerification $verification
+ * @property bool $is_scholarship_holder
  */
-#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'inactive_with_identity', 'declared_by', 'declared_at'])]
+#[Fillable(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'inactive_with_identity', 'source', 'verification', 'is_scholarship_holder', 'preinscription_reference', 'matched_import_id', 'declared_by', 'declared_at'])]
 #[Hidden(['active_academic_year_id', 'live_marker'])]
 class StudentRecord extends Model
 {
     /** @use HasFactory<StudentRecordFactory> */
     use HasFactory, HasPublicUuid, LogsActivity, Trashable;
 
-    protected $attributes = ['status' => 'active'];
+    protected $attributes = ['status' => 'active', 'source' => 'establishment', 'verification' => 'verified', 'is_scholarship_holder' => false];
 
     protected function casts(): array
     {
-        return ['status' => StudentRecordStatus::class, 'repeat_code' => RepeatCode::class, 'scholarship_requested_at' => 'date', 'inactive_with_identity' => 'boolean', 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
+        return ['status' => StudentRecordStatus::class, 'repeat_code' => RepeatCode::class, 'scholarship_requested_at' => 'date', 'inactive_with_identity' => 'boolean', 'source' => SituationSource::class, 'verification' => SituationVerification::class, 'is_scholarship_holder' => 'boolean', 'matched_import_id' => 'integer', 'declared_at' => 'datetime', 'student_id' => 'integer', 'establishment_id' => 'integer', 'academic_year_id' => 'integer', 'level_id' => 'integer', 'program_id' => 'integer', 'declared_by' => 'integer'];
     }
 
     /** @return BelongsTo<Student, $this> */
@@ -94,6 +99,6 @@ class StudentRecord extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->useLogName('student_records')->logOnly(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'declared_by', 'declared_at'])->logOnlyDirty()->logEmptyChanges();
+        return LogOptions::defaults()->useLogName('student_records')->logOnly(['student_id', 'academic_year_id', 'establishment_id', 'level_id', 'program_id', 'repeat_code', 'scholarship_requested_at', 'scholarship_request_reference', 'status', 'source', 'verification', 'is_scholarship_holder', 'declared_by', 'declared_at'])->logOnlyDirty()->logEmptyChanges();
     }
 }
