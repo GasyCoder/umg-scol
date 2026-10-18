@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 /** Action applied to the situations ticked in the student list; each one is still authorised on its own. */
 class BulkStudentRecordsRequest extends FormRequest
 {
-    public const ACTIONS = ['deactivate', 'activate', 'trash'];
+    public const ACTIONS = ['deactivate', 'activate', 'trash', 'verify'];
 
     public function authorize(): bool
     {
