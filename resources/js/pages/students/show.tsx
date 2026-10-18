@@ -1,3 +1,5 @@
+import { NotifyStudentButton } from '@/components/students/notify-student-dialog';
+import type { StudentNotification } from '@/components/students/notify-student-dialog';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -19,6 +21,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { verify } from '@/actions/App/Http/Controllers/Students/StudentRecordController';
 import { IconAction } from '@/components/icon-action';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { ToneBadge, toneFor } from '@/components/tone-badge';
@@ -34,7 +37,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { REPEAT_CODE_LABELS, SEX_LABELS } from '@/components/students/types';
+import {
+    RECORD_STATUS_LABELS,
+    REPEAT_CODE_LABELS,
+    SEX_LABELS,
+    SOURCE_LABELS,
+    VERIFICATION_LABELS,
+    VERIFICATION_SHORT,
+} from '@/components/students/types';
 import type {
     AnnualRecord,
     Eligibility,
@@ -66,7 +76,7 @@ type Pending = {
     data: Record<string, string | boolean>;
     title: string;
     description?: string;
-    method?: 'patch' | 'delete';
+    method?: 'patch' | 'delete' | 'post';
 } | null;
 type Tab = 'informations' | 'verification';
 
@@ -145,27 +155,41 @@ function Field({
     );
 }
 
-/** Group of official information: icon tile, title and a two-column key/value grid. */
+/**
+ * Group of official information: icon tile, title and a two-column key/value grid; the pencil
+ * (when the identity may be edited) opens the edit form on this block's step.
+ */
 function Section({
     title,
     icon: Icon,
+    editHref,
     children,
 }: {
     title: string;
     icon: LucideIcon;
+    editHref?: string;
     children: ReactNode;
 }) {
     return (
         <section className="rounded-xl border bg-muted/20 p-4 sm:p-5">
-            <h3 className="mb-4 flex items-center gap-2.5 text-sm font-bold text-foreground">
-                <span
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
-                    aria-hidden="true"
-                >
-                    <Icon className="size-4" />
-                </span>
-                {title}
-            </h3>
+            <div className="mb-4 flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2.5 text-sm font-bold text-foreground">
+                    <span
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent text-primary"
+                        aria-hidden="true"
+                    >
+                        <Icon className="size-4" />
+                    </span>
+                    {title}
+                </h3>
+                {editHref && (
+                    <IconAction
+                        icon={Pencil}
+                        label={`Modifier : ${title}`}
+                        href={editHref}
+                    />
+                )}
+            </div>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">{children}</dl>
         </section>
     );
@@ -221,6 +245,7 @@ export default function StudentShow({
     canDeactivate,
     canCreateRecord,
     currentYear,
+    notification,
 }: {
     student: Student & { cin_is_standard: boolean };
     records: DeclarationRow[];
@@ -231,7 +256,12 @@ export default function StudentShow({
     canDeactivate: boolean;
     canCreateRecord: boolean;
     currentYear: { id: number; name: string } | null;
+    /** Email about missing or doubtful information, null without the permission. */
+    notification: StudentNotification | null;
 }) {
+    // Pencil of a block: the edit form, opened on that block's step.
+    const editStep = (step: string) =>
+        canUpdate ? `/students/${student.uuid}/edit?step=${step}` : undefined;
     const [tab, setTab] = useState<Tab>('informations');
     const [pending, setPending] = useState<Pending>(null);
     const [processing, setProcessing] = useState(false);
@@ -244,8 +274,15 @@ export default function StudentShow({
             pending.method === 'delete'
                 ? (url: string, options: Parameters<typeof router.delete>[1]) =>
                       router.delete(url, options)
-                : (url: string, options: Parameters<typeof router.delete>[1]) =>
-                      router.patch(url, pending.data, options);
+                : pending.method === 'post'
+                  ? (
+                        url: string,
+                        options: Parameters<typeof router.delete>[1],
+                    ) => router.post(url, pending.data, options)
+                  : (
+                        url: string,
+                        options: Parameters<typeof router.delete>[1],
+                    ) => router.patch(url, pending.data, options);
         send(pending.url, {
             preserveScroll: true,
             onSuccess: () => setPending(null),
@@ -261,11 +298,25 @@ export default function StudentShow({
     const situation =
         records.find(
             (record) =>
-                record.academic_year?.is_current && record.status === 'active',
+                record.academic_year?.is_current &&
+                record.status !== 'inactive',
         ) ??
         records.find((record) => record.academic_year?.is_current) ??
         null;
     const previous = records.filter((record) => record !== situation);
+    // UIN and bank account are only sent to the central office.
+    const showsPnes = student.uin !== undefined;
+    const canVerifySituation =
+        situation?.canVerify === true && situation.verification === 'matched';
+    const verifySituation = (record: DeclarationRow) =>
+        setPending({
+            url: verify.url(record.uuid),
+            data: {},
+            method: 'post',
+            title: `Valider la situation ${record.academic_year?.name ?? ''}`,
+            description:
+                'La situation saisie par la Scolarité a été retrouvée dans la liste importée de l’établissement. Une fois validée, le dossier de bourse pourra être validé.',
+        });
     const yearCount = new Set(records.map((record) => record.academic_year_id))
         .size;
     const toggleSituation = (record: DeclarationRow) =>
@@ -372,6 +423,12 @@ export default function StudentShow({
                                         : 'Réactiver'}
                                 </Button>
                             )}
+                            {notification && (
+                                <NotifyStudentButton
+                                    studentUuid={student.uuid}
+                                    notification={notification}
+                                />
+                            )}
                             {canUpdate && (
                                 <Button asChild>
                                     <Link
@@ -460,9 +517,9 @@ export default function StudentShow({
                                         )}
                                     >
                                         {situation
-                                            ? situation.status === 'active'
-                                                ? 'Active'
-                                                : 'Inactive'
+                                            ? RECORD_STATUS_LABELS[
+                                                  situation.status
+                                              ]
                                             : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
@@ -561,42 +618,81 @@ export default function StudentShow({
                                                         situation.status,
                                                     )}
                                                 >
-                                                    {situation.status ===
-                                                    'active'
-                                                        ? 'Active'
-                                                        : 'Inactive'}
+                                                    {
+                                                        RECORD_STATUS_LABELS[
+                                                            situation.status
+                                                        ]
+                                                    }
                                                 </ToneBadge>
                                             )}
+                                            {situation?.is_scholarship_holder && (
+                                                <ToneBadge tone="info">
+                                                    Boursier PNES
+                                                </ToneBadge>
+                                            )}
+                                            {situation &&
+                                                situation.verification ===
+                                                    'matched' && (
+                                                    <ToneBadge tone="warning">
+                                                        {
+                                                            VERIFICATION_SHORT[
+                                                                situation
+                                                                    .verification
+                                                            ]
+                                                        }
+                                                    </ToneBadge>
+                                                )}
                                         </h3>
-                                        {situation?.canUpdate && (
-                                            <div className="flex items-center gap-1">
-                                                <IconAction
-                                                    icon={Pencil}
-                                                    label="Modifier la situation de l’année"
-                                                    href={`/student-records/${situation.uuid}/edit`}
-                                                />
-                                                <IconAction
-                                                    icon={Power}
-                                                    tone={
-                                                        situation.status ===
-                                                        'active'
-                                                            ? 'default'
-                                                            : 'success'
-                                                    }
-                                                    label={
-                                                        situation.status ===
-                                                        'active'
-                                                            ? 'Désactiver la situation'
-                                                            : 'Réactiver la situation'
-                                                    }
-                                                    onClick={() =>
-                                                        toggleSituation(
-                                                            situation,
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        )}
+                                        {situation &&
+                                            (situation.canUpdate ||
+                                                canVerifySituation) && (
+                                                <div className="flex items-center gap-1">
+                                                    {canVerifySituation && (
+                                                        <IconAction
+                                                            icon={BadgeCheck}
+                                                            tone="success"
+                                                            label="Valider la situation"
+                                                            onClick={() =>
+                                                                verifySituation(
+                                                                    situation,
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                    {situation.canUpdate && (
+                                                        <>
+                                                            <IconAction
+                                                                icon={Pencil}
+                                                                label="Modifier la situation de l’année"
+                                                                href={`/student-records/${situation.uuid}/edit`}
+                                                            />
+                                                            {situation.status !==
+                                                                'pending' && (
+                                                                <IconAction
+                                                                    icon={Power}
+                                                                    tone={
+                                                                        situation.status ===
+                                                                        'active'
+                                                                            ? 'default'
+                                                                            : 'success'
+                                                                    }
+                                                                    label={
+                                                                        situation.status ===
+                                                                        'active'
+                                                                            ? 'Désactiver la situation'
+                                                                            : 'Réactiver la situation'
+                                                                    }
+                                                                    onClick={() =>
+                                                                        toggleSituation(
+                                                                            situation,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                     </div>
                                     {situation ? (
                                         <div className="space-y-4">
@@ -668,7 +764,46 @@ export default function StudentShow({
                                                             : 'Aucune demande'
                                                     }
                                                 />
+                                                <Field
+                                                    label="Origine"
+                                                    value={
+                                                        SOURCE_LABELS[
+                                                            situation.source
+                                                        ]
+                                                    }
+                                                />
+                                                <Field
+                                                    label="Vérification"
+                                                    value={
+                                                        VERIFICATION_LABELS[
+                                                            situation
+                                                                .verification
+                                                        ]
+                                                    }
+                                                />
+                                                {situation.preinscription_reference && (
+                                                    <Field
+                                                        label="Référence de préinscription"
+                                                        value={
+                                                            situation.preinscription_reference
+                                                        }
+                                                    />
+                                                )}
                                             </dl>
+                                            {situation.verification !==
+                                                'verified' && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {situation.verification ===
+                                                    'matched'
+                                                        ? 'L’étudiant figure dans la liste importée de l’établissement. La Scolarité doit valider la situation.'
+                                                        : 'La situation reste à confirmer à partir de la liste de l’établissement ou de la base PNES.'}{' '}
+                                                    Le dossier de bourse peut
+                                                    être reçu et instruit. Sa
+                                                    validation reste bloquée
+                                                    tant que la situation n’est
+                                                    pas vérifiée.
+                                                </p>
+                                            )}
                                             {situation.eligibility && (
                                                 <div className="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg bg-muted/40 px-3 py-2">
                                                     <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -738,7 +873,11 @@ export default function StudentShow({
                                     )}
                                 </section>
                                 <div className="grid gap-4 2xl:grid-cols-2">
-                                    <Section title="Identité" icon={UserRound}>
+                                    <Section
+                                        title="Identité"
+                                        icon={UserRound}
+                                        editHref={editStep('identity')}
+                                    >
                                         <Field
                                             label="Nom"
                                             value={student.last_name}
@@ -768,7 +907,11 @@ export default function StudentShow({
                                             value={student.nationality}
                                         />
                                     </Section>
-                                    <Section title="Contact" icon={Phone}>
+                                    <Section
+                                        title="Contact"
+                                        icon={Phone}
+                                        editHref={editStep('contact')}
+                                    >
                                         <Field
                                             label="Téléphone"
                                             value={student.phone}
@@ -784,25 +927,43 @@ export default function StudentShow({
                                         />
                                     </Section>
                                     <Section
-                                        title="Pièce d’identité (CIN)"
+                                        title="Identification"
                                         icon={IdCard}
+                                        editHref={editStep('cin')}
                                     >
                                         <Field
-                                            label="Numéro"
+                                            label="Numéro CIN"
                                             value={student.cin}
                                             extra={cinFlag}
                                         />
                                         <Field
-                                            label="Délivrance"
+                                            label="Délivrance CIN"
                                             value={join(
                                                 date(student.cin_issued_at),
                                                 student.cin_issued_place,
                                             )}
                                         />
+                                        <Field
+                                            label="Code bourse"
+                                            value={student.scholarship_code}
+                                        />
+                                        {showsPnes && (
+                                            <>
+                                                <Field
+                                                    label="UIN"
+                                                    value={student.uin}
+                                                />
+                                                <Field
+                                                    label="Numéro de compte"
+                                                    value={student.bank_account}
+                                                />
+                                            </>
+                                        )}
                                     </Section>
                                     <Section
                                         title="Baccalauréat"
                                         icon={GraduationCap}
+                                        editHref={editStep('bac')}
                                     >
                                         <Field
                                             label="Année d’obtention"
@@ -863,15 +1024,64 @@ export default function StudentShow({
                                                         {record.program?.name ??
                                                             'Sans parcours'}
                                                     </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {
+                                                            SOURCE_LABELS[
+                                                                record.source
+                                                            ]
+                                                        }
+                                                    </span>
+                                                    {record.is_scholarship_holder && (
+                                                        <ToneBadge tone="info">
+                                                            Boursier PNES
+                                                        </ToneBadge>
+                                                    )}
+                                                    {record.verification ===
+                                                        'matched' && (
+                                                        <span
+                                                            title={
+                                                                VERIFICATION_LABELS[
+                                                                    record
+                                                                        .verification
+                                                                ]
+                                                            }
+                                                        >
+                                                            <ToneBadge tone="warning">
+                                                                {
+                                                                    VERIFICATION_SHORT[
+                                                                        record
+                                                                            .verification
+                                                                    ]
+                                                                }
+                                                            </ToneBadge>
+                                                        </span>
+                                                    )}
+                                                    {record.canVerify &&
+                                                        record.verification ===
+                                                            'matched' && (
+                                                            <IconAction
+                                                                icon={
+                                                                    BadgeCheck
+                                                                }
+                                                                tone="success"
+                                                                label="Valider la situation"
+                                                                onClick={() =>
+                                                                    verifySituation(
+                                                                        record,
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
                                                     <ToneBadge
                                                         tone={toneFor(
                                                             record.status,
                                                         )}
                                                     >
-                                                        {record.status ===
-                                                        'active'
-                                                            ? 'Active'
-                                                            : 'Inactive'}
+                                                        {
+                                                            RECORD_STATUS_LABELS[
+                                                                record.status
+                                                            ]
+                                                        }
                                                     </ToneBadge>
                                                 </li>
                                             ))}
