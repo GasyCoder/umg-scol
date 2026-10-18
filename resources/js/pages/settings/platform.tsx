@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent, ReactNode } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { BrandMark } from '@/components/brand-mark';
+import { DdbLabel } from '@/components/scholarships/ddb-label';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -42,12 +44,39 @@ const fileRules: Record<
     },
 };
 
+type DdbSettings = {
+    pattern: string;
+    digits: number;
+    defaultPattern: string;
+    defaultDigits: number;
+    tokens: Record<string, string>;
+};
+
+type LabelKey =
+    | 'ddb_label_heading'
+    | 'ddb_label_caption'
+    | 'ddb_label_hint'
+    | 'ddb_label_footer'
+    | 'ddb_label_url';
+type LabelSettings = {
+    values: Record<LabelKey, string>;
+    defaults: Record<LabelKey, string>;
+    /** QR code of the saved link. */
+    qr: string;
+};
+
 export default function PlatformSettings({
     values,
     defaults,
+    ddb,
+    labels,
+    studentMails,
 }: {
     values: Texts;
     defaults: Omit<Texts, 'support_email'>;
+    ddb: DdbSettings;
+    labels: LabelSettings;
+    studentMails: StudentMailSettings;
 }) {
     const { branding } = usePage().props;
     const form = useForm({
@@ -321,7 +350,367 @@ export default function PlatformSettings({
                     </Button>
                 </div>
             </form>
+            <DdbNumbering ddb={ddb} />
+            <DdbLabelTexts
+                labels={labels}
+                institution={institution}
+                pattern={ddb.pattern}
+            />
+            <StudentMailSwitches settings={studentMails} />
         </>
+    );
+}
+
+/** Same rule as the server (DdbNumber::format), for the preview only. */
+function formatDdb(pattern: string, digits: number, sequence: number) {
+    return pattern
+        .replaceAll('{NUM}', String(sequence).padStart(digits, '0'))
+        .replaceAll('{ANNEE}', '2026')
+        .replaceAll('{AU}', '2026-2027')
+        .replaceAll('{ETAB}', 'FMED');
+}
+
+/** Pattern of the DDB numbers generated at the reception counter. */
+function DdbNumbering({ ddb }: { ddb: DdbSettings }) {
+    const form = useForm({ ddb_pattern: ddb.pattern, ddb_digits: ddb.digits });
+    const errors = form.errors as Record<string, string | undefined>;
+    const pattern = form.data.ddb_pattern.toUpperCase();
+    const digits = Math.min(10, Math.max(1, Number(form.data.ddb_digits) || 1));
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.put('/settings/platform/ddb', { preserveScroll: true });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            noValidate
+            className="mt-6 rounded-xl border bg-card text-card-foreground"
+        >
+            <div className="border-b px-6 py-5">
+                <h2 className="text-lg font-semibold text-foreground">
+                    Numérotation des dossiers (DDB)
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Numéro généré à la réception d’un dossier papier et recopié
+                    au stylo sur l’étiquette du dossier. Les numéros déjà donnés
+                    ne changent pas.
+                </p>
+            </div>
+            <Row
+                label="Modèle"
+                help="Lettres, chiffres, séparateurs et balises. {NUM} est obligatoire."
+                htmlFor="ddb_pattern"
+            >
+                <div className="space-y-3">
+                    <TextInput
+                        id="ddb_pattern"
+                        value={form.data.ddb_pattern}
+                        onChange={(value) => form.setData('ddb_pattern', value)}
+                        placeholder={ddb.defaultPattern}
+                        maxLength={60}
+                        error={errors.ddb_pattern}
+                    />
+                    <ul className="flex flex-wrap gap-2">
+                        {Object.entries(ddb.tokens).map(([token, label]) => (
+                            <li key={token}>
+                                <button
+                                    type="button"
+                                    title={label}
+                                    className="rounded-md border px-2 py-1 font-mono text-xs text-foreground hover:bg-accent"
+                                    onClick={() =>
+                                        form.setData(
+                                            'ddb_pattern',
+                                            form.data.ddb_pattern + token,
+                                        )
+                                    }
+                                >
+                                    {token}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <dl className="grid gap-1 text-xs text-muted-foreground">
+                        {Object.entries(ddb.tokens).map(([token, label]) => (
+                            <div key={token} className="flex gap-2">
+                                <dt className="w-24 shrink-0 font-mono">
+                                    {token}
+                                </dt>
+                                <dd>{label}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            </Row>
+            <Row
+                label="Chiffres du numéro d’ordre"
+                help="Longueur de {NUM}, complétée par des zéros."
+                htmlFor="ddb_digits"
+            >
+                <TextInput
+                    id="ddb_digits"
+                    type="number"
+                    value={String(form.data.ddb_digits)}
+                    onChange={(value) =>
+                        form.setData('ddb_digits', Number(value))
+                    }
+                    placeholder={String(ddb.defaultDigits)}
+                    maxLength={2}
+                    error={errors.ddb_digits}
+                />
+            </Row>
+            <Row label="Aperçu" help="Exemple pour le 124ᵉ dossier reçu.">
+                <p className="font-mono text-2xl font-bold tracking-wide text-foreground">
+                    {pattern.includes('{NUM}')
+                        ? formatDdb(pattern, digits, 124)
+                        : '—'}
+                </p>
+            </Row>
+            <div className="flex flex-col-reverse gap-2 px-6 py-4 sm:flex-row sm:justify-end">
+                <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={form.processing}
+                    onClick={() =>
+                        form.setData({
+                            ddb_pattern: ddb.defaultPattern,
+                            ddb_digits: ddb.defaultDigits,
+                        })
+                    }
+                >
+                    Revenir au modèle par défaut
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={form.processing || !form.isDirty}
+                >
+                    {form.processing && <Spinner />}
+                    Enregistrer la numérotation
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+const labelFields: {
+    key: LabelKey;
+    label: string;
+    help: string;
+    maxLength: number;
+}[] = [
+    {
+        key: 'ddb_label_heading',
+        label: 'Ligne sous l’institution',
+        help: 'Suivie de l’année universitaire sélectionnée.',
+        maxLength: 40,
+    },
+    {
+        key: 'ddb_label_caption',
+        label: 'Titre du numéro',
+        help: 'Au-dessus du préfixe et de la ligne à remplir.',
+        maxLength: 30,
+    },
+    {
+        key: 'ddb_label_hint',
+        label: 'Mention sous le numéro',
+        help: 'Courte indication pour l’étudiant.',
+        maxLength: 50,
+    },
+    {
+        key: 'ddb_label_footer',
+        label: 'Pied de l’étiquette',
+        help: 'Service émetteur, centré en bas.',
+        maxLength: 60,
+    },
+    {
+        key: 'ddb_label_url',
+        label: 'Lien du QR code',
+        help: 'Adresse complète ouverte au scan, aussi imprimée sous le code.',
+        maxLength: 100,
+    },
+];
+
+/** Texts printed on the blank DDB labels; an empty field restores its default. */
+function DdbLabelTexts({
+    labels,
+    institution,
+    pattern,
+}: {
+    labels: LabelSettings;
+    institution: string;
+    pattern: string;
+}) {
+    const form = useForm(labels.values);
+    const errors = form.errors as Record<string, string | undefined>;
+    const text = (key: LabelKey) =>
+        form.data[key].trim() || labels.defaults[key];
+    const [before, after = ''] = pattern.split('{NUM}');
+    const resolve = (part: string) =>
+        formatDdb(part, 1, 0).replaceAll('FMED', '____');
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.put('/settings/platform/labels', {
+            preserveScroll: true,
+            onSuccess: () => form.setDefaults(),
+        });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            noValidate
+            className="mt-6 rounded-xl border bg-card text-card-foreground"
+        >
+            <div className="border-b px-6 py-5">
+                <h2 className="text-lg font-semibold text-foreground">
+                    Étiquettes DDB
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Textes imprimés sur la fiche d’étiquettes vierges de la
+                    réception. Un champ vide reprend le texte par défaut.
+                </p>
+            </div>
+            {labelFields.map((field) => (
+                <Row
+                    key={field.key}
+                    label={field.label}
+                    help={field.help}
+                    htmlFor={field.key}
+                >
+                    <TextInput
+                        id={field.key}
+                        type={field.key === 'ddb_label_url' ? 'url' : 'text'}
+                        value={form.data[field.key]}
+                        placeholder={labels.defaults[field.key]}
+                        maxLength={field.maxLength}
+                        error={errors[field.key]}
+                        onChange={(value) => form.setData(field.key, value)}
+                    />
+                </Row>
+            ))}
+            <Row
+                label="Aperçu"
+                help="Taille réelle. Le QR code suit le lien enregistré."
+            >
+                <div className="overflow-x-auto">
+                    <DdbLabel
+                        texts={{
+                            institution,
+                            heading: text('ddb_label_heading'),
+                            caption: text('ddb_label_caption'),
+                            hint: text('ddb_label_hint'),
+                            footer: text('ddb_label_footer'),
+                            urlLabel: text('ddb_label_url')
+                                .replace(/^https?:\/\//, '')
+                                .replace(/\/+$/, ''),
+                        }}
+                        academicYear="2026-2027"
+                        prefix={resolve(before)}
+                        suffix={resolve(after)}
+                        qr={labels.qr}
+                    />
+                </div>
+            </Row>
+            <div className="flex flex-col-reverse gap-2 px-6 py-4 sm:flex-row sm:justify-end">
+                <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={form.processing}
+                    onClick={() =>
+                        form.setData({
+                            ddb_label_heading: '',
+                            ddb_label_caption: '',
+                            ddb_label_hint: '',
+                            ddb_label_footer: '',
+                            ddb_label_url: '',
+                        })
+                    }
+                >
+                    Revenir aux textes par défaut
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={form.processing || !form.isDirty}
+                >
+                    {form.processing && <Spinner />}
+                    Enregistrer les étiquettes
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+type StudentMailSettings = {
+    values: Record<string, boolean>;
+    labels: Record<string, string>;
+};
+
+/** When each email is sent; the student must have an email on the file. */
+const studentMailHelp: Record<string, string> = {
+    mail_student_registered:
+        'À la création d’une fiche avec le formulaire (jamais lors d’un import de liste).',
+    mail_scholarship_received:
+        'À l’enregistrement de la réception du dossier papier, avec le N° DDB.',
+};
+
+/** Emails sent to the official address of a student file, switched on or off one by one. */
+function StudentMailSwitches({ settings }: { settings: StudentMailSettings }) {
+    const form = useForm<Record<string, boolean>>(settings.values);
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        form.put('/settings/platform/student-mails', {
+            preserveScroll: true,
+            onSuccess: () => form.setDefaults(),
+        });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            noValidate
+            className="mt-6 rounded-xl border bg-card text-card-foreground"
+        >
+            <div className="border-b px-6 py-5">
+                <h2 className="text-lg font-semibold text-foreground">
+                    Emails aux étudiants
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Envoyés à l’adresse email de la fiche, quand elle est
+                    renseignée, avec le lien du portail étudiant.
+                </p>
+            </div>
+            {Object.entries(settings.labels).map(([key, label]) => (
+                <Row
+                    key={key}
+                    label={label}
+                    help={studentMailHelp[key] ?? ''}
+                    htmlFor={key}
+                >
+                    <label
+                        htmlFor={key}
+                        className="flex cursor-pointer items-center gap-3 text-sm text-foreground"
+                    >
+                        <Checkbox
+                            id={key}
+                            checked={form.data[key]}
+                            onCheckedChange={(checked) =>
+                                form.setData(key, checked === true)
+                            }
+                        />
+                        {form.data[key] ? 'Envoyé' : 'Désactivé'}
+                    </label>
+                </Row>
+            ))}
+            <div className="flex justify-end px-6 py-4">
+                <Button
+                    type="submit"
+                    disabled={form.processing || !form.isDirty}
+                >
+                    {form.processing && <Spinner />}
+                    Enregistrer les emails
+                </Button>
+            </div>
+        </form>
     );
 }
 
