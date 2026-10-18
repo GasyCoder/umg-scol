@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\StudentMails;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,17 +30,28 @@ class StudentOtpMail extends Mailable implements ShouldBeEncrypted, ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Votre code d’accès au portail étudiant UMG');
+        // The code first: readable in the phone notification without opening the email.
+        return new Envelope(subject: $this->code.' est votre code d’accès au portail étudiant');
     }
 
     public function content(): Content
     {
         $minutes = (int) config('portals.otp_minutes');
 
-        return new Content(htmlString: '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">'
-            .'<p style="font-size:15px">Voici votre code d’accès au portail étudiant de l’Université de Mahajanga :</p>'
-            .'<p style="font-size:32px;font-weight:700;letter-spacing:10px;text-align:center;background:#eef2ff;border-radius:12px;padding:16px 0;margin:20px 0">'.e($this->code).'</p>'
-            .'<p style="font-size:13px;color:#475569">Il expire dans '.$minutes.' minutes et ne sert qu’une fois. Si vous n’avez pas demandé ce code, ignorez cet email.</p>'
-            .'</div>');
+        return new Content(htmlString: StudentMails::html(
+            '<p style="margin:0 0 6px;font-size:18px;font-weight:700">Votre code de connexion</p>'
+            .'<p style="margin:0 0 20px;color:#475569">Saisissez ce code sur le portail étudiant pour continuer.</p>'
+            .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px"><tr>'
+            .'<td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:22px 12px;text-align:center">'
+            .'<p style="margin:0;font-size:34px;line-height:1;font-weight:700;letter-spacing:12px;padding-left:12px;font-family:Consolas,Menlo,Monaco,monospace;color:#0f172a">'.e($this->code).'</p>'
+            .'</td></tr></table>'
+            .'<p style="margin:0 0 24px;font-size:13px;color:#64748b;text-align:center">Valable '.$minutes.' minutes · une seule utilisation</p>'
+            .'<p style="margin:0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:13px;line-height:1.55;color:#64748b">'
+            .'Vous n’avez pas demandé ce code ? Ignorez cet email : sans lui, personne ne peut ouvrir votre fiche. '
+            .'Ne le communiquez à personne, même à la scolarité.</p>',
+            'Code '.$this->code.', valable '.$minutes.' minutes.',
+            portalButton: false,
+            subtitle: 'Portail étudiant',
+        ));
     }
 }
