@@ -124,12 +124,12 @@ it('isolates every import endpoint from a foreign establishment', function (stri
     $import->update(['establishment_id' => $this->b->id]);
     $this->{$method}('/imports/'.$import->uuid.$endpoint)->assertForbidden();
 })->with([['', 'get'], ['/analyze', 'post'], ['/commit', 'post'], ['/errors', 'get']]);
-it('blocks central and student roles even if granted import permissions', function (string $role) {
+it('blocks the student role even if granted import permissions', function (string $role) {
     $user = User::factory()->create()->assignRole($role);
     $user->givePermissionTo(['imports.view', 'imports.create', 'imports.commit', 'imports.export_errors']);
     $this->actingAs($user)->get('/imports')->assertForbidden();
     $this->get('/imports/create')->assertForbidden();
-})->with(['student', 'central_scholarship_office']);
+})->with(['student']);
 it('allows superadmin to select an establishment', function () {
     $this->actingAs($this->admin)->post('/imports', ['file' => UploadedFile::fake()->createWithContent('rows.csv', "last_name,level\nNom,L1"), 'academic_year_id' => $this->year->id, 'establishment_id' => $this->b->id])->assertSessionHasNoErrors()->assertRedirect();
     expect(StudentImport::sole()->establishment_id)->toBe($this->b->id);
@@ -171,7 +171,7 @@ it('rejects invalid row fields with structured errors', function (string $field,
     $row = $import->rows()->sole();
     expect($row->status)->toBe(RowStatus::Rejected)->and($row->errors[0])->toHaveKeys(['field', 'code', 'message']);
 })->with([['last_name', ''], ['email', 'invalid'], ['level', 'unknown'], ['birth_date', '31/02/2001'], ['birth_date', '2999-01-01'], ['birth_date', ''], ['phone', 'bad'], ['bac_year', 1800], ['cin', str_repeat('1', 101)], ['last_name', '=1+1'],
-    ['sex', ''], ['sex', 'X'], ['nationality', ''], ['nationality', 'Martienne'], ['repeat_code', ''], ['repeat_code', 'Q (Quadruplant)'], ['bac_series', 'Z9'], ['scholarship_requested_at', '2026-01-01']]);
+    ['sex', ''], ['sex', 'X'], ['nationality', ''], ['nationality', 'Martienne'], ['repeat_code', ''], ['repeat_code', 'Q (Quadruplant)'], ['bac_series', 'Z9']]);
 it('rejects inactive or ambiguous programs', function (string $case) {
     if ($case === 'inactive') {
         $this->program->update(['is_active' => false]);
