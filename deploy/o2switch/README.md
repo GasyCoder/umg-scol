@@ -86,3 +86,13 @@ au maximum cinq fichiers JavaScript, imports compris.
 Après une modification du build, vérifier dans un navigateur avec un cache vide : ouverture du
 tableau de bord authentifié, navigation Inertia et portail étudiant. Un contrôle HTTP isolé de
 chaque fichier ne suffit pas à reproduire ce problème de chargement.
+
+## Modifications depuis le portail interne
+
+PowerBoost a aussi interrompu une requête native `PATCH` en HTTP/2 lors du choix de l'année
+courante. Le client HTTP Inertia transporte les méthodes `PATCH`, `PUT` et `DELETE` en `POST`
+avec l'en-tête Laravel `X-HTTP-Method-Override`. Le serveur retrouve la méthode initiale :
+les routes, Policies, contrôles CSRF, validations et audits restent appliqués.
+Le corps est conservé, y compris les fichiers multipart ; les requêtes `GET` et `POST`
+ordinaires restent inchangées. Vérifier la confirmation de l'année courante et l'ouverture
+de la réception après déploiement.

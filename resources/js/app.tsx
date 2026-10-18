@@ -1,4 +1,4 @@
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, http } from '@inertiajs/react';
 import { PageLoadingProvider } from '@/components/loading/page-loading-boundary';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -6,8 +6,11 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { laravelMutationTransport } from '@/lib/laravel-mutation-transport';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+http.onRequest(laravelMutationTransport);
 
 void createInertiaApp({
     // The configured portal name (settings → Plateforme), falling back to the build-time name.

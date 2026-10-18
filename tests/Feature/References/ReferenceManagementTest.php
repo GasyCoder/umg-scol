@@ -104,6 +104,32 @@ it('enforces the single-current invariant in the database itself', function () {
     expect(fn () => AcademicYear::factory()->create(['is_current' => true]))->toThrow(QueryException::class);
 });
 
+it('opens reception after selecting the current year through a POST method override', function () {
+    $this->withoutVite();
+    $year = AcademicYear::factory()->create(['is_current' => false, 'is_active' => true]);
+    $this->actingAs($this->admin)->get('/scholarships/reception')
+        ->assertInertia(fn (Assert $page) => $page->where('year', null));
+
+    $this->withHeaders(['X-HTTP-Method-Override' => 'PATCH', 'X-Inertia' => 'true'])
+        ->post('/references/academic-years/'.$year->uuid.'/current')
+        ->assertStatus(303)->assertRedirect('/references/academic-years')->assertSessionHasNoErrors();
+
+    expect($year->fresh()->is_current)->toBeTrue()->and($year->fresh()->is_active)->toBeTrue();
+    expect(Activity::query()->where('subject_type', AcademicYear::class)->where('subject_id', $year->id)
+        ->where('event', 'updated')->where('causer_id', $this->admin->id)->exists())->toBeTrue();
+
+    $this->flushHeaders();
+    $this->get('/scholarships/reception')->assertInertia(fn (Assert $page) => $page->where('year.id', $year->id));
+});
+
+it('keeps current-year permissions enforced with a POST method override', function () {
+    $year = AcademicYear::factory()->create(['is_current' => false]);
+    $user = User::factory()->create()->assignRole('central_scholarship_office');
+    $this->actingAs($user)->withHeader('X-HTTP-Method-Override', 'PATCH')
+        ->post('/references/academic-years/'.$year->uuid.'/current')->assertForbidden();
+    expect($year->fresh()->is_current)->toBeFalse();
+});
+
 it('rolls back both the current-year switch and its audit on a failed save', function () {
     $a = AcademicYear::factory()->create(['is_current' => true]);
     $b = AcademicYear::factory()->create();
