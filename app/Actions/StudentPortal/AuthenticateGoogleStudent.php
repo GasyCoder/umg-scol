@@ -6,6 +6,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Support\PortalEmailLock;
 use App\Support\StudentPortalAccess;
+use App\Support\StudentPortalIdentity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,9 @@ class AuthenticateGoogleStudent
 
         return DB::transaction(function () use ($email, $subject, $current) {
             PortalEmailLock::acquire(['email:'.$email, 'google:'.$subject]);
+            if (StudentPortalIdentity::find($email, true) === null) {
+                $this->fail();
+            }
             $social = SocialAccount::query()->where('provider', 'google')->where('provider_user_id', $subject)->lockForUpdate()->first();
             if ($social !== null) {
                 $user = User::query()->lockForUpdate()->findOrFail($social->user_id);
