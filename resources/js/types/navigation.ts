@@ -11,8 +11,8 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
-    /** Pending work counter shown next to the entry. */
-    badge?: number;
+    /** False: reachable from the page search only (e.g. notifications, opened from the header bell). */
+    inSidebar?: boolean;
 };
 
 export type NavGroup = {
