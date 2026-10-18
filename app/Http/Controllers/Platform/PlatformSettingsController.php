@@ -2,10 +2,19 @@
 
 namespace App\Http\Controllers\Platform;
 
+use App\Actions\Platform\SaveDdbLabelTexts;
+use App\Actions\Platform\SaveDdbNumbering;
 use App\Actions\Platform\SavePlatformBranding;
+use App\Actions\Platform\SaveStudentMails;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\SaveDdbLabelTextsRequest;
+use App\Http\Requests\Platform\SaveDdbNumberingRequest;
 use App\Http\Requests\Platform\SavePlatformBrandingRequest;
+use App\Http\Requests\Platform\SaveStudentMailsRequest;
 use App\Support\Branding;
+use App\Support\Scholarships\DdbLabel;
+use App\Support\Scholarships\DdbNumber;
+use App\Support\StudentMails;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -25,7 +34,37 @@ class PlatformSettingsController extends Controller
             // Raw values (empty when the default applies) and the defaults shown as placeholders.
             'values' => collect(Branding::TEXT_KEYS)->mapWithKeys(fn ($key) => [$key => $stored[$key] ?? ''])->all(),
             'defaults' => ['institution_name' => 'Université de Mahajanga', 'scol_name' => config('app.name'), 'bourse_name' => config('app.name')],
+            // Numbering of the paper files received (DDB), generated at reception.
+            'ddb' => [...DdbNumber::settings(), 'defaultPattern' => DdbNumber::DEFAULT_PATTERN, 'defaultDigits' => DdbNumber::DEFAULT_DIGITS, 'tokens' => DdbNumber::TOKENS],
+            // Texts of the blank DDB labels (empty when the default applies) and the current QR code, for the preview.
+            'labels' => ['values' => DdbLabel::raw(), 'defaults' => DdbLabel::defaults(), 'qr' => DdbLabel::qr(DdbLabel::texts()['url'])],
+            // Emails sent to the official address of a student file.
+            'studentMails' => ['values' => StudentMails::settings(), 'labels' => StudentMails::KINDS],
         ]);
+    }
+
+    public function updateDdb(SaveDdbNumberingRequest $request, SaveDdbNumbering $action): RedirectResponse
+    {
+        $action->handle($request->user(), $request->validated('ddb_pattern'), $request->integer('ddb_digits'));
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Numérotation des dossiers DDB enregistrée.']);
+
+        return to_route('platform.edit');
+    }
+
+    public function updateLabels(SaveDdbLabelTextsRequest $request, SaveDdbLabelTexts $action): RedirectResponse
+    {
+        $action->handle($request->user(), $request->validated());
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Textes des étiquettes DDB enregistrés.']);
+
+        return to_route('platform.edit');
+    }
+
+    public function updateStudentMails(SaveStudentMailsRequest $request, SaveStudentMails $action): RedirectResponse
+    {
+        $action->handle($request->user(), $request->validated());
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Emails aux étudiants enregistrés.']);
+
+        return to_route('platform.edit');
     }
 
     public function update(SavePlatformBrandingRequest $request, SavePlatformBranding $action): RedirectResponse
