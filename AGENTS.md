@@ -35,6 +35,7 @@ Packages privilégiés : `spatie/laravel-permission`, `spatie/laravel-activitylo
 - Un établissement ne voit/modifie que ses propres étudiants.
 - L'étudiant peut vérifier ses informations et signaler une correction, mais ne modifie pas directement ses données officielles.
 - La Scolarité Centrale peut consulter tous les établissements et traiter les dossiers papier.
+- La Scolarité Centrale importe aussi la base PNES des boursiers et les résultats de préinscription (admis seulement), et saisit un étudiant absent de la liste de son établissement : situation `pending`, validée seulement après import de la liste de l'établissement. Un dossier de bourse ne se valide pas sur une situation non vérifiée. UIN et numéro de compte : Scolarité Centrale uniquement (voir `docs/WORKFLOWS.md`, ADR-075).
 - Statuts bourse minimum : `pending`, `in_review`, `validated`, `needs_correction`, `rejected`.
 - Le rôle `developer` peut être absent des listes opérationnelles mais jamais des audits.
 
