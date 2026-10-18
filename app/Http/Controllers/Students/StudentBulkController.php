@@ -17,6 +17,7 @@ class StudentBulkController extends Controller
         $done = match ($verb) {
             'activate' => 'réactivée(s)',
             'deactivate' => 'désactivée(s)',
+            'verify' => 'validée(s)',
             default => 'étudiant(s) déplacé(s) dans la corbeille',
         };
         $parts = [$verb === 'trash' ? $result['done'].' '.$done : $result['done'].' situation(s) '.$done];
