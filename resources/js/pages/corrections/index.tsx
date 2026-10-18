@@ -16,34 +16,43 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+/** One student and the requests of the list (ADR-090): several requests never take several rows. */
 type Row = {
-    id: number;
     uuid: string;
-    field_label: string;
-    status: string;
-    status_label: string;
-    created_at: string;
+    total: number;
+    first_at: string;
     student: {
         last_name: string;
         first_names: string | null;
         birth_date: string | null;
-    };
+    } | null;
     establishments: string[];
+    fields: { label: string; status: string }[];
+    statuses: Record<string, number>;
 };
+/** Fields shown as chips before « +N ». */
+const VISIBLE_FIELDS = 3;
 type Option = { value: string; label: string };
 
 export default function CorrectionsIndex({
-    corrections,
+    students,
+    requestCount,
     filters,
     options,
 }: {
-    corrections: {
+    students: {
         data: Row[];
         total: number;
         links: PageLink[];
     };
+    requestCount: number;
     filters: Record<string, string | undefined>;
     options: {
         statuses: Option[];
@@ -95,6 +104,9 @@ export default function CorrectionsIndex({
         ...options.statuses,
     ];
     const currentStatus = filters.status ?? 'pending';
+    const statusLabels = Object.fromEntries(
+        options.statuses.map((item) => [item.value, item.label]),
+    );
     const narrowed = Boolean(
         filters.search || filters.field || filters.establishment_id,
     );
@@ -109,7 +121,9 @@ export default function CorrectionsIndex({
                     description="Corrections d’informations proposées par les étudiants. La fiche officielle n’est modifiée qu’après approbation."
                     meta={
                         <span className="inline-flex items-center rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-foreground tabular-nums">
-                            {corrections.total} demande(s)
+                            {students.total} étudiant
+                            {students.total > 1 ? 's' : ''} · {requestCount}{' '}
+                            demande{requestCount > 1 ? 's' : ''}
                         </span>
                     }
                 />
@@ -211,7 +225,7 @@ export default function CorrectionsIndex({
                     </div>
                 </form>
 
-                {corrections.data.length === 0 ? (
+                {students.data.length === 0 ? (
                     <div className="surface">
                         {narrowed ? (
                             <EmptyState
@@ -250,14 +264,14 @@ export default function CorrectionsIndex({
                                 <thead>
                                     <tr>
                                         <th scope="col">Étudiant</th>
-                                        <th scope="col">Information</th>
+                                        <th scope="col">Informations</th>
                                         <th
                                             scope="col"
                                             className="hidden lg:table-cell"
                                         >
                                             Établissement
                                         </th>
-                                        <th scope="col">Demandée le</th>
+                                        <th scope="col">Depuis le</th>
                                         <th scope="col">Statut</th>
                                         <th scope="col">
                                             <span className="sr-only">
@@ -267,70 +281,151 @@ export default function CorrectionsIndex({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {corrections.data.map((item) => (
-                                        <tr key={item.id}>
-                                            <td className="max-w-64">
-                                                <Link
-                                                    href={`/corrections/${item.uuid}`}
-                                                    className="block truncate font-semibold text-foreground hover:text-primary"
-                                                >
-                                                    {item.student.last_name}{' '}
-                                                    {item.student.first_names}
-                                                </Link>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    {item.student.birth_date
-                                                        ? `Né(e) le ${new Date(item.student.birth_date).toLocaleDateString('fr-FR')}`
-                                                        : 'Date de naissance non renseignée'}
-                                                </span>
-                                                {item.establishments.length >
-                                                    0 && (
-                                                    <span className="block truncate text-xs text-muted-foreground lg:hidden">
-                                                        {item.establishments.join(
-                                                            ', ',
-                                                        )}
+                                    {students.data.map((item) => {
+                                        const href = `/corrections/students/${item.uuid}`;
+                                        const visible = item.fields.slice(
+                                            0,
+                                            VISIBLE_FIELDS,
+                                        );
+                                        const hidden =
+                                            item.fields.slice(VISIBLE_FIELDS);
+
+                                        return (
+                                            <tr key={item.uuid}>
+                                                <td className="max-w-64">
+                                                    <Link
+                                                        href={href}
+                                                        className="block truncate font-semibold text-foreground hover:text-primary"
+                                                    >
+                                                        {
+                                                            item.student
+                                                                ?.last_name
+                                                        }{' '}
+                                                        {
+                                                            item.student
+                                                                ?.first_names
+                                                        }
+                                                    </Link>
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        {item.student
+                                                            ?.birth_date
+                                                            ? `Né(e) le ${new Date(item.student.birth_date).toLocaleDateString('fr-FR')}`
+                                                            : 'Date de naissance non renseignée'}
                                                     </span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                                                    {item.field_label}
-                                                </span>
-                                            </td>
-                                            <td className="hidden max-w-56 truncate text-muted-foreground lg:table-cell">
-                                                {item.establishments.length > 0
-                                                    ? item.establishments.join(
-                                                          ', ',
-                                                      )
-                                                    : '—'}
-                                            </td>
-                                            <td className="whitespace-nowrap text-muted-foreground tabular-nums">
-                                                {new Date(
-                                                    item.created_at,
-                                                ).toLocaleDateString('fr-FR')}
-                                            </td>
-                                            <td>
-                                                <CorrectionStatusBadge
-                                                    status={item.status}
-                                                    label={item.status_label}
-                                                />
-                                            </td>
-                                            <td>
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <IconAction
-                                                        icon={Eye}
-                                                        label="Examiner la demande"
-                                                        href={`/corrections/${item.uuid}`}
-                                                    />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                    {item.establishments
+                                                        .length > 0 && (
+                                                        <span className="block truncate text-xs text-muted-foreground lg:hidden">
+                                                            {item.establishments.join(
+                                                                ', ',
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="flex max-w-md flex-wrap items-center gap-1.5">
+                                                        {visible.map(
+                                                            (field, index) => (
+                                                                <span
+                                                                    key={`${field.label}-${index}`}
+                                                                    className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                                                                >
+                                                                    {
+                                                                        field.label
+                                                                    }
+                                                                </span>
+                                                            ),
+                                                        )}
+                                                        {hidden.length > 0 && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
+                                                                    <Link
+                                                                        href={
+                                                                            href
+                                                                        }
+                                                                        className="inline-flex items-center rounded-md border border-dashed px-2 py-0.5 text-xs font-semibold text-primary hover:bg-accent"
+                                                                        aria-label={`${hidden.length} autre${hidden.length > 1 ? 's' : ''} : ${hidden.map((field) => field.label).join(', ')}`}
+                                                                    >
+                                                                        +
+                                                                        {
+                                                                            hidden.length
+                                                                        }
+                                                                    </Link>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    {hidden
+                                                                        .map(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.label,
+                                                                        )
+                                                                        .join(
+                                                                            ', ',
+                                                                        )}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="hidden max-w-56 truncate text-muted-foreground lg:table-cell">
+                                                    {item.establishments
+                                                        .length > 0
+                                                        ? item.establishments.join(
+                                                              ', ',
+                                                          )
+                                                        : '—'}
+                                                </td>
+                                                <td className="whitespace-nowrap text-muted-foreground tabular-nums">
+                                                    {new Date(
+                                                        item.first_at,
+                                                    ).toLocaleDateString(
+                                                        'fr-FR',
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {Object.entries(
+                                                            item.statuses,
+                                                        ).map(
+                                                            ([
+                                                                status,
+                                                                count,
+                                                            ]) => (
+                                                                <CorrectionStatusBadge
+                                                                    key={status}
+                                                                    status={
+                                                                        status
+                                                                    }
+                                                                    label={`${count} ${(statusLabels[status] ?? status).toLowerCase()}`}
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <IconAction
+                                                            icon={Eye}
+                                                            label={
+                                                                item.total > 1
+                                                                    ? `Examiner les ${item.total} demandes`
+                                                                    : 'Examiner la demande'
+                                                            }
+                                                            href={href}
+                                                        />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 )}
-                <Pagination links={corrections.links} />
+                <Pagination links={students.links} />
             </PageBody>
         </>
     );
