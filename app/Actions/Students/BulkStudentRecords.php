@@ -34,6 +34,17 @@ class BulkStudentRecords
 
             return $result;
         }
+        if ($action === 'verify') {
+            foreach ($records as $record) {
+                try {
+                    app(VerifyStudentRecord::class)->handle($actor, $record) ? $result['done']++ : $result['unchanged']++;
+                } catch (ValidationException|AuthorizationException|HttpException) {
+                    $result['refused']++;
+                }
+            }
+
+            return $result;
+        }
         $target = $action === 'activate' ? StudentRecordStatus::Active : StudentRecordStatus::Inactive;
         foreach ($records as $record) {
             if ($record->status === $target) {
