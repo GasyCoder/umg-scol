@@ -17,15 +17,22 @@ final class ReportScope
         public readonly ?int $establishmentId,
         public readonly ?AcademicYear $year,
         public readonly ?AcademicYear $currentYear,
+        /** Reports of this account's own activity only (reports.view_own); null for the whole perimeter. */
+        public readonly ?int $actorId = null,
     ) {}
 
     /** $yearId is honoured only when it names an existing year; otherwise the current year applies. */
-    public static function for(User $user, ?int $yearId = null): self
+    public static function for(User $user, ?int $yearId = null, bool $own = false): self
     {
         $current = AcademicYear::query()->where('is_current', true)->where('is_active', true)->first(['id', 'name', 'is_current', 'is_active']);
         $year = $yearId !== null && $yearId !== $current?->id ? AcademicYear::query()->find($yearId, ['id', 'name', 'is_current', 'is_active']) : $current;
 
-        return new self($user, $user->hasRole('establishment') ? (int) $user->establishment_id : null, $year, $current);
+        return new self($user, $user->hasRole('establishment') ? (int) $user->establishment_id : null, $year, $current, $own ? $user->id : null);
+    }
+
+    public function isOwn(): bool
+    {
+        return $this->actorId !== null;
     }
 
     public function isGlobal(): bool
