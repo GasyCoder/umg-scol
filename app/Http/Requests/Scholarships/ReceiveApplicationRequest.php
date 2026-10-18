@@ -16,12 +16,12 @@ class ReceiveApplicationRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['campaign_id' => ['required', 'integer'], 'student_id' => ['required', 'integer'], 'ddb_number' => ['nullable', 'string', 'max:100'], 'internal_notes' => ['nullable', 'string', 'max:2000']];
+        return ['student_id' => ['required', 'integer'], 'ddb_number' => ['nullable', 'string', 'max:100'], 'internal_notes' => ['nullable', 'string', 'max:2000']];
     }
 
     /** @return array<string,string> */
     public function messages(): array
     {
-        return ['required' => 'Sélectionnez la campagne et l’étudiant.', 'integer' => 'Sélection invalide.', 'ddb_number.max' => 'Le numéro DDB dépasse 100 caractères.', 'internal_notes.max' => 'Les observations dépassent 2000 caractères.'];
+        return ['required' => 'Sélectionnez l’étudiant.', 'integer' => 'Sélection invalide.', 'ddb_number.max' => 'Le numéro DDB dépasse 100 caractères.', 'internal_notes.max' => 'Les observations dépassent 2000 caractères.'];
     }
 }
