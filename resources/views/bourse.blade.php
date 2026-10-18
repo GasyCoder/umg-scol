@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="fr" @class(['bg-background', 'dark' => ($appearance ?? 'system') == 'dark'])>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -21,17 +21,6 @@
             }
         })();
     </script>
-
-    {{-- HTML background follows the theme tokens of app.css (--background). --}}
-    <style>
-        html {
-            background-color: #f4f6fb;
-        }
-
-        html.dark {
-            background-color: #0a0f1c;
-        }
-    </style>
 
     @if ($branding['favicon_url'])
         <link rel="icon" href="{{ $branding['favicon_url'] }}" type="image/png">
