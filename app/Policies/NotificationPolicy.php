@@ -10,7 +10,7 @@ class NotificationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return StudentPortalAccess::internal($user) && $user->hasUsableEstablishment();
+        return StudentPortalAccess::internal($user) && $user->hasUsableEstablishment() && $user->can('notifications.view');
     }
 
     public function update(User $user, DatabaseNotification $notification): bool
