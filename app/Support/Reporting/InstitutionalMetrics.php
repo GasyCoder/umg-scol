@@ -3,12 +3,10 @@
 namespace App\Support\Reporting;
 
 use App\Enums\ScholarshipApplicationStatus;
-use App\Enums\ScholarshipCampaignStatus;
 use App\Enums\StudentCorrectionStatus;
 use App\Enums\StudentImportStatus;
 use App\Models\Establishment;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipCampaign;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
 use App\Models\StudentInformationConfirmation;
@@ -169,12 +167,11 @@ final class InstitutionalMetrics
     /** @return Builder<ScholarshipApplication> */
     private function applications(): Builder
     {
-        return ScholarshipApplication::query()->join('scholarship_campaigns', 'scholarship_campaigns.id', '=', 'scholarship_applications.scholarship_campaign_id')->whereNull('scholarship_campaigns.deleted_at')
-            ->where('scholarship_campaigns.academic_year_id', $this->scope->year?->id);
+        return ScholarshipApplication::query()->where('scholarship_applications.academic_year_id', $this->scope->year?->id);
     }
 
     /**
-     * Paper files of the selected year's campaigns, by status, plus files received today.
+     * Paper files of the selected academic year, by status, plus files received today.
      *
      * @return array{total:int,today:int,by_status:array<string,int>}
      */
@@ -196,15 +193,27 @@ final class InstitutionalMetrics
             ->selectRaw('establishments.id as id, establishments.name as label, count(*) as value'));
     }
 
-    /** @return array{year:array<int,array{id:int,name:string,status:string}>,open:array<int,array{id:int,name:string}>} */
-    public function campaigns(): array
+    /**
+     * Receipts over the last 30 calendar days, for the selected academic year only.
+     * Missing days are explicit zeroes; one grouped query, no student identities.
+     *
+     * @return list<array{date:string,value:int}>
+     */
+    public function scholarshipsDaily(): array
     {
-        $year = ScholarshipCampaign::query()->where('academic_year_id', $this->scope->year?->id)->orderBy('name')->get(['id', 'name', 'status']);
+        if ($this->scope->year === null) {
+            return [];
+        }
+        $start = now()->startOfDay()->subDays(29);
+        $counts = $this->applications()->whereBetween('received_at', [$start, now()->endOfDay()])
+            ->selectRaw('DATE(received_at) as day, COUNT(*) as aggregate')
+            ->groupByRaw('DATE(received_at)')->pluck('aggregate', 'day');
 
-        return [
-            'year' => $year->map(fn (ScholarshipCampaign $c) => ['id' => $c->id, 'name' => $c->name, 'status' => $c->status->value])->values()->all(),
-            'open' => ScholarshipCampaign::query()->where('status', ScholarshipCampaignStatus::Open->value)->orderBy('name')->get(['id', 'name'])->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()->all(),
-        ];
+        return array_map(function (int $offset) use ($start, $counts): array {
+            $date = $start->copy()->addDays($offset)->format('Y-m-d');
+
+            return ['date' => $date, 'value' => (int) ($counts[$date] ?? 0)];
+        }, range(0, 29));
     }
 
     public function activeEstablishments(): int
