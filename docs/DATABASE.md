@@ -15,17 +15,18 @@
 - `scholarship_applications`
 - `student_correction_requests`
 - `student_information_confirmations`
+- `student_information_requests`
 - `imports`
 - `import_rows`
 - `activity_log`
 
 ## students
 
-Identité permanente, alignée sur le fichier modèle des établissements : `last_name`, `first_names`, `sex`, `birth_date`, `mother_name`, `cin`, `cin_issued_at`, `cin_issued_place`, `nationality`, `phone`, `email`, `address`, `bac_series`, `bac_year`, `is_active`. Pas de matricule, de numéro BAC, de lieu de naissance ni de mention BAC (absents du modèle, supprimés par la migration `2026_10_17_100000_align_students_with_establishment_template`).
+Identité permanente, alignée sur le fichier modèle des établissements : `last_name`, `first_names`, `sex`, `birth_date`, `mother_name`, `cin`, `cin_issued_at`, `cin_issued_place`, `uin`, `scholarship_code`, `bank_account`, `nationality`, `phone`, `email`, `address`, `bac_series`, `bac_year`, `is_active` (UIN, code bourse et numéro de compte : base PNES des boursiers, voir « Boursiers et origine des situations »). Pas de matricule, de numéro BAC, de lieu de naissance ni de mention BAC (absents du modèle, supprimés par la migration `2026_10_17_100000_align_students_with_establishment_template`).
 
 ## student_records
 
-Déclaration annuelle d'un étudiant déjà inscrit : `student_id`, `academic_year_id`, `establishment_id`, `level_id`, `program_id`, `repeat_code` (N, R, T+), `scholarship_requested_at`, `scholarship_request_reference`, `status`, `declared_by`, `declared_at`.
+Déclaration annuelle d'un étudiant déjà inscrit : `student_id`, `academic_year_id`, `establishment_id`, `level_id`, `program_id`, `repeat_code` (N, R, T+), `scholarship_requested_at`, `scholarship_request_reference`, `status`, `source`, `verification`, `is_scholarship_holder`, `preinscription_reference`, `matched_import_id`, `declared_by`, `declared_at`.
 
 Indexes conseillés : `(academic_year_id, establishment_id)`, `(student_id, academic_year_id)`, `(establishment_id, level_id)`.
 
@@ -119,11 +120,11 @@ Les contraintes critiques ont été vérifiées sur MySQL : FK, unicités annuel
 
 Laravel Excel **4.0.4** et PhpSpreadsheet **5.10.0**, compatibles Laravel 13/PHP 8.4. Aucun changement des autres versions verrouillées.
 
-- `student_imports` : FK restrictives établissement/année/auteur ; nom original, chemin UUID privé, disque ; `StudentImportStatus` ; headers/mapping JSON ; `excel_calendar` (1900/1904) ; compteurs ; dates uploaded/analyzed/committed/failed et marqueur `purged_at`. Index `(establishment_id, created_at)` et `(status, created_at)`.
-- `student_import_rows` : FK import avec cascade réservée à la gestion technique, numéro physique de ligne, raw/normalized JSON, `StudentImportRowStatus`, erreurs/avertissements structurés `{field, code, message}`, FK restrictives vers identité/déclaration reconnues, résolution `imported`/`skipped`. Unicité `(student_import_id, row_number)` et index `(student_import_id, status, id)`. Aucune route DELETE.
-- `student_identity_locks` : clé SHA-256 primaire, sans valeur personnelle brute. Verrous transactionnels persistants sur CIN standard, téléphone, email et identité exacte avec naissance ; clés triées pour limiter les deadlocks. Ne pas purger ces clés pendant l'exploitation : une suppression concurrente détruirait la coordination. Les clés sont des pseudonymes techniques à protéger dans les sauvegardes.
+- `student_imports` : FK restrictives établissement/année/auteur ; nom original, chemin UUID privé, disque ; `StudentImportStatus` ; headers/mapping JSON ; `excel_calendar` (1900/1904) ; compteurs (dont `matched_rows`) ; `kind` (`ImportKind` : `establishment`, `pnes`, `preinscription`) ; dates uploaded/analyzed/committed/failed et marqueur `purged_at`. Index `(establishment_id, created_at)` et `(status, created_at)`.
+- `student_import_rows` : FK import avec cascade réservée à la gestion technique, numéro physique de ligne, raw/normalized JSON, `StudentImportRowStatus`, erreurs/avertissements structurés `{field, code, message}`, FK restrictives vers identité/déclaration reconnues, résolution `imported`/`matched`/`skipped`. Unicité `(student_import_id, row_number)` et index `(student_import_id, status, id)`. Aucune route DELETE.
+- `student_identity_locks` : clé SHA-256 primaire, sans valeur personnelle brute. Verrous transactionnels persistants sur CIN standard, téléphone, email, UIN, code bourse et identité exacte avec naissance ; clés triées pour limiter les deadlocks. Ne pas purger ces clés pendant l'exploitation : une suppression concurrente détruirait la coordination. Les clés sont des pseudonymes techniques à protéger dans les sauvegardes.
 
-`created_rows` compte les nouvelles identités ; `updated_rows` les identités dont des champs vides ont été complétés ; `declared_rows` les nouvelles déclarations, y compris pour une identité réutilisée sans changement ; `skipped_rows = total_rows - declared_rows`. Les compteurs valid/warning/rejected/duplicate sont recalculés après confirmation si la base a changé.
+`created_rows` compte les nouvelles identités ; `updated_rows` les identités dont des champs vides ont été complétés ; `declared_rows` les nouvelles déclarations, y compris pour une identité réutilisée sans changement ; `matched_rows` les situations existantes confirmées par le fichier (trouvées dans la liste de l'établissement ou marquées boursières par la base PNES) ; `skipped_rows = total_rows - declared_rows - matched_rows`. Les compteurs valid/warning/rejected/duplicate sont recalculés après confirmation si la base a changé.
 
 Analyse : collecte groupée des candidats pour chaque bloc, union des correspondances CIN standard et nom/prénoms/naissance. Plusieurs candidats impliquent une revue, jamais une fusion. Téléphone et email ne rapprochent pas deux fiches : portés par une autre identité, ils rejettent la ligne (unicité). Une référence de demande de bourse déjà attribuée à un autre étudiant dans l'établissement et l'année rejette aussi la ligne. Dans le fichier, une même identité répétée est un doublon ; une autre identité réutilisant CIN standard, téléphone, email ou référence est rejetée. Une seule identité visible chez l'établissement, sans historique étranger, est réutilisable ; sinon message générique sans ID ou valeurs officielles étrangers. Les valeurs non vides différentes déclenchent un warning sur **tous** les champs, contacts compris. Des valeurs DB vides peuvent être complétées, après validation et contrôle de cohérence des dates combinées.
 
@@ -159,6 +160,14 @@ Migration `2026_10_14_190000_create_student_correction_requests`, table `student
 
 Aucune suppression en cascade ; le rollback supprime uniquement cette table. Vérifications MySQL dédiées (contrainte unique, FK, attente de verrou entre deux connexions, rollback) : `php tests/MySql/StudentCorrectionChecks.php`, **uniquement sur une base jetable dont le nom contient `check`** (le script écrit des données réelles).
 
+## Cloche du portail étudiant (ADR-089)
+
+Migration `2026_10_20_100000_add_portal_notifications_seen_at_to_users` : `users.portal_notifications_seen_at` (timestamp nullable), moment où l'étudiant a ouvert sa cloche pour la dernière fois. Le fil lui-même est dérivé de `student_correction_requests` (décisions, modifications directes = `approved` sans `reviewed_by`) et de `student_information_requests` ; aucune table de notifications pour les étudiants.
+
+## Emails « informations à compléter » (ADR-088)
+
+Migration `2026_10_20_090000_create_student_information_requests`, table `student_information_requests` : un envoi par ligne. `student_id` (cascade à la purge de la fiche), `sent_by` (agent, nul si le compte est supprimé), `scholarship_application_id` (dossier d’où part l’envoi, nul sinon), `fields` (JSON des noms de champs `StudentCorrectionField`, jamais de valeurs), `message` (texte facultatif de l’agent), `created_at`. Index `(student_id, created_at)` pour le dernier envoi. La même migration crée la permission `students.notify` et l’accorde à superadmin et developer.
+
 ## Confirmations étudiantes implémentées
 
 Migration `2026_10_14_210000_create_student_information_confirmations`, table `student_information_confirmations` : historique des déclarations « mes informations affichées sont correctes ».
@@ -180,17 +189,17 @@ Rotation d'`APP_KEY` : toutes les empreintes deviennent non comparables, donc to
 
 Migration `2026_10_14_200000_create_scholarship_tables`. Toutes les FK sont restrictives, sans cascade ; le rollback supprime uniquement ces quatre tables.
 
-- `scholarship_campaigns` : `academic_year_id`, `name` (unique par année), `starts_at`/`ends_at` indicatives, `status` (indexé), `notes`, `created_by`, `last_application_sequence` (compteur de numérotation, incrémenté sous verrou de la ligne campagne).
-- `scholarship_applications` : le dossier papier reçu. `application_number` unique ; `scholarship_campaign_id`, `sequence` (unique par campagne) ; `student_id` et `student_record_id` (déclaration annuelle retenue à la réception) ; `ddb_number` et `ddb_key` ; `status` ; `received_by`/`received_at` ; `review_started_by`/`review_started_at` (**dernier début de vérification**) ; `decided_by`/`decided_at` (**décision définitive uniquement** : validation ou rejet) ; `decision_reason` (motif de la demande de correction en cours ou du rejet) ; `internal_notes`. Aucune donnée personnelle du formulaire papier n'est recopiée : la comparaison se fait avec `students`/`student_records`.
-    - Unique `(campaign, student)` : un dossier par étudiant et campagne.
-    - Unique `(campaign, ddb_key)` : un numéro DDB fourni est unique dans sa campagne ; plusieurs dossiers sans DDB restent possibles (NULL).
-    - Index `(campaign, status, received_at)`, `(status, received_at)`, `received_at`, `ddb_key`, plus les index des FK `student_id` et `student_record_id`.
+- Migration `2026_10_19_120000_replace_scholarship_campaigns_with_academic_years` : suppression de `scholarship_campaigns`, transfert des dossiers vers `academic_year_id` et de `last_application_sequence` vers `academic_years`. Les compteurs historiques et les références DDB/techniques sont conservés, même après purge. Plusieurs campagnes d’une année occupent des plages de séquences distinctes. Les conflits sont vérifiés avant toute DDL ; arrêter les écritures et sauvegarder avant migration. Le rollback recrée une campagne nationale par année et refuse les doublons étudiant/année, corbeille comprise ; il ne reconstitue pas les anciens libellés ou permissions.
+- `scholarship_applications` : dossier papier reçu, `application_number` unique, `academic_year_id`, `sequence`, `student_id`, `student_record_id`, `ddb_number`, `ddb_key`, statut, réception et décision avec acteurs/dates, notes internes. Les données personnelles restent dans `students`/`student_records`.
+    - Unique `(academic_year_id, student_id, live_marker)` : un seul dossier hors corbeille par étudiant et année ; `live_marker` calculé vaut 1 hors corbeille, NULL sinon.
+    - Unique `(academic_year_id, sequence)` et `(academic_year_id, ddb_key)` : numérotation et DDB réservés y compris en corbeille ; plusieurs anciennes valeurs DDB NULL restent possibles.
+    - Index `(academic_year_id, status, received_at)`, `(status, received_at)`, `received_at`, `ddb_key`, et FK restrictives.
 - `scholarship_application_checks` : un contrôle par `(application, key)` unique ; `status` (`pending`, `ok`, `issue`, `not_applicable`), `note`, `checked_by`/`checked_at`. Les clés sont copiées depuis `config/scholarships.php` à la réception : modifier la liste ne change pas les dossiers déjà reçus.
 - `scholarship_application_status_histories` : historique métier `from_status` (NULL à la réception) → `to_status`, `actor_id`, `reason`, `created_at`. ActivityLog reste l'audit technique.
 
-**Numéro de dossier** : format technique `BRS{id campagne}-{séquence sur 6 chiffres}`, par exemple `BRS3-000042` (préfixe configurable). Ce n'est pas un format officiel. Il est attribué par le serveur, stable et unique (contrainte SQL). La séquence n'est consommée que si la réception est validée dans la même transaction.
+**Numéro de dossier technique** (`application_number`) : format `BRS-{année universitaire}-{séquence sur 6 chiffres}`, par exemple `BRS-2026-2027-000042` (préfixe configurable). Attribué par le serveur, stable et unique sur toute la plateforme (contrainte SQL), il sert de clé interne et **n'est jamais affiché** : le seul numéro visible d'un dossier est son **N° DDB** (`ScholarshipApplication::reference()`, ADR-081), le numéro technique ne le remplace que pour un ancien dossier sans DDB. La séquence n'est consommée que si la réception est validée dans la même transaction.
 
-**Numéro DDB** : sa structure réglementaire n'est pas connue. Il est conservé tel que saisi, en chaîne, après suppression des espaces de début et de fin et regroupement des espaces internes. La clé de doublon `ddb_key` retire les espaces et passe en majuscules, sans toucher aux autres caractères. Il n'y a pas d'unicité globale, seulement par campagne.
+**Numéro DDB** : généré à la réception à partir du modèle de la plateforme (`platform_settings.ddb_pattern`, défaut `DDB-{ANNEE}-{NUM}`, et `ddb_digits`, défaut 6 ; balises `{NUM}` obligatoire = séquence de réception de l’année universitaire, `{ANNEE}`, `{AU}`, `{ETAB}`), réglé par le superadmin dans Paramètres › Plateforme (`branding.manage`, audit `ddb_numbering_updated`). Un numéro fourni explicitement à l'Action reste accepté. Il est conservé en chaîne, après suppression des espaces de début et de fin et regroupement des espaces internes. La clé de doublon `ddb_key` retire les espaces et passe en majuscules, sans toucher aux autres caractères. Il n'y a pas d'unicité globale, seulement par année universitaire.
 
 Vérifications MySQL : `php tests/MySql/ScholarshipChecks.php`, **uniquement sur une base jetable dont le nom contient `check`**.
 
@@ -212,7 +221,7 @@ Migration `2026_10_15_120000_add_uuid_to_routed_tables` : même colonne `uuid` (
 
 Migrations `2026_10_15_130000_add_trash_columns` et `130100_make_trash_restoration_constraints_safe` : `deleted_at` (indexé), `deleted_by` (FK nullable vers users, nullOnDelete), `trash_batch` (UUID indexé) sur établissements, années, niveaux, mentions, parcours, campagnes, imports, étudiants, déclarations et dossiers. `Trashable` applique le scope SoftDeletes et refuse delete/forceDelete/restore hors `TrashManager`. Les UUID publics et les ID/FK existants restent inchangés.
 
-La suppression d'un étudiant déplace ses déclarations visibles dans le même lot. La restauration ne restaure que les déclarations supprimées avec lui, jamais celles déjà en corbeille auparavant. Un référentiel ou une campagne utilisé, même par un enfant en corbeille, n'est pas supprimable ; désactiver/archiver reste l'action standard. Un étudiant/une déclaration portant un dossier visible doit d'abord faire traiter ce dossier. Imports analyzing/committing protégés.
+La suppression d'un étudiant déplace ses déclarations visibles dans le même lot. La restauration ne restaure que les déclarations supprimées avec lui, jamais celles déjà en corbeille auparavant. Un référentiel utilisé, même par un enfant en corbeille, n’est pas supprimable ; la désactivation reste l’action standard. Un étudiant/une déclaration portant un dossier visible doit d'abord faire traiter ce dossier. Imports analyzing/committing protégés.
 
 Les slots d'unicité des lignes visibles sont désormais conditionnés par `deleted_at IS NULL` : `academic_years.current_marker`, `student_records.active_academic_year_id` et nouveau `student_records.live_marker` dans l'unicité étudiant/année/établissement. Un index indépendant sur `student_records.student_id` assure le support de sa FK lorsque les index composites sont reconstruits (MySQL 1553 sinon). Les codes/noms uniques des référentiels restent réservés en corbeille. Restauration : contrôle des identifiants étudiants, année courante, déclaration annuelle et parents disponibles, puis contraintes SQL comme dernier rempart ; refus transactionnel en cas de conflit.
 
@@ -226,7 +235,7 @@ Migration `2026_10_16_100000_add_internal_user_management` : `users.uuid` (UUID 
 
 Migration `2026_10_16_110000_add_logo_to_establishments` : `establishments.logo_path` nullable, chemin sur le disque privé `local` (`establishment-logos/{uuid7}.{ext}`).
 
-Migration `2026_10_16_120000_create_platform_settings` : table clé/valeur `platform_settings` (`key` clé primaire, `value` texte nullable, timestamps) pour l'identité de la plateforme : `institution_name`, `scol_name`, `bourse_name`, `support_email`, `logo_path`, `favicon_path` (fichiers sur le disque privé `local`, dossier `branding/`).
+Migration `2026_10_16_120000_create_platform_settings` : table clé/valeur `platform_settings` (`key` clé primaire, `value` texte nullable, timestamps) pour l'identité de la plateforme : `institution_name`, `scol_name`, `bourse_name`, `support_email`, `logo_path`, `favicon_path` (fichiers sur le disque privé `local`, dossier `branding/`). Textes des étiquettes DDB vierges : `ddb_label_heading`, `ddb_label_caption`, `ddb_label_hint`, `ddb_label_footer`, `ddb_label_url` (NULL = texte par défaut, ADR-077).
 
 ## Alignement sur le fichier modèle des établissements
 
@@ -254,3 +263,23 @@ Suppression des colonnes `student_number`, `birth_place`, `bac_registration_numb
 ## Notifications du personnel
 
 Migration `2026_10_17_170000_create_notifications_table` : table Laravel `notifications` (UUID primaire, type, destinataire polymorphe, données JSON encodées en texte, `read_at`, timestamps), index destinataire + état de lecture ; `users.notification_preferences` JSON nullable (`off` = types désactivés, aucun par défaut). Données stockées : type, titre, message bref avec le nom, UUID étudiant et UUID du sujet. Aucune valeur corrigée, CIN, contact, empreinte ou note étudiante. La lecture expose uniquement les champs de présentation, après contrôle des droits et du périmètre courant. Notifications et action métier appartiennent à la même transaction.
+
+## Boursiers et origine des situations
+
+Migration `2026_10_18_100000_add_scholarship_registry_and_situation_origin` (ADR-075) :
+
+- `students.uin` (30, indexé), `students.scholarship_code` (code bourse, 30, indexé), `students.bank_account` (texte, cast `encrypted` : jamais stocké en clair). Unicité applicative de l'UIN et du code bourse, comme CIN/téléphone/email (verrous `student_identity_locks`), sans UNIQUE SQL. Normalisation : espaces et points retirés. UIN et numéro de compte sont masqués à la sérialisation (`#[Hidden]`) ; le code bourse ne l'est pas.
+- `student_records.source` (`SituationSource` : `establishment`, `pnes`, `central`, `preinscription` ; défaut `establishment`), `verification` (`SituationVerification` : `verified`, `pending`, `matched` ; défaut `verified`, indexé), `is_scholarship_holder` (booléen indexé), `preinscription_reference` (50, numéro de dossier de préinscription), `matched_import_id` (FK nullable vers `student_imports`, `nullOnDelete` : liste qui a confirmé la situation). Les déclarations existantes restent `establishment`/`verified`/non boursières.
+- `student_imports.kind` (défaut `establishment`, indexé) et `matched_rows` (défaut 0).
+
+L'audit `student_records` trace aussi `source`, `verification` et `is_scholarship_holder`. Le `down()` supprime ces colonnes (valeurs PNES perdues).
+
+### Migration `2026_10_18_130000_set_pending_status_of_central_entries`
+
+`student_records.status` accepte `pending` (ENUM MySQL élargi) : situations saisies par la Scolarité, actives à leur validation. Les saisies centrales non validées existantes passent `pending`. La colonne virtuelle `active_academic_year_id` (une situation active par étudiant et par année) ne compte que `active` ; l'unicité active/en attente pour une même année est vérifiée par `SaveStudentRecord`.
+
+## Vérification automatique des situations retrouvées (ADR-076)
+
+À la confirmation d’une liste d’établissement, une situation existante reconnue passe directement à `verified` ; seul le statut `pending` devient `active`. L’origine `central` et le caractère non boursier restent conservés. L’événement `verified_by_import` relie la situation à l’import, dans la même transaction. Aucun dossier de bourse n’est validé par cette opération.
+
+La migration `2026_10_18_140000` régularise les anciens `central`/`matched` seulement avec une identité active sans autre situation active pour la même année, un import d’établissement terminé et daté, et une ligne valide de résolution `matched` correspondant à la même identité, situation, année et établissement. Chaque correction est auditée comme action système ; une désactivation est conservée. La migration ne dévalide aucune situation au rollback.
