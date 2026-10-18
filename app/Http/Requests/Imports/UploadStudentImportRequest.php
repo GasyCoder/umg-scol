@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Imports;
 
+use App\Enums\ImportKind;
 use App\Models\StudentImport;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,8 @@ class UploadStudentImportRequest extends FormRequest
 
     public function authorize(): bool
     {
-        if (! Gate::allows('create', StudentImport::class)) {
+        $kind = ImportKind::tryFrom((string) $this->input('kind', ImportKind::Establishment->value));
+        if ($kind === null || ! Gate::allows('handleKind', [StudentImport::class, $kind])) {
             return false;
         }
         if (! $this->user()->hasRole('establishment')) {
@@ -32,8 +34,8 @@ class UploadStudentImportRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['file' => ['required', 'file', 'extensions:xlsx,csv', 'mimes:xlsx,csv,txt', 'max:'.config('student_imports.max_kilobytes')], // Empty for a global actor: the file covers several establishments, named on each row.
-            'establishment_id' => [$this->user()->hasRole('establishment') ? 'required' : 'nullable', 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')->where('is_active', true)], 'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')->whereNull('deleted_at')->where('is_active', true)]];
+        return ['kind' => ['nullable', Rule::enum(ImportKind::class)], 'file' => ['required', 'file', 'extensions:xlsx,csv', 'mimes:xlsx,csv,txt', 'max:'.config('student_imports.max_kilobytes')], // Empty for a global actor: the file covers several establishments, named on each row.
+            'establishment_id' => [$this->user()->hasRole('establishment') ? 'required' : 'nullable', Rule::prohibitedIf(fn () => ($this->input('kind') ?? 'establishment') !== 'establishment'), 'integer', Rule::exists('establishments', 'id')->whereNull('deleted_at')->where('is_active', true)], 'academic_year_id' => ['required', 'integer', Rule::exists('academic_years', 'id')->whereNull('deleted_at')->where('is_active', true)]];
     }
 
     public function messages(): array
