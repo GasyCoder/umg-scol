@@ -35,7 +35,7 @@ final class NotificationInbox
             if ($confirmations) {
                 $students = Student::query()->visibleTo($user)
                     ->when($user->hasRole('establishment'), fn ($student) => $student->currentlyDeclaredBy($user->establishment_id));
-                $visible->orWhere(fn (Builder $kind) => $kind->where('data->kind', StudentActivity::INFORMATION_CONFIRMED)
+                $visible->orWhere(fn (Builder $kind) => $kind->whereIn('data->kind', [StudentActivity::INFORMATION_CONFIRMED, StudentActivity::INFORMATION_UPDATED])
                     ->whereIn('data->student_uuid', $students->select('uuid')));
             }
         });
