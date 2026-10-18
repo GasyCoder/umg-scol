@@ -2,11 +2,15 @@
 
 namespace App\Support;
 
+use App\Enums\ImportKind;
+use App\Models\StudentImportRow;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
- * Columns of the official establishment file (modèle établissement), in the template order.
+ * Columns of the imported files: the official establishment file (modèle établissement, in the
+ * template order), plus the PNES scholarship base (code bourse, UIN, bank account) and the
+ * pre-registration results (file number, result) for their own kinds.
  * BOURSIER and TAUX DE BOURSE are spreadsheet formulas: never imported, the server applies the rule itself.
  */
 class StudentImportColumns
@@ -14,13 +18,25 @@ class StudentImportColumns
     public const DATE_FIELDS = ['birth_date', 'cin_issued_at', 'scholarship_requested_at'];
 
     /** Identity fields written to Student. */
-    public const IDENTITY_FIELDS = ['last_name', 'first_names', 'sex', 'birth_date', 'mother_name', 'cin', 'cin_issued_at', 'cin_issued_place', 'nationality', 'bac_year', 'bac_series', 'address', 'phone', 'email'];
+    public const IDENTITY_FIELDS = ['last_name', 'first_names', 'sex', 'birth_date', 'mother_name', 'cin', 'cin_issued_at', 'cin_issued_place', 'uin', 'scholarship_code', 'bank_account', 'nationality', 'bac_year', 'bac_series', 'address', 'phone', 'email'];
 
     /** Annual declaration fields written to StudentRecord. */
     public const RECORD_FIELDS = ['repeat_code', 'scholarship_requested_at', 'scholarship_request_reference'];
 
     /** @return array<string,string> */
-    public static function labels(): array
+    public static function labels(?ImportKind $kind = null): array
+    {
+        $extra = match ($kind) {
+            ImportKind::Pnes => ['scholarship_code' => 'Code bourse', 'uin' => 'UIN', 'bank_account' => 'Numéro de compte'],
+            ImportKind::Preinscription => ['preinscription_reference' => 'Numéro de dossier', 'result' => 'Résultat'],
+            default => [],
+        };
+
+        return [...$extra, ...self::establishmentLabels()];
+    }
+
+    /** @return array<string,string> */
+    private static function establishmentLabels(): array
     {
         return [
             'last_name' => 'Nom', 'first_names' => 'Prénoms', 'sex' => 'Sexe', 'birth_date' => 'Date de naissance',
@@ -40,10 +56,15 @@ class StudentImportColumns
      *
      * @return list<string>
      */
-    public static function required(): array
+    public static function required(?ImportKind $kind = null): array
     {
         // Sex and nationality are checked when the file has them; some establishment files do not.
-        return ['last_name', 'birth_date', 'repeat_code', 'level'];
+        return match ($kind) {
+            ImportKind::Pnes => ['scholarship_code', 'last_name', 'birth_date', 'repeat_code', 'level'],
+            // New bacheliers: first year, new students when the file says nothing.
+            ImportKind::Preinscription => ['last_name', 'birth_date'],
+            default => ['last_name', 'birth_date', 'repeat_code', 'level'],
+        };
     }
 
     public static function fold(string $value): string
@@ -55,7 +76,7 @@ class StudentImportColumns
      * @param  array<int,string>  $headers
      * @return array<string,int>
      */
-    public static function suggest(array $headers): array
+    public static function suggest(array $headers, ?ImportKind $kind = null): array
     {
         // Headers of the official template, including its spelling variants.
         $aliases = [
@@ -63,7 +84,7 @@ class StudentImportColumns
             'nom_et_prenom_de_mere' => 'mother_name', 'nom_et_prenoms_de_mere' => 'mother_name', 'nom_et_prenom_de_la_mere' => 'mother_name', 'nom_de_la_mere' => 'mother_name', 'complement_nom' => 'mother_name',
             'date_delivrabce' => 'cin_issued_at', 'date_delivrance' => 'cin_issued_at', 'date_de_delivrance' => 'cin_issued_at',
             'lieu_de_delivrance' => 'cin_issued_place', 'lieu_delivrance' => 'cin_issued_place',
-            'annee_d_obtention_du_bacc' => 'bac_year', 'annee_d_obtention_du_bac' => 'bac_year', 'annee_bac' => 'bac_year', 'annee_bacc' => 'bac_year',
+            'annee_d_obtention_du_bacc' => 'bac_year', 'annee_d_obtention_du_bac' => 'bac_year', 'annee_bac' => 'bac_year', 'annee_du_bac' => 'bac_year', 'annee_du_bacc' => 'bac_year', 'annee_bacc' => 'bac_year',
             'serie_du_bacc' => 'bac_series', 'serie_bac' => 'bac_series', 'serie_bacc' => 'bac_series',
             'code_redoublement' => 'repeat_code',
             'date_de_depot_du_demande_de_bourse' => 'scholarship_requested_at', 'date_de_depot_de_la_demande_de_bourse' => 'scholarship_requested_at',
@@ -73,15 +94,18 @@ class StudentImportColumns
             'institution_code' => 'establishment_code', 'code_institution' => 'establishment_code', 'code_etablissement' => 'establishment_code', 'sigle' => 'establishment_code', 'sigle_etablissement' => 'establishment_code',
             'nom_mere' => 'mother_name', 'numero_cin' => 'cin', 'n_cin' => 'cin', 'numero_de_telephone' => 'phone', 'e_mail' => 'email', 'courriel' => 'email',
             'date_naissance' => 'birth_date', 'prenoms_etudiant' => 'first_names',
+            'code_bourse' => 'scholarship_code', 'numero_de_compte' => 'bank_account', 'n_compte' => 'bank_account', 'compte' => 'bank_account', 'rib' => 'bank_account',
+            'numero_de_dossier' => 'preinscription_reference', 'n_dossier' => 'preinscription_reference', 'dossier' => 'preinscription_reference', 'resultat' => 'result', 'decision' => 'result',
         ];
-        foreach (self::labels() as $field => $label) {
+        $labels = self::labels($kind);
+        foreach ($labels as $field => $label) {
             $aliases[self::header($label)] = $field;
             $aliases[$field] = $field;
         }
         $mapping = [];
         foreach ($headers as $index => $header) {
             $field = $aliases[self::header($header)] ?? null;
-            if ($field !== null && ! isset($mapping[$field])) {
+            if ($field !== null && isset($labels[$field]) && ! isset($mapping[$field])) {
                 $mapping[$field] = $index;
             }
         }
@@ -125,6 +149,43 @@ class StudentImportColumns
         }
 
         return false;
+    }
+
+    /**
+     * The file row with the values corrected in the preview, each put in the column of its field.
+     *
+     * @param  array<int,mixed>  $raw
+     * @param  array<string,int>  $mapping
+     * @param  array<string,string>|null  $corrections
+     * @return array<int,mixed>
+     */
+    public static function corrected(array $raw, array $mapping, ?array $corrections): array
+    {
+        foreach ($corrections ?? [] as $field => $value) {
+            if (isset($mapping[$field])) {
+                $raw[$mapping[$field]] = $value === '' ? null : $value;
+            }
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Values of a staged row as analysed: file values, corrections made in the preview, and the
+     * fields of the existing record the agent chose to replace.
+     *
+     * @param  array<string,int>  $mapping
+     * @return array<string,mixed>
+     */
+    public static function preview(StudentImportRow $row, array $mapping, int $calendar): array
+    {
+        $data = self::normalize(self::corrected($row->raw_data, $mapping, $row->corrections), $mapping, $calendar);
+        $updates = array_values(array_intersect($row->identity_updates ?? [], array_keys($mapping)));
+        if ($updates !== []) {
+            $data['_identity_updates'] = $updates;
+        }
+
+        return $data;
     }
 
     /**
