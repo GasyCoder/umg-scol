@@ -30,7 +30,7 @@ export function AppSidebarHeader() {
             <CommandPalette />
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
                 <ThemeToggle />
-                <NotificationBell />
+                {auth.canViewNotifications && <NotificationBell />}
                 {auth.user && (
                     <>
                         <span
