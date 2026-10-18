@@ -2,10 +2,8 @@
 
 use App\Actions\Scholarships\ReceiveScholarshipApplication;
 use App\Actions\Scholarships\TransitionScholarshipApplication;
-use App\Actions\Scholarships\TransitionScholarshipCampaign;
 use App\Actions\Scholarships\UpdateScholarshipCheck;
 use App\Enums\ScholarshipApplicationStatus;
-use App\Enums\ScholarshipCampaignStatus;
 use App\Enums\ScholarshipCheckStatus;
 use App\Models\AcademicYear;
 use App\Models\Activity;
@@ -14,11 +12,11 @@ use App\Models\Level;
 use App\Models\Program;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipApplicationStatusHistory;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentRecord;
 use App\Models\User;
+use App\Support\Trash\TrashManager;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -27,6 +25,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -49,12 +49,11 @@ beforeEach(function () {
     $this->admin = User::factory()->create()->assignRole('superadmin');
     $this->staff = User::factory()->create()->assignRole('establishment');
     $this->staff->forceFill(['establishment_id' => $this->establishment->id])->save();
-    $this->campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'name' => 'Bourse 2025-2026', 'status' => 'open', 'created_by' => $this->admin->id]);
 });
 
 function receiveFile(TestCase $test, ?Student $student = null, ?string $ddb = null, ?User $actor = null): ScholarshipApplication
 {
-    return app(ReceiveScholarshipApplication::class)->handle($actor ?? $test->central, $test->campaign->id, ($student ?? $test->student)->id, $ddb, null);
+    return app(ReceiveScholarshipApplication::class)->handle($actor ?? $test->central, ($student ?? $test->student)->id, $ddb, null);
 }
 function completeChecks(ScholarshipApplication $application, User $actor, ScholarshipCheckStatus $status = ScholarshipCheckStatus::Ok): void
 {
@@ -70,62 +69,35 @@ function declaredStudent(TestCase $test, array $attributes = [], string $status 
     return $student;
 }
 
-// Campaigns
-it('lets campaign managers create a draft campaign and audits it', function () {
-    $year = AcademicYear::factory()->create(['name' => '2026-2027', 'is_active' => true]);
-    $this->actingAs($this->admin)->post('/scholarships/campaigns', ['academic_year_id' => $year->id, 'name' => 'Bourse nationale 2026-2027', 'starts_at' => '2026-11-01', 'ends_at' => '2026-12-15'])->assertRedirect('/scholarships/campaigns');
-    $campaign = ScholarshipCampaign::where('academic_year_id', $year->id)->sole();
-    expect($campaign->status)->toBe(ScholarshipCampaignStatus::Draft)->and($campaign->created_by)->toBe($this->admin->id);
-    expect(Activity::where('log_name', 'scholarship_campaigns')->where('event', 'campaign_created')->where('subject_id', $campaign->id)->exists())->toBeTrue();
-    $this->post('/scholarships/campaigns', ['academic_year_id' => $year->id, 'name' => 'Bourse nationale 2026-2027'])->assertSessionHasErrors('name');
-    $this->post('/scholarships/campaigns', ['academic_year_id' => $year->id, 'name' => 'Autre', 'starts_at' => '2026-12-01', 'ends_at' => '2026-11-01'])->assertSessionHasErrors('ends_at');
-});
-it('follows the campaign lifecycle and refuses incoherent transitions', function () {
-    $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'status' => 'draft', 'created_by' => $this->admin->id]);
-    $transition = fn (string $status) => app(TransitionScholarshipCampaign::class)->handle($this->admin, $campaign, ScholarshipCampaignStatus::from($status));
-    expect(fn () => $transition('closed'))->toThrow(ValidationException::class);
-    expect(fn () => $transition('archived'))->toThrow(ValidationException::class);
-    $transition('scheduled');
-    expect(fn () => $transition('draft'))->toThrow(ValidationException::class);
-    foreach (['open', 'closed', 'archived'] as $status) {
-        expect($transition($status)->status->value)->toBe($status);
-    }
-    expect(fn () => $transition('open'))->toThrow(ValidationException::class);
-    expect(Activity::where('event', 'campaign_status_changed')->where('subject_id', $campaign->id)->count())->toBe(4);
-    $this->actingAs($this->admin)->put('/scholarships/campaigns/'.$campaign->uuid, ['academic_year_id' => $this->year->id, 'name' => 'Renommée'])->assertSessionHasErrors('campaign');
-});
-it('refuses to open a campaign of an inactive academic year', function () {
-    $year = AcademicYear::factory()->create(['is_active' => false]);
-    $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $year->id, 'status' => 'draft', 'created_by' => $this->admin->id]);
-    expect(fn () => app(TransitionScholarshipCampaign::class)->handle($this->admin, $campaign, ScholarshipCampaignStatus::Open))->toThrow(ValidationException::class);
-});
-it('restricts campaign administration to campaigns.manage and keeps the central office read-only', function () {
-    $this->actingAs($this->central)->get('/scholarships/campaigns')->assertOk()->assertInertia(fn (Assert $page) => $page->where('canManage', false)->where('campaigns.data.0.targets', []));
-    $this->post('/scholarships/campaigns', ['academic_year_id' => $this->year->id, 'name' => 'Interdite'])->assertForbidden();
-    $this->post('/scholarships/campaigns/'.$this->campaign->uuid.'/status', ['status' => 'closed'])->assertForbidden();
-    $this->actingAs($this->staff)->get('/scholarships/campaigns')->assertForbidden();
-    $this->actingAs(User::factory()->create()->assignRole('developer'))->post('/scholarships/campaigns/'.$this->campaign->uuid.'/status', ['status' => 'closed'])->assertRedirect();
-    expect($this->campaign->fresh()->status)->toBe(ScholarshipCampaignStatus::Closed);
-});
-it('refuses reception outside an open campaign', function (string $status) {
-    $this->campaign->update(['status' => $status]);
-    expect(fn () => receiveFile($this))->toThrow(ValidationException::class);
+// Academic year of the reception
+it('receives files only for the current academic year', function (array $year) {
+    $this->year->update($year);
+    expect(fn () => receiveFile($this))->toThrow(ValidationException::class, 'Aucune année universitaire courante');
     expect(ScholarshipApplication::count())->toBe(0);
-})->with(['draft', 'scheduled', 'closed', 'archived']);
+    $this->actingAs($this->central)->get('/scholarships/reception')->assertInertia(fn (Assert $page) => $page->where('year', null));
+})->with([[['is_current' => false]], [['is_active' => false]]]);
+
+it('removes campaign routes and permissions while keeping reception available', function () {
+    $this->actingAs($this->admin)->get('/scholarships/campaigns')->assertNotFound();
+    $this->post('/scholarships/campaigns', ['name' => 'Ancienne campagne'])->assertNotFound();
+    expect(array_filter(config('access.permissions'), fn (string $name) => str_starts_with($name, 'campaigns.')))->toBe([]);
+    $this->get('/scholarships/reception')->assertOk();
+});
 
 // Reception
 it('lets the central office receive a paper file with server-derived context', function () {
-    $this->actingAs($this->central)->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id, 'ddb_number' => '  ddb 0042 ', 'student_record_id' => 999, 'received_by' => $this->admin->id, 'status' => 'validated'])
+    $this->actingAs($this->central)->post('/scholarships/applications', ['student_id' => $this->student->id, 'academic_year_id' => 999, 'ddb_number' => '  ddb 0042 ', 'student_record_id' => 999, 'received_by' => $this->admin->id, 'status' => 'validated'])
         ->assertRedirect();
     $application = ScholarshipApplication::sole();
     expect($application->status)->toBe(ScholarshipApplicationStatus::Pending)->and($application->student_record_id)->toBe($this->record->id)
+        ->and($application->academic_year_id)->toBe($this->year->id)
         ->and($application->received_by)->toBe($this->central->id)->and($application->received_at)->not->toBeNull()
-        ->and($application->ddb_number)->toBe('ddb 0042')->and($application->application_number)->toBe('BRS'.$this->campaign->id.'-000001')
+        ->and($application->ddb_number)->toBe('ddb 0042')->and($application->application_number)->toBe('BRS-2025-2026-000001')
         ->and($application->checks()->orderBy('id')->pluck('key')->all())->toBe(array_keys(config('scholarships.checks')));
-    expect($this->campaign->fresh()->last_application_sequence)->toBe(1);
+    expect($this->year->fresh()->last_application_sequence)->toBe(1);
 });
 it('denies reception without the receive permission', function () {
-    $this->actingAs($this->staff)->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id])->assertForbidden();
+    $this->actingAs($this->staff)->post('/scholarships/applications', ['student_id' => $this->student->id])->assertForbidden();
     $this->actingAs($this->staff)->get('/scholarships/reception')->assertForbidden();
     expect(fn () => receiveFile($this, actor: $this->staff))->toThrow(AuthorizationException::class);
     expect(ScholarshipApplication::count())->toBe(0);
@@ -139,53 +111,94 @@ it('refuses unknown or inactive students and missing or inactive declarations', 
         'inactive declaration' => declaredStudent($this, status: 'inactive')->id,
         'inactive level' => tap(declaredStudent($this), fn () => $this->level->update(['is_active' => false]))->id,
     };
-    $this->actingAs($this->central)->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $studentId])->assertSessionHasErrors('student_id');
-    expect(ScholarshipApplication::count())->toBe(0)->and($this->campaign->fresh()->last_application_sequence)->toBe(0);
+    $this->actingAs($this->central)->post('/scholarships/applications', ['student_id' => $studentId])->assertSessionHasErrors('student_id');
+    expect(ScholarshipApplication::count())->toBe(0)->and($this->year->fresh()->last_application_sequence)->toBe(0);
 })->with(['unknown', 'inactive student', 'no declaration', 'other year only', 'inactive declaration', 'inactive level']);
-it('selects the active declaration of the campaign year among several', function () {
+it('selects the active declaration of the academic year among several', function () {
     $other = Establishment::factory()->create();
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $this->year->id, 'establishment_id' => $other->id, 'status' => 'inactive']);
     StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => AcademicYear::factory()->create()->id, 'establishment_id' => $other->id, 'status' => 'active']);
     expect(receiveFile($this)->student_record_id)->toBe($this->record->id);
 });
-it('numbers files uniquely per campaign and enforces it in SQL', function () {
+it('numbers files uniquely per academic year and enforces it in SQL', function () {
     $first = receiveFile($this);
     $second = receiveFile($this, declaredStudent($this));
-    expect($second->application_number)->toBe('BRS'.$this->campaign->id.'-000002');
+    expect($second->application_number)->toBe('BRS-2025-2026-000002');
     expect(fn () => DB::table('scholarship_applications')->where('id', $second->id)->update(['application_number' => $first->application_number]))->toThrow(QueryException::class);
 });
-it('allows one file per student and campaign, in the action and in SQL', function () {
+it('allows one scholarship request per student and academic year', function () {
     $first = receiveFile($this);
-    $this->actingAs($this->central)->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id])->assertSessionHasErrors('student_id');
-    expect(fn () => DB::table('scholarship_applications')->insert([...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'uuid' => (string) Str::uuid7(), 'application_number' => 'X-1', 'sequence' => 99, 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now()]))
-        ->toThrow(QueryException::class);
-    $other = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'status' => 'open', 'created_by' => $this->admin->id]);
-    expect(app(ReceiveScholarshipApplication::class)->handle($this->central, $other->id, $this->student->id, null, null)->application_number)->toBe('BRS'.$other->id.'-000001');
+    $this->actingAs($this->central)->post('/scholarships/applications', ['student_id' => $this->student->id])
+        ->assertSessionHasErrors(['student_id' => 'Une seule demande de bourse par année universitaire : cet étudiant a déjà un dossier en 2025-2026 (N° DDB '.$first->reference().').']);
+    $this->get('/scholarships/reception/students/'.$this->student->uuid)
+        ->assertInertia(fn (Assert $page) => $page->where('student.yearApplication.reference', $first->reference()));
+    $this->get('/scholarships/reception?search=RABE')
+        ->assertInertia(fn (Assert $page) => $page->where('results.0.application.reference', $first->reference()));
+
+    // A file put in the trash frees the year; restoring it while another one exists is refused.
+    app(TrashManager::class)->handle($this->admin, 'applications', $first->uuid, 'trash');
+    $replacement = receiveFile($this);
+    expect(fn () => app(TrashManager::class)->handle($this->admin, 'applications', $first->uuid, 'restore'))->toThrow(ValidationException::class, 'déjà un autre dossier');
+    expect($first->fresh()->trashed())->toBeTrue()->and($replacement->fresh()->trashed())->toBeFalse();
+
+    // The next academic year, once current: a new request, numbered from 1 again.
+    $next = AcademicYear::factory()->create(['name' => '2026-2027', 'is_active' => true]);
+    StudentRecord::factory()->create(['student_id' => $this->student->id, 'academic_year_id' => $next->id, 'establishment_id' => $this->establishment->id, 'level_id' => $this->level->id, 'status' => 'active']);
+    $this->year->update(['is_current' => false]);
+    $next->update(['is_current' => true]);
+    $nextFile = receiveFile($this);
+    expect($nextFile->academic_year_id)->toBe($next->id)->and($nextFile->ddb_number)->toBe('DDB-2026-000001');
 });
-it('rejects a DDB number already used in the same campaign only', function () {
+it('rejects a DDB number already used in the same academic year', function () {
     receiveFile($this, ddb: 'DDB-12 34');
-    expect(fn () => receiveFile($this, declaredStudent($this), 'ddb-1234'))->toThrow(ValidationException::class);
-    receiveFile($this, declaredStudent($this));
-    receiveFile($this, declaredStudent($this));
-    $other = ScholarshipCampaign::factory()->create(['academic_year_id' => $this->year->id, 'status' => 'open', 'created_by' => $this->admin->id]);
-    expect(app(ReceiveScholarshipApplication::class)->handle($this->central, $other->id, $this->student->id, 'DDB-12 34', null)->ddb_number)->toBe('DDB-12 34');
-    expect(ScholarshipApplication::whereNull('ddb_key')->count())->toBe(2);
+    expect(fn () => receiveFile($this, declaredStudent($this), 'ddb-1234'))->toThrow(ValidationException::class, 'déjà utilisé cette année universitaire');
+    // Without a number written on the form, the DDB number is generated (default pattern).
+    expect(receiveFile($this, declaredStudent($this))->ddb_number)->toBe('DDB-2025-000002')
+        ->and(receiveFile($this, declaredStudent($this))->ddb_number)->toBe('DDB-2025-000003');
+    expect(ScholarshipApplication::whereNull('ddb_key')->count())->toBe(0);
+});
+it('generates the DDB number from the pattern set by the platform administrator', function () {
+    $this->establishment->update(['code' => 'fs']);
+    $this->actingAs($this->admin)->put('/settings/platform/ddb', ['ddb_pattern' => 'umg/{etab}/{au}/{num}', 'ddb_digits' => 4])->assertSessionHasNoErrors()->assertRedirect('/settings/platform');
+    expect(Activity::where('log_name', 'platform')->where('event', 'ddb_numbering_updated')->exists())->toBeTrue();
+    $this->actingAs($this->central)->get('/scholarships/reception/students/'.$this->student->uuid)
+        ->assertInertia(fn (Assert $page) => $page->where('nextDdb', 'UMG/FS/2025-2026/0001')
+            // Shown as on the paper label: printed prefix, number on the line, label texts and QR code.
+            ->where('ddbLabel.prefix', 'UMG/FS/2025-2026/')->where('ddbLabel.number', '0001')->where('ddbLabel.suffix', '')
+            ->where('ddbLabel.texts.footer', 'Service Scolarité Centrale')->where('ddbLabel.qr', fn (string $qr) => str_starts_with($qr, 'data:image/svg+xml;base64,')));
+    expect(receiveFile($this)->ddb_number)->toBe('UMG/FS/2025-2026/0001');
+});
+it('validates the DDB pattern and keeps it to the platform administrator', function () {
+    $this->actingAs($this->admin)->put('/settings/platform/ddb', ['ddb_pattern' => 'DDB-{ANNEE}', 'ddb_digits' => 6])->assertSessionHasErrors('ddb_pattern');
+    $this->put('/settings/platform/ddb', ['ddb_pattern' => 'DDB-{NUM}-{X}', 'ddb_digits' => 6])->assertSessionHasErrors('ddb_pattern');
+    $this->put('/settings/platform/ddb', ['ddb_pattern' => 'DDB <b>{NUM}', 'ddb_digits' => 6])->assertSessionHasErrors('ddb_pattern');
+    $this->put('/settings/platform/ddb', ['ddb_pattern' => 'DDB-{NUM}', 'ddb_digits' => 12])->assertSessionHasErrors('ddb_digits');
+    $this->actingAs($this->central)->put('/settings/platform/ddb', ['ddb_pattern' => 'X-{NUM}', 'ddb_digits' => 3])->assertForbidden();
+    expect(receiveFile($this)->ddb_number)->toBe('DDB-2025-000001');
+});
+it('sends the agent back to the reception search with the DDB number to copy on the label', function () {
+    $response = $this->actingAs($this->central)->post('/scholarships/applications', ['student_id' => $this->student->id]);
+    $application = ScholarshipApplication::sole();
+    $response->assertRedirect('/scholarships/reception')
+        ->assertInertiaFlash('toast.message', 'Dossier reçu : N° DDB DDB-2025-000001.');
+    // No printable receipt any more.
+    $this->get('/scholarships/reception/receipts/'.$application->uuid)->assertNotFound();
 });
 it('keeps a double click from creating two files', function () {
-    $payload = ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id, 'ddb_number' => 'D1'];
+    $payload = ['student_id' => $this->student->id, 'ddb_number' => 'D1'];
     $this->actingAs($this->central)->post('/scholarships/applications', $payload)->assertRedirect();
     $this->post('/scholarships/applications', $payload)->assertSessionHasErrors('student_id');
-    expect(ScholarshipApplication::count())->toBe(1)->and($this->campaign->fresh()->last_application_sequence)->toBe(1);
+    expect(ScholarshipApplication::count())->toBe(1)->and($this->year->fresh()->last_application_sequence)->toBe(1);
 });
 it('rechecks the declaration at reception time', function () {
-    $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search=RABE')->assertInertia(fn (Assert $page) => $page->has('results', 1));
+    $this->actingAs($this->central)->get('/scholarships/reception?search=RABE')->assertInertia(fn (Assert $page) => $page->has('results', 1));
     $this->record->update(['status' => 'inactive']);
-    $this->post('/scholarships/applications', ['campaign_id' => $this->campaign->id, 'student_id' => $this->student->id])->assertSessionHasErrors('student_id');
+    $this->post('/scholarships/applications', ['student_id' => $this->student->id])->assertSessionHasErrors('student_id');
     expect(ScholarshipApplication::count())->toBe(0);
 });
 it('searches students on the server with a minimal preview', function (string $term) {
     declaredStudent($this, ['last_name' => 'AUTRE']);
-    $response = $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search='.urlencode($term))
+    $response = $this->actingAs($this->central)->get('/scholarships/reception?search='.urlencode($term))
         ->assertInertia(fn (Assert $page) => $page->component('scholarships/reception')->has('results', 1)->where('results.0.id', $this->student->id)
             ->where('results.0.records.0.establishment', 'Faculté des Sciences')->where('results.0.records.0.program', 'Biologie')->missing('results.0.cin')->missing('results.0.address'));
     // The search matches on the CIN but never returns it; the typed term is only echoed back in the search box.
@@ -196,8 +209,85 @@ it('searches students on the server with a minimal preview', function (string $t
 })->with(['rabe', 'Hery', '501012345678', '5010 1234', '0347654321', 'hery@example.test']);
 it('shows an existing file in reception search results', function () {
     $application = receiveFile($this);
-    $this->actingAs($this->central)->get('/scholarships/reception?campaign_id='.$this->campaign->id.'&search=501012345678')
+    $this->actingAs($this->central)->get('/scholarships/reception?search=501012345678')
         ->assertInertia(fn (Assert $page) => $page->where('results.0.application.id', $application->id)->where('results.0.birth_date', '2003-04-05')->missing('results.0.cin'));
+});
+
+// Reception counter: full file, identity completion, agent activity
+it('flags missing identity fields in reception results without their values', function () {
+    $this->student->update(['mother_name' => null, 'bac_year' => null]);
+    $this->actingAs($this->central)->get('/scholarships/reception?search=RABE')
+        ->assertInertia(fn (Assert $page) => $page->where('results.0.uuid', $this->student->uuid)
+            ->where('results.0.missing', fn ($missing) => in_array('mother_name', [...$missing], true) && in_array('bac_year', [...$missing], true) && ! in_array('cin', [...$missing], true))
+            ->missing('results.0.cin')->missing('results.0.phone')->missing('student'));
+});
+it('opens the full student file on its own page from the reception', function () {
+    $application = receiveFile($this);
+    $this->actingAs($this->central)->get('/scholarships/reception/students/'.$this->student->uuid.'?search=RABE')
+        ->assertInertia(fn (Assert $page) => $page->component('scholarships/reception-student')->where('student.uuid', $this->student->uuid)
+            ->where('year.id', $this->year->id)->where('backUrl', '/scholarships/reception?search=RABE')->where('student.cin', '501012345678')
+            ->where('student.address', 'Lot SECRET 7')->where('student.canUpdate', true)->has('student.uin')
+            ->where('student.records.0.establishment', 'Faculté des Sciences')->where('student.records.0.is_reception_year', true)
+            ->where('student.applications.0.reference', $application->ddb_number));
+    $this->get('/scholarships/reception/students/'.Str::uuid())->assertNotFound();
+    $this->actingAs($this->staff)->get('/scholarships/reception/students/'.$this->student->uuid)->assertForbidden();
+});
+it('opens and completes the file at the counter with the reception right, even without students.view', function () {
+    Role::findByName('central_scholarship_office')->revokePermissionTo('students.view');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->actingAs($this->central->fresh())->get('/scholarships/reception/students/'.$this->student->uuid)
+        ->assertInertia(fn (Assert $page) => $page->where('student.uuid', $this->student->uuid)->where('student.canUpdate', true)
+            ->where('student.blockReason', null)->where('student.yearApplication', null));
+    $this->put('/scholarships/reception/students/'.$this->student->uuid, ['last_name' => 'RABE', 'first_names' => 'Hery', 'sex' => 'M', 'birth_date' => '2003-04-05', 'nationality' => 'Malagasy', 'bac_year' => 2021])
+        ->assertSessionHasNoErrors();
+    expect($this->student->fresh()->bac_year)->toBe(2021);
+});
+it('tells at the counter why a file cannot be received, or which one exists', function () {
+    $this->record->update(['status' => 'inactive']);
+    $this->actingAs($this->central)->get('/scholarships/reception/students/'.$this->student->uuid)
+        ->assertInertia(fn (Assert $page) => $page->where('student.blockReason', 'Situation inactive pour l’année universitaire en cours : contactez l’établissement.'));
+    $this->record->update(['status' => 'active']);
+    $application = receiveFile($this);
+    $this->get('/scholarships/reception/students/'.$this->student->uuid)
+        ->assertInertia(fn (Assert $page) => $page->where('student.yearApplication.reference', $application->ddb_number));
+});
+it('lets the central office complete a student file from the reception, audited', function () {
+    $this->student->update(['mother_name' => null]);
+    $url = '/scholarships/reception/students/'.$this->student->uuid.'?search=RABE';
+    $this->actingAs($this->central)->from($url)->put('/scholarships/reception/students/'.$this->student->uuid, [
+        'last_name' => 'RABE', 'first_names' => 'Hery', 'sex' => 'M', 'birth_date' => '2003-04-05', 'nationality' => 'Malagasy',
+        'cin' => '501012345678', 'phone' => '0347654321', 'email' => 'hery@example.test', 'address' => 'Lot SECRET 7', 'mother_name' => 'RASOA Marie',
+    ])->assertRedirect($url)->assertSessionHasNoErrors();
+    expect($this->student->fresh()->mother_name)->toBe('RASOA Marie');
+    $log = Activity::where('log_name', 'students')->where('event', 'updated')->where('subject_id', $this->student->id)->latest('id')->first();
+    expect($log->causer_id)->toBe($this->central->id)->and($log->properties->get('changed_fields'))->toContain('mother_name')
+        ->and(json_encode($log->properties))->not->toContain('RASOA');
+    $this->get('/scholarships/reception')->assertInertia(fn (Assert $page) => $page->where('activity.updatedToday', 1)
+        ->where('activity.recent.0.event', 'updated')->where('activity.recent.0.fields', ['mother_name'])->where('activity.recent.0.student', 'RABE Hery'));
+});
+it('rejects an identity completion that breaks the identity rules', function () {
+    declaredStudent($this, ['last_name' => 'AUTRE', 'phone' => '0341111111']);
+    $this->actingAs($this->central)->put('/scholarships/reception/students/'.$this->student->uuid, [
+        'last_name' => 'RABE', 'sex' => 'M', 'birth_date' => '2003-04-05', 'nationality' => 'Malagasy', 'phone' => '0341111111',
+    ])->assertSessionHasErrors('phone');
+    expect($this->student->fresh()->phone)->toBe('0347654321');
+});
+it('denies identity completion without students.update or reception rights', function () {
+    Role::findByName('central_scholarship_office')->revokePermissionTo('students.update');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $payload = ['last_name' => 'RABE', 'sex' => 'M', 'birth_date' => '2003-04-05', 'nationality' => 'Malagasy'];
+    $this->actingAs($this->central->fresh())->put('/scholarships/reception/students/'.$this->student->uuid, $payload)->assertForbidden();
+    // The establishment may edit its own student, but not through the reception counter.
+    $this->actingAs($this->staff)->put('/scholarships/reception/students/'.$this->student->uuid, $payload)->assertForbidden();
+});
+it('shows the agent their own reception activity only', function () {
+    $application = receiveFile($this);
+    receiveFile($this, declaredStudent($this, ['last_name' => 'AUTRE']), null, $this->admin);
+    $this->actingAs($this->central)->get('/scholarships/reception')
+        ->assertInertia(fn (Assert $page) => $page->where('activity.today', 1)->where('activity.week', 1)->where('activity.year', 1)
+            ->has('activity.days', 7)->where('activity.days.6.count', 1)
+            ->has('activity.recent', 1)->where('activity.recent.0.event', 'application_received')
+            ->where('activity.recent.0.reference', $application->ddb_number)->where('activity.recent.0.student', 'RABE Hery'));
 });
 
 // Isolation
@@ -208,7 +298,7 @@ it('denies students and establishments on every scholarship route', function (st
     }
     $application = receiveFile($this);
     $this->actingAs($user);
-    foreach (['/scholarships/campaigns', '/scholarships/reception', '/scholarships/applications', '/scholarships/applications/'.$application->uuid, '/scholarships/applications/export'] as $url) {
+    foreach (['/scholarships/reception', '/scholarships/applications', '/scholarships/applications/'.$application->uuid, '/scholarships/applications/export'] as $url) {
         $this->get($url)->assertForbidden();
     }
     $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'rejected', 'reason' => 'Tentative non autorisée.'])->assertForbidden();
@@ -325,14 +415,9 @@ it('requires a reason to reject and leaves the student unchanged', function () {
     expect($application->status)->toBe(ScholarshipApplicationStatus::Rejected)->and($application->decision_reason)->toBe('Dossier déposé hors délai.')
         ->and($application->decided_by)->toBe($this->central->id)->and($this->student->fresh()->getAttributes())->toBe($before);
 });
-it('refuses any decision once the campaign is archived', function () {
+it('keeps processing files after their academic year is no longer current', function () {
     $application = receiveFile($this);
-    $this->campaign->update(['status' => 'archived']);
-    expect(fn () => app(TransitionScholarshipApplication::class)->handle($this->central, $application, ScholarshipApplicationStatus::Rejected, 'Motif suffisant.'))->toThrow(ValidationException::class);
-});
-it('keeps processing files after the campaign closes', function () {
-    $application = receiveFile($this);
-    app(TransitionScholarshipCampaign::class)->handle($this->admin, $this->campaign, ScholarshipCampaignStatus::Closed);
+    $this->year->update(['is_current' => false]);
     completeChecks($application, $this->central);
     app(TransitionScholarshipApplication::class)->handle($this->central, $application, ScholarshipApplicationStatus::Validated);
     expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::Validated);
@@ -374,13 +459,6 @@ it('lets two agents act on the same file without a double decision', function ()
     expect($application->fresh()->decided_by)->toBe($second->id)->and($application->fresh()->decision_reason)->toBe('Dossier non signé.')
         ->and(Activity::where('event', 'application_rejected')->count())->toBe(1);
 });
-it('serializes a reception with a campaign closing', function () {
-    $staleCampaign = ScholarshipCampaign::find($this->campaign->id);
-    app(TransitionScholarshipCampaign::class)->handle($this->admin, $this->campaign, ScholarshipCampaignStatus::Closed);
-    expect(fn () => app(ReceiveScholarshipApplication::class)->handle($this->central, $staleCampaign->id, $this->student->id, null, null))->toThrow(ValidationException::class);
-    expect(ScholarshipApplication::count())->toBe(0);
-});
-
 // Audit and history
 it('audits receptions, reviews, checks and decisions without personal data', function () {
     $validated = receiveFile($this, ddb: 'DDB-9');
@@ -389,14 +467,14 @@ it('audits receptions, reviews, checks and decisions without personal data', fun
     $rejected = receiveFile($this, declaredStudent($this, ['cin' => '509999999999', 'phone' => '0320000001', 'email' => 'autre@example.test', 'address' => 'Lot AUTRE 9']));
     app(TransitionScholarshipApplication::class)->handle($this->central, $rejected, ScholarshipApplicationStatus::NeedsCorrection, 'Le téléphone 0347654321 diffère.');
     app(TransitionScholarshipApplication::class)->handle($this->central, $rejected, ScholarshipApplicationStatus::Rejected, 'Refus confidentiel détaillé.');
-    $this->actingAs($this->central)->get('/scholarships/applications/export')->assertOk()->streamedContent();
+    $this->actingAs($this->central)->get('/scholarships/applications/export')->assertOk();
 
     $events = Activity::where('log_name', 'scholarships')->orderBy('id')->pluck('event')->all();
     expect($events)->toContain('application_received', 'review_started', 'check_updated', 'application_validated', 'application_needs_correction', 'application_rejected', 'applications_exported');
     $received = Activity::where('event', 'application_received')->where('subject_id', $validated->id)->sole();
     // MySQL JSON columns do not keep key order: compare as a map.
-    expect($received->causer_id)->toBe($this->central->id)->and($received->properties->only(['application_id', 'campaign_id', 'student_id', 'status'])->all())
-        ->toEqual(['application_id' => $validated->id, 'campaign_id' => $this->campaign->id, 'student_id' => $this->student->id, 'status' => 'pending']);
+    expect($received->causer_id)->toBe($this->central->id)->and($received->properties->only(['application_id', 'academic_year_id', 'student_id', 'status'])->all())
+        ->toEqual(['application_id' => $validated->id, 'academic_year_id' => $this->year->id, 'student_id' => $this->student->id, 'status' => 'pending']);
     expect(Activity::where('event', 'check_updated')->first()->properties->get('check_key'))->toBe('identity');
     $json = Activity::all()->toJson();
     foreach (['501012345678', '0347654321', 'hery@example.test', 'Lot SECRET 7', '2003-04-05', '509999999999', 'Lot AUTRE 9', 'Refus confidentiel', 'RABE'] as $secret) {
@@ -431,7 +509,7 @@ it('lists, filters and searches files with server pagination', function () {
     $count = fn (string $query) => $this->get('/scholarships/applications'.$query)->assertOk()->viewData('page')['props']['applications']['total'];
     expect($count(''))->toBe(2)->and($count('?establishment_id='.$other->id))->toBe(1)->and($count('?status=rejected'))->toBe(1)
         ->and($count('?search=ddb-777'))->toBe(1)->and($count('?search=DDB 777'))->toBe(0)->and($count('?search='.$mine->application_number))->toBe(1)->and($count('?search=50900'))->toBe(1)->and($count('?search=509.000'))->toBe(1)
-        ->and($count('?search=zaf'))->toBe(1)->and($count('?campaign_id='.$this->campaign->id.'&level_id='.$this->level->id))->toBe(2)
+        ->and($count('?search=zaf'))->toBe(1)->and($count('?academic_year_id='.$this->year->id.'&level_id='.$this->level->id))->toBe(2)
         ->and($count('?received_from='.now()->addDay()->format('Y-m-d')))->toBe(0);
     $this->get('/scholarships/applications?received_from=2026-02-01&received_to=2026-01-01')->assertSessionHasErrors('received_to');
 });
@@ -443,12 +521,28 @@ it('counts files per status for the current filters, ignoring the status filter 
     app(TransitionScholarshipApplication::class)->handle($this->central, receiveFile($this, $foreignStudent), ScholarshipApplicationStatus::Rejected, 'Dossier hors délai.');
     app(TransitionScholarshipApplication::class)->handle($this->central, receiveFile($this, declaredStudent($this)), ScholarshipApplicationStatus::InReview, null);
     $this->actingAs($this->central);
-    $empty = ['pending' => 0, 'in_review' => 0, 'needs_correction' => 0, 'validated' => 0, 'rejected' => 0];
+    $empty = ['awaiting_list' => 0, 'pending' => 0, 'in_review' => 0, 'needs_correction' => 0, 'validated' => 0, 'rejected' => 0];
     $this->get('/scholarships/applications?status=rejected')->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)
         ->where('statusCounts', [...$empty, 'pending' => 1, 'in_review' => 1, 'rejected' => 1]));
     $this->get('/scholarships/applications?status=pending&establishment_id='.$this->establishment->id)->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)
         ->where('statusCounts', [...$empty, 'pending' => 1, 'in_review' => 1]));
     $this->get('/scholarships/applications?search=zaf')->assertInertia(fn (Assert $page) => $page->where('statusCounts', [...$empty, 'rejected' => 1]));
+});
+it('shows a received file as « En attente de la liste » until the establishment list confirms the situation', function () {
+    $this->record->update(['source' => 'central', 'verification' => 'pending', 'status' => 'pending']);
+    $application = receiveFile($this);
+    receiveFile($this, declaredStudent($this));
+    $this->actingAs($this->central)->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
+        ->where('statusCounts.awaiting_list', 1)->where('statusCounts.pending', 1)
+        ->where('applications.data.1.status', 'awaiting_list')->where('applications.data.1.status_label', 'En attente de la liste'));
+    $this->get('/scholarships/applications?status=awaiting_list')->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)->where('applications.data.0.uuid', $application->uuid));
+    $this->get('/scholarships/applications?status=pending')->assertInertia(fn (Assert $page) => $page->where('applications.total', 1)->whereNot('applications.data.0.uuid', $application->uuid));
+    $this->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page
+        ->where('application.status', 'pending')->where('application.shown_status', ['value' => 'awaiting_list', 'label' => 'En attente de la liste']));
+
+    // Once the list is imported and confirms the situation, the file is simply « Reçu ».
+    $this->record->update(['verification' => 'verified', 'status' => 'active']);
+    $this->get('/scholarships/applications?status=pending')->assertInertia(fn (Assert $page) => $page->where('applications.total', 2)->where('statusCounts.awaiting_list', 0));
 });
 it('paginates the file list by 25', function () {
     foreach (range(1, 27) as $i) {
@@ -485,22 +579,32 @@ it('gives each throttled action its own counter, so processing files never block
     }
     $this->get('/scholarships/applications/export')->assertOk();
 });
-it('exports filtered files as CSV without sensitive data and requires the export permission', function () {
+it('exports filtered files to Excel without sensitive data and requires the export permission', function () {
     receiveFile($this, ddb: '=HYPERLINK("x")');
     $rejected = receiveFile($this, declaredStudent($this, ['last_name' => 'REJETE']));
     app(TransitionScholarshipApplication::class)->handle($this->central, $rejected, ScholarshipApplicationStatus::Rejected, 'Motif interne détaillé.');
-    $csv = $this->actingAs($this->central)->get('/scholarships/applications/export?status=pending')->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->streamedContent();
-    expect($csv)->toContain('"N° dossier";"N° DDB";"Date de naissance";Nom')->toContain('2003-04-05;RABE;Hery')->toContain('Faculté des Sciences')->toContain('Biologie')->toContain("'=HYPERLINK")
-        ->not->toContain('REJETE')->not->toContain('501012345678')->not->toContain('0347654321')->not->toContain('hery@example.test')->not->toContain('Lot SECRET 7')->not->toContain('Motif interne');
-    expect(substr_count(trim($csv), "\n"))->toBe(1);
+    $response = $this->actingAs($this->central)->get('/scholarships/applications/export?status=pending')->assertOk()
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect($response->headers->get('content-disposition'))->toContain('.xlsx')->and($response->headers->get('cache-control'))->toContain('no-store');
+    $sheet = IOFactory::load($response->baseResponse->getFile()->getPathname())->getActiveSheet();
+    $rows = $sheet->toArray();
+    expect($rows)->toHaveCount(2)
+        ->and($rows[0])->toBe(['N° DDB', 'Date de naissance', 'Nom', 'Prénoms', 'Établissement', 'Niveau', 'Parcours', 'Année universitaire', 'Statut', 'Date de réception', 'Date de décision'])
+        ->and(array_slice($rows[1], 0, 8))->toBe(['=HYPERLINK("x")', '05/04/2003', 'RABE', 'Hery', 'Faculté des Sciences', 'Licence 1', 'Biologie', '2025-2026'])
+        // Written as text, never as a formula.
+        ->and($sheet->getCell('A2')->getDataType())->toBe(DataType::TYPE_STRING)
+        ->and($sheet->getFreezePane())->toBe('A2');
+    $flat = json_encode($rows);
+    expect($flat)->not->toContain('REJETE')->not->toContain('501012345678')->not->toContain('0347654321')->not->toContain('hery@example.test')->not->toContain('Lot SECRET 7')->not->toContain('Motif interne');
     Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.export');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $this->get('/scholarships/applications/export')->assertForbidden();
     $this->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page->where('canExport', false));
 });
 it('shows the scholarship menu only to authorized accounts', function () {
-    $this->actingAs($this->central)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.scholarships', ['campaigns' => true, 'receive' => true, 'applications' => true]));
-    $this->actingAs($this->staff)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.scholarships', ['campaigns' => false, 'receive' => false, 'applications' => false]));
+    $this->actingAs($this->central)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.scholarships', ['receive' => true, 'labels' => false, 'applications' => true]));
+    $this->actingAs($this->staff)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.scholarships', ['receive' => false, 'labels' => false, 'applications' => false]));
+    $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.scholarships.labels', true));
 });
 it('renders the file detail with official data, checklist and allowed actions', function () {
     $application = receiveFile($this, ddb: 'DDB-1');
@@ -510,8 +614,105 @@ it('renders the file detail with official data, checklist and allowed actions', 
         ->where('application.student.birth_date', '2003-04-05')->where('application.student.sex', 'M')->where('application.student.nationality', 'Malagasy')
         ->missing('application.student.cin')->missing('application.student.address')->missing('application.student.phone'));
 });
-it('identifies the student of a listed file by names and birth date without the CIN', function () {
+it('identifies the student of a listed file by names, birth date and CIN, never by contacts', function () {
+    $this->establishment->update(['code' => 'FS']);
+    $this->level->update(['code' => 'L1']);
     receiveFile($this);
     $this->actingAs($this->central)->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
-        ->where('applications.data.0.student', ['last_name' => 'RABE', 'first_names' => 'Hery', 'birth_date' => '2003-04-05']));
+        ->where('applications.data.0.student', ['last_name' => 'RABE', 'first_names' => 'Hery', 'cin' => '501012345678', 'birth_date' => '2003-04-05'])
+        ->where('applications.data.0.establishment', ['code' => 'FS', 'name' => 'Faculté des Sciences'])
+        ->where('applications.data.0.level', ['code' => 'L1', 'name' => 'Licence 1'])
+        ->missing('applications.data.0.campaign')->missing('applications.data.0.student.phone')->missing('applications.data.0.student.email'));
+});
+
+it('offers on each listed file the decisions the account may take, and stays on the list after one', function () {
+    $application = receiveFile($this);
+    $this->actingAs($this->central)->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
+        ->where('applications.data.0.actions', ['in_review', 'validated', 'needs_correction', 'rejected'])
+        ->where('bulkActions', ['in_review', 'validated', 'needs_correction', 'rejected']));
+    $this->from('/scholarships/applications?status=pending')
+        ->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'in_review', 'from_list' => true])
+        ->assertRedirect('/scholarships/applications?status=pending');
+    expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::InReview);
+    // Without the list flag, the file page as before.
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'needs_correction', 'reason' => 'Relevé de notes manquant.'])
+        ->assertRedirect('/scholarships/applications/'.$application->uuid);
+
+    Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.validate');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->actingAs($this->central->fresh())->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
+        ->where('applications.data.0.actions', ['in_review', 'rejected'])->where('bulkActions', ['in_review', 'needs_correction', 'rejected']));
+});
+it('applies one decision to a selection, file by file, and reports the refused ones', function () {
+    $ready = receiveFile($this);
+    completeChecks($ready, $this->central);
+    $unchecked = receiveFile($this, declaredStudent($this, ['last_name' => 'SANS CONTROLE']));
+    $issue = receiveFile($this, declaredStudent($this, ['last_name' => 'NON CONFORME']));
+    app(UpdateScholarshipCheck::class)->handle($this->central, $issue, 'identity', ScholarshipCheckStatus::Issue, 'Nom différent.');
+    $done = receiveFile($this, declaredStudent($this, ['last_name' => 'DEJA']));
+    completeChecks($done, $this->central);
+    app(TransitionScholarshipApplication::class)->handle($this->central, $done, ScholarshipApplicationStatus::Validated);
+
+    $this->actingAs($this->central)->from('/scholarships/applications')->post('/scholarships/applications/bulk', [
+        'status' => 'validated', 'applications' => [$ready->uuid, $unchecked->uuid, $issue->uuid, $done->uuid],
+    ])->assertRedirect('/scholarships/applications')
+        ->assertInertiaFlash('toast.message', '2 dossier(s) : validé · 1 déjà dans cet état · 1 refusé(s) (droits, contrôles ou situation non vérifiée).');
+    // Quick validation: the checks still to do are recorded as conforming by the agent, through « En vérification ».
+    expect($ready->fresh()->status)->toBe(ScholarshipApplicationStatus::Validated)
+        ->and($unchecked->fresh()->status)->toBe(ScholarshipApplicationStatus::Validated)
+        ->and($unchecked->checks()->pluck('status')->map->value->unique()->all())->toBe(['ok'])
+        ->and($unchecked->checks()->first()->checked_by)->toBe($this->central->id)
+        ->and(ScholarshipApplicationStatusHistory::query()->where('scholarship_application_id', $unchecked->id)->orderBy('id')->pluck('to_status')->map->value->all())->toBe(['pending', 'in_review', 'validated'])
+        // A non-conforming check still blocks, and nothing of the file is changed.
+        ->and($issue->fresh()->status)->toBe(ScholarshipApplicationStatus::InReview)
+        ->and($issue->checks()->where('status', 'ok')->count())->toBe(0)
+        ->and(ScholarshipApplicationStatusHistory::query()->where('scholarship_application_id', $ready->id)->where('to_status', 'validated')->count())->toBe(1);
+    $unchecked = $issue;
+
+    // A reason is required to reject, and the same reason is kept on each file.
+    $this->post('/scholarships/applications/bulk', ['status' => 'rejected', 'applications' => [$unchecked->uuid]])->assertSessionHasErrors('reason');
+    $this->post('/scholarships/applications/bulk', ['status' => 'rejected', 'applications' => [$unchecked->uuid], 'reason' => 'Dossier hors délai de dépôt.'])->assertSessionHasNoErrors();
+    expect($unchecked->fresh())->status->toBe(ScholarshipApplicationStatus::Rejected)->decision_reason->toBe('Dossier hors délai de dépôt.');
+});
+it('keeps bulk decisions to the accounts that may read the files', function () {
+    $application = receiveFile($this);
+    $this->actingAs($this->staff)->post('/scholarships/applications/bulk', ['status' => 'in_review', 'applications' => [$application->uuid]])->assertForbidden();
+    Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.review');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->actingAs($this->central->fresh())->post('/scholarships/applications/bulk', ['status' => 'in_review', 'applications' => [$application->uuid]])
+        ->assertInertiaFlash('toast.type', 'warning');
+    expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::Pending);
+});
+
+it('explains in plain words why a file cannot be validated yet', function () {
+    $this->record->update(['source' => 'central', 'verification' => 'pending', 'status' => 'pending']);
+    $application = receiveFile($this);
+    $pending = 'La situation de l’étudiant est en attente de la liste de Faculté des Sciences : le dossier pourra être validé une fois cette liste importée.';
+    $this->actingAs($this->central)->get('/scholarships/applications')->assertInertia(fn (Assert $page) => $page
+        // The list validates quickly (checks still to do are confirmed): only the situation blocks there.
+        ->where('applications.data.0.validationBlockers', [$pending]));
+    $this->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page
+        ->where('validationBlockers', [$pending, '5 contrôles sur 5 restent à faire ou non conformes : ouvrez le dossier pour les compléter.']));
+    // Refused from the list too, and the checks are left untouched.
+    $this->from('/scholarships/applications')->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated', 'from_list' => true])->assertSessionHasErrors('status');
+    expect($application->checks()->where('status', 'ok')->count())->toBe(0)->and($application->fresh()->status)->toBe(ScholarshipApplicationStatus::Pending);
+    expect(fn () => app(TransitionScholarshipApplication::class)->handle($this->central, $application, ScholarshipApplicationStatus::Validated))
+        ->toThrow(ValidationException::class, 'Validation impossible. '.$pending);
+
+    // Situation confirmed by the list and checks done: nothing left, « Valider » is open.
+    $this->record->update(['verification' => 'verified', 'status' => 'active']);
+    completeChecks($application, $this->central);
+    $this->get('/scholarships/applications/'.$application->uuid)->assertInertia(fn (Assert $page) => $page->where('validationBlockers', []));
+});
+
+it('receives the file of a pending central entry but validates it only once the establishment list confirmed it', function () {
+    $this->record->update(['source' => 'central', 'verification' => 'pending', 'status' => 'pending']);
+    $application = receiveFile($this);
+    completeChecks($application, $this->central);
+    $this->actingAs($this->central)->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
+    $this->record->update(['verification' => 'matched']);
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertSessionHasErrors('status');
+    $this->record->update(['verification' => 'verified', 'status' => 'active']);
+    $this->post('/scholarships/applications/'.$application->uuid.'/status', ['status' => 'validated'])->assertRedirect();
+    expect($application->fresh()->status)->toBe(ScholarshipApplicationStatus::Validated);
 });
