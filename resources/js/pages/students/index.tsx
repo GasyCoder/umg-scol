@@ -1,10 +1,14 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    BadgeCheck,
     BookMarked,
     CircleCheck,
     CircleOff,
+    ClipboardCheck,
+    GraduationCap,
     HandCoins,
+    Mail,
     Power,
     PowerOff,
     Trash2,
@@ -19,6 +23,7 @@ import {
     RotateCcw,
     Route,
     Search,
+    SlidersHorizontal,
     UserPlus,
     Users,
 } from 'lucide-react';
@@ -58,15 +63,26 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { REPEAT_CODE_LABELS, SEX_LABELS } from '@/components/students/types';
-import type { AnnualRecord, Options } from '@/components/students/types';
+import {
+    REPEAT_CODE_LABELS,
+    RECORD_STATUS_LABELS,
+    SEX_LABELS,
+    SOURCE_LABELS,
+    VERIFICATION_LABELS,
+    VERIFICATION_SHORT,
+} from '@/components/students/types';
+import type {
+    AnnualRecord,
+    Options,
+    SituationSource,
+} from '@/components/students/types';
 
 type Row = AnnualRecord & {
     program?: {
         id: number;
         code?: string | null;
         name: string;
-        mention?: { name: string } | null;
+        mention?: { name: string; code?: string | null } | null;
     } | null;
 };
 type MentionOption = {
@@ -76,6 +92,29 @@ type MentionOption = {
     name: string;
 };
 type Choice = { value: string; label: string };
+/** Display abbreviation only; never assigns or changes an official reference code. */
+function referenceCode(reference: {
+    name: string;
+    code?: string | null;
+}): string {
+    if (reference.code?.trim()) return reference.code.trim();
+
+    return (
+        reference.name
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .split(/[^\p{L}\p{N}]+/u)
+            .filter(
+                (word) =>
+                    word &&
+                    !/^(a|au|aux|d|de|des|du|en|et|l|la|le|les)$/i.test(word),
+            )
+            .map((word) => word[0])
+            .join('')
+            .toLocaleUpperCase('fr') || 'Sans code'
+    );
+}
+
 type FilterKey =
     | 'search'
     | 'academic_year_id'
@@ -83,7 +122,10 @@ type FilterKey =
     | 'level_id'
     | 'mention_id'
     | 'program_id'
-    | 'status';
+    | 'status'
+    | 'holder'
+    | 'verification'
+    | 'source';
 type Filters = Partial<Record<FilterKey | 'view', string>>;
 type Step = 'establishments' | 'levels' | 'mentions' | 'programs' | 'list';
 type Card = {
@@ -92,8 +134,55 @@ type Card = {
     code: string | null;
     active: number;
     inactive: number;
+    pending?: number;
+    /** Active situations of each origin. */
+    sources?: Partial<Record<SituationSource, number>>;
 };
 type Params = Record<string, string | number>;
+type Origin = { value: SituationSource; label: string; count: number };
+
+/** Origins of a situation, in the order of the page, with a short label and one plain sentence. */
+const ORIGINS: Record<SituationSource, { short: string; sentence: string }> = {
+    establishment: {
+        short: 'Liste établissement',
+        sentence:
+            'Étudiants déclarés par les listes Excel des établissements (inscriptions faites dans l’établissement).',
+    },
+    pnes: {
+        short: 'Base PNES',
+        sentence:
+            'Boursiers de la base nationale PNES, avec leur code bourse, rattachés à leur établissement.',
+    },
+    preinscription: {
+        short: 'Préinscription',
+        sentence:
+            'Nouveaux bacheliers retenus après la sélection des dossiers, pris en première année.',
+    },
+    central: {
+        short: 'Saisie Scolarité',
+        sentence: 'Étudiants ajoutés manuellement par la Scolarité Centrale.',
+    },
+};
+const STATUS_CHOICES: Choice[] = [
+    { value: 'active', label: 'Actives' },
+    { value: 'pending', label: 'En attente' },
+    { value: 'inactive', label: 'Inactives' },
+];
+const HOLDER_CHOICES: Choice[] = [
+    { value: 'yes', label: 'Oui' },
+    { value: 'no', label: 'Non' },
+];
+const VERIFICATION_CHOICES: Choice[] = [
+    { value: 'verified', label: 'Vérifiées' },
+    { value: 'matched', label: 'À valider' },
+    { value: 'pending', label: 'Pas encore dans la liste' },
+];
+const ORIGIN_ORDER: SituationSource[] = [
+    'establishment',
+    'pnes',
+    'preinscription',
+    'central',
+];
 type Stats = {
     total: number;
     active: number;
@@ -101,8 +190,14 @@ type Stats = {
     requests: number;
     incomplete: number;
     establishments: number;
+    /** Scholarship holders of the PNES base. */
+    holders: number;
+    /** Situations entered by the central office, not yet confirmed by the establishment's list. */
+    to_verify: number;
+    /** Central entries waiting for their validation (status « En attente »). */
+    pending: number;
 };
-type BulkAction = 'deactivate' | 'activate' | 'trash';
+type BulkAction = 'deactivate' | 'activate' | 'trash' | 'verify';
 
 const bulkLabels: Record<
     BulkAction,
@@ -126,6 +221,12 @@ const bulkLabels: Record<
             'Chaque étudiant sélectionné et ses situations vont dans la corbeille ; ils restent restaurables depuis la corbeille.',
         confirm: 'Mettre à la corbeille',
     },
+    verify: {
+        title: 'Valider les situations sélectionnées',
+        description:
+            'Seules les situations trouvées dans la liste de l’établissement (« À valider ») sont validées ; les autres restent en attente.',
+        confirm: 'Valider',
+    },
 };
 
 /** Reads the XSRF cookie Laravel sets, for the export of the selection (a file, not an Inertia visit). */
@@ -136,6 +237,47 @@ const xsrfToken = () =>
             .find((item) => item.startsWith('XSRF-TOKEN='))
             ?.split('=')[1] ?? '',
     );
+
+/** Exports the displayed scope and filters, across every page. */
+function StudentExportButton({
+    href,
+    hasYear,
+    label = 'Exporter les résultats (Excel)',
+}: {
+    href: string;
+    hasYear: boolean;
+    label?: string;
+}) {
+    if (hasYear) {
+        return (
+            <Button variant="outline" asChild>
+                <a
+                    href={href}
+                    title="Tous les résultats correspondant à la catégorie et aux filtres appliqués, sur toutes les pages."
+                >
+                    <Download aria-hidden="true" />
+                    {label}
+                </a>
+            </Button>
+        );
+    }
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                    <Button type="button" variant="outline" disabled>
+                        <Download aria-hidden="true" />
+                        {label}
+                    </Button>
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>
+                Choisissez une année universitaire pour exporter.
+            </TooltipContent>
+        </Tooltip>
+    );
+}
 
 /** Counter tile above the list; clickable when it filters the list. */
 function StatTile({
@@ -241,12 +383,28 @@ function BrowserCard({
     card,
     icon: Icon,
     href,
+    showOrigins,
 }: {
     card: Card;
     icon: LucideIcon;
     href: string;
+    /** No origin chosen: the card says where its students come from. */
+    showOrigins: boolean;
 }) {
     const empty = card.id === NONE;
+    // Origins of the active situations, when the card mixes several or is not only establishment lists.
+    const parts = ORIGIN_ORDER.filter(
+        (origin) => (card.sources?.[origin] ?? 0) > 0,
+    );
+    const breakdown =
+        showOrigins && (parts.length > 1 || parts[0] !== 'establishment')
+            ? parts
+                  .map(
+                      (origin) =>
+                          `${ORIGINS[origin].short} ${number(card.sources?.[origin] ?? 0)}`,
+                  )
+                  .join(' · ')
+            : null;
     return (
         <Link
             href={href}
@@ -273,11 +431,18 @@ function BrowserCard({
                 >
                     {card.label}
                 </span>
-                {card.code && (
-                    <span className="mt-0.5 inline-flex rounded bg-secondary px-1.5 font-mono text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        {card.code}
-                    </span>
-                )}
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    {card.code && (
+                        <span className="inline-flex rounded bg-secondary px-1.5 font-mono text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            {card.code}
+                        </span>
+                    )}
+                    {breakdown && (
+                        <span className="truncate text-[11px] text-muted-foreground">
+                            {breakdown}
+                        </span>
+                    )}
+                </span>
             </span>
             <span className="shrink-0 text-right">
                 <span className="block font-heading text-lg leading-tight font-extrabold text-foreground tabular-nums">
@@ -285,6 +450,8 @@ function BrowserCard({
                 </span>
                 <span className="block text-[11px] text-muted-foreground">
                     {card.active > 1 ? 'actifs' : 'actif'}
+                    {(card.pending ?? 0) > 0 &&
+                        ` · ${number(card.pending ?? 0)} en attente`}
                     {card.inactive > 0 &&
                         ` · ${number(card.inactive)} inactif${card.inactive > 1 ? 's' : ''}`}
                 </span>
@@ -294,6 +461,48 @@ function BrowserCard({
                 aria-hidden="true"
             />
         </Link>
+    );
+}
+
+/**
+ * Where the students of the selection come from: the establishment lists, the national PNES base,
+ * the pre-registration results or a central entry. Works for the cards and for the list.
+ */
+function OriginFilter({
+    origins,
+    current,
+    href,
+}: {
+    origins: Origin[];
+    current?: string;
+    href: (source?: string) => string;
+}) {
+    const shown = ORIGIN_ORDER.map((value) =>
+        origins.find((origin) => origin.value === value),
+    ).filter(
+        (origin): origin is Origin =>
+            origin !== undefined &&
+            (origin.value !== 'central' ||
+                origin.count > 0 ||
+                current === 'central'),
+    );
+    const total = origins.reduce((sum, origin) => sum + origin.count, 0);
+    return (
+        <div className="w-full min-w-0 sm:w-60">
+            <FilterSelect
+                id="filter-origin"
+                label="Origine"
+                value={current}
+                allLabel={`Toutes (${number(total)})`}
+                choices={shown.map((origin) => ({
+                    value: origin.value,
+                    label: `${ORIGINS[origin.value].short} (${number(origin.count)})`,
+                }))}
+                onChange={(source) =>
+                    router.get(href(source), {}, { preserveScroll: true })
+                }
+            />
+        </div>
     );
 }
 
@@ -346,6 +555,9 @@ function FilterSelect({
     choices: Choice[];
     onChange: (value: string | undefined) => void;
 }) {
+    const selectedLabel =
+        choices.find((choice) => choice.value === value)?.label ?? allLabel;
+
     return (
         <Field id={id} label={label}>
             <Select
@@ -354,14 +566,30 @@ function FilterSelect({
                     onChange(item === ALL ? undefined : item)
                 }
             >
-                <SelectTrigger id={id} className="w-full bg-background">
-                    <SelectValue placeholder={allLabel} />
+                <SelectTrigger
+                    id={id}
+                    className="w-full max-w-full min-w-0 overflow-hidden bg-background"
+                    title={selectedLabel}
+                >
+                    <SelectValue className="min-w-0 flex-1 text-left">
+                        <span className="block truncate">{selectedLabel}</span>
+                    </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                    align="start"
+                    avoidCollisions
+                    className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]"
+                >
                     <SelectItem value={ALL}>{allLabel}</SelectItem>
                     {choices.map((choice) => (
-                        <SelectItem key={choice.value} value={choice.value}>
-                            {choice.label}
+                        <SelectItem
+                            key={choice.value}
+                            value={choice.value}
+                            className="whitespace-normal [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1"
+                        >
+                            <span className="min-w-0 text-left wrap-anywhere">
+                                {choice.label}
+                            </span>
                         </SelectItem>
                     ))}
                 </SelectContent>
@@ -382,10 +610,15 @@ export default function StudentsIndex({
     mentions,
     canCreate,
     canExport,
+    canNotifyStudents,
+    canVerify,
+    origins = [],
 }: {
     step: Step;
     cards: Card[];
     stats: Stats;
+    /** Situations of the selection by origin (StudentController::origins). */
+    origins?: Origin[];
     trail: { label: string; params: Params }[];
     year: { id: number; name: string; is_current: boolean } | null;
     records: { data: Row[]; total: number; links: PageLink[] } | null;
@@ -394,12 +627,34 @@ export default function StudentsIndex({
     mentions: MentionOption[];
     canCreate: boolean;
     canExport: boolean;
+    /** Email the selected students about missing or doubtful information (ADR-088). */
+    canNotifyStudents: boolean;
+    canVerify: boolean;
 }) {
     const { auth } = usePage().props;
     const [search, setSearch] = useState(filters.search ?? '');
+    const [moreOpen, setMoreOpen] = useState(false);
     // Selection of the rows of the current page (by situation uuid), cleared when the page changes.
     const [selected, setSelected] = useState<string[]>([]);
     const [bulk, setBulk] = useState<BulkAction | null>(null);
+    const [notifying, setNotifying] = useState(false);
+    const [notifyProcessing, setNotifyProcessing] = useState(false);
+    // The selection holds annual situations: the server finds each one's student.
+    const notifySelection = () => {
+        setNotifyProcessing(true);
+        router.post(
+            '/students/notifications',
+            { records: selected },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setNotifying(false);
+                    setSelected([]);
+                },
+                onFinish: () => setNotifyProcessing(false),
+            },
+        );
+    };
     const [busy, setBusy] = useState(false);
     const [exporting, setExporting] = useState(false);
     const pageKey = records?.data.map((row) => row.uuid).join(',') ?? '';
@@ -476,6 +731,18 @@ export default function StudentsIndex({
             ? name
             : `${name} (${codes.get(establishmentId) ?? '?'})`;
 
+    const referenceChoice = (item: {
+        id: number;
+        name: string;
+        code?: string | null;
+        establishment_id?: number;
+    }): Choice => {
+        return {
+            value: String(item.id),
+            label: withCode(referenceCode(item), item.establishment_id),
+        };
+    };
+
     // Filters and searches always lead to the whole list ("Tous les étudiants").
     const apply = (changes: Filters) =>
         router.get(LIST_URL, clean({ ...filters, ...changes, view: 'list' }), {
@@ -500,10 +767,7 @@ export default function StudentsIndex({
                     !establishment ||
                     String(item.establishment_id) === establishment,
             )
-            .map((item) => ({
-                value: String(item.id),
-                label: withCode(item.name, item.establishment_id),
-            })),
+            .map(referenceChoice),
         { value: NONE, label: 'Sans mention' },
     ];
     const programChoices: Choice[] = [
@@ -517,13 +781,43 @@ export default function StudentsIndex({
                             ? !item.mention
                             : String(item.mention?.id) === filters.mention_id)),
             )
-            .map((item) => ({
-                value: String(item.id),
-                label: withCode(item.name, item.establishment_id),
-            })),
+            .map(referenceChoice),
         { value: NONE, label: 'Sans parcours' },
     ];
 
+    const levelChoices: Choice[] = options.levels.map((item) => ({
+        value: String(item.id),
+        label: item.code ? `${item.code} — ${item.name}` : item.name,
+    }));
+    // Secondary filters in use, shown as removable chips (the panel stays closed).
+    const chipOf = (
+        key: FilterKey,
+        label: string,
+        choices: Choice[],
+        clear: Filters = {},
+    ) => {
+        const value = filters[key];
+        if (!value) return [];
+        const choice = choices.find((item) => item.value === value);
+        return [
+            {
+                key,
+                label,
+                value: choice?.label ?? value,
+                clear: { [key]: undefined, ...clear } as Filters,
+            },
+        ];
+    };
+    const chips = [
+        ...chipOf('level_id', 'Niveau', levelChoices),
+        ...chipOf('mention_id', 'Mention', mentionChoices, {
+            program_id: undefined,
+        }),
+        ...chipOf('program_id', 'Parcours', programChoices),
+        ...chipOf('status', 'Statut', STATUS_CHOICES),
+        ...chipOf('holder', 'Boursier', HOLDER_CHOICES),
+        ...chipOf('verification', 'Vérification', VERIFICATION_CHOICES),
+    ];
     // Any filter but the year (the year is a scope, not a narrowing of the list).
     const filtered = Boolean(
         filters.search ||
@@ -531,9 +825,18 @@ export default function StudentsIndex({
         filters.mention_id ||
         filters.program_id ||
         filters.status ||
+        filters.holder ||
+        filters.verification ||
+        filters.source ||
         (!fixed && filters.establishment_id),
     );
     const resettable = filtered || Boolean(filters.academic_year_id);
+    const templateUrl = `/students/template?${new URLSearchParams(
+        clean({
+            establishment_id: fixed ? String(fixed) : filters.establishment_id,
+            academic_year_id: year ? String(year.id) : undefined,
+        }),
+    ).toString()}`;
     const exportUrl = `/students/export?${new URLSearchParams(
         clean({
             ...filters,
@@ -541,22 +844,23 @@ export default function StudentsIndex({
         }),
     ).toString()}`;
     const listMode = step === 'list';
-    // Counters link to the list of the current selection, by status.
-    const statusHref = (status?: string) =>
+    // Counters link to the list of the current selection, narrowed by the counter.
+    const listHref = (changes: Filters) =>
         url(
             clean({
                 ...(listMode ? filters : (scope as Filters)),
                 view: 'list',
-                status,
+                ...changes,
             }) as Params,
         );
+    const statusHref = (status?: string) => listHref({ status });
     const total = records?.total ?? 0;
     // Scope of the current card step: the list view of « this selection ».
     const scope: Params =
         trail.at(-1)?.params ?? (year ? { academic_year_id: year.id } : {});
     const definition = listMode ? null : steps[step];
     const tiles = (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 2xl:grid-cols-7">
             <StatTile
                 icon={Users}
                 label={
@@ -599,68 +903,47 @@ export default function StudentsIndex({
                 tone="bg-warning-soft text-warning-foreground"
                 hint="Situations sans code de redoublement"
             />
+            <StatTile
+                icon={GraduationCap}
+                label="Boursiers PNES"
+                value={stats.holders}
+                tone="bg-accent text-primary"
+                href={listHref({ holder: 'yes' })}
+                active={filters.holder === 'yes'}
+                hint="Boursiers de l’année selon la base PNES"
+            />
+            <StatTile
+                icon={ClipboardCheck}
+                label="En attente"
+                value={stats.pending}
+                tone="bg-warning-soft text-warning-foreground"
+                href={statusHref('pending')}
+                active={filters.status === 'pending'}
+                hint="Saisies de la Scolarité, actives seulement après validation (liste de l’établissement ou base PNES)"
+            />
         </div>
     );
-    const unit = year
-        ? total > 1
-            ? 'étudiants'
-            : 'étudiant'
-        : total > 1
-          ? 'situations'
-          : 'situation';
 
     return (
         <>
             <Head title="Étudiants déclarés" />
-            <PageBody>
+            <PageBody className="space-y-4">
                 <PageHeader
-                    icon={Users}
                     title="Étudiants déclarés"
-                    description="Tous les étudiants inscrits dans votre périmètre, avec leur établissement et leur situation de l’année."
-                    meta={
-                        <ToneBadge
-                            tone={year?.is_current ? 'primary' : 'neutral'}
-                        >
-                            {listMode
-                                ? `${number(total)} ${unit} · `
-                                : 'Année '}
-                            {year
-                                ? `${year.name}${year.is_current ? '' : ' (non courante)'}`
-                                : 'toutes les années'}
-                        </ToneBadge>
-                    }
+                    description="Consultez les étudiants déjà inscrits dans les établissements."
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            {canExport &&
-                                (year ? (
-                                    <Button variant="outline" asChild>
-                                        <a
-                                            href={exportUrl}
-                                            title="Fichier Excel au format du modèle établissement, réimportable tel quel (situations actives sauf statut choisi)"
-                                        >
-                                            <Download aria-hidden="true" />
-                                            Exporter (modèle Excel)
-                                        </a>
-                                    </Button>
-                                ) : (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span tabIndex={0}>
-                                                <Button
-                                                    variant="outline"
-                                                    disabled
-                                                >
-                                                    <Download aria-hidden="true" />
-                                                    Exporter (modèle Excel)
-                                                </Button>
-                                            </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            Choisissez une année universitaire
-                                            pour exporter.
-                                        </TooltipContent>
-                                    </Tooltip>
-                                ))}
+                            {canExport && (
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href={templateUrl}
+                                        title="Modèle Excel vide, avec les colonnes, les listes déroulantes et les formules pour préparer un fichier d’étudiants."
+                                    >
+                                        <Download aria-hidden="true" />
+                                        Exporter le modèle
+                                    </a>
+                                </Button>
+                            )}
                             {canCreate && (
                                 <Button asChild>
                                     <Link href="/students/create">
@@ -673,47 +956,92 @@ export default function StudentsIndex({
                     }
                 />
 
-                <nav
-                    aria-label="Affichage des étudiants"
-                    className="inline-flex w-fit rounded-lg border bg-muted/40 p-1"
-                >
-                    {(
-                        [
-                            {
-                                key: 'cards',
-                                label: 'Par établissement',
-                                icon: LayoutGrid,
-                                href: url(
-                                    year ? { academic_year_id: year.id } : {},
-                                ),
-                                active: !listMode,
-                            },
-                            {
-                                key: 'list',
-                                label: 'Tous les étudiants',
-                                icon: List,
-                                href: url({ ...scope, view: 'list' }),
-                                active: listMode,
-                            },
-                        ] as const
-                    ).map((item) => (
-                        <Link
-                            key={item.key}
-                            href={item.href}
-                            aria-current={item.active ? 'page' : undefined}
-                            className={
-                                item.active
-                                    ? 'inline-flex items-center gap-2 rounded-md bg-card px-3 py-1.5 text-sm font-semibold text-primary shadow-card'
-                                    : 'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground'
-                            }
-                        >
-                            <item.icon className="size-4" aria-hidden="true" />
-                            {item.label}
-                        </Link>
-                    ))}
-                </nav>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <nav
+                        aria-label="Affichage des étudiants"
+                        className="inline-flex w-fit rounded-lg border bg-muted/40 p-1"
+                    >
+                        {(
+                            [
+                                {
+                                    key: 'cards',
+                                    label: 'Par établissement',
+                                    icon: LayoutGrid,
+                                    href: url({
+                                        ...(year
+                                            ? { academic_year_id: year.id }
+                                            : {}),
+                                        ...(filters.source
+                                            ? { source: filters.source }
+                                            : {}),
+                                    }),
+                                    active: !listMode,
+                                },
+                                {
+                                    key: 'list',
+                                    label: 'Tous les étudiants',
+                                    icon: List,
+                                    href: url({ ...scope, view: 'list' }),
+                                    active: listMode,
+                                },
+                            ] as const
+                        ).map((item) => (
+                            <Link
+                                key={item.key}
+                                href={item.href}
+                                aria-current={item.active ? 'page' : undefined}
+                                className={
+                                    item.active
+                                        ? 'inline-flex items-center gap-2 rounded-md bg-card px-3 py-1.5 text-sm font-semibold text-primary shadow-card'
+                                        : 'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground'
+                                }
+                            >
+                                <item.icon
+                                    className="size-4"
+                                    aria-hidden="true"
+                                />
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
 
-                {tiles}
+                    <OriginFilter
+                        origins={origins}
+                        current={filters.source}
+                        href={(source) =>
+                            url(
+                                clean({
+                                    ...(listMode
+                                        ? filters
+                                        : (scope as Filters)),
+                                    source,
+                                }) as Params,
+                            )
+                        }
+                    />
+                </div>
+
+                <details className="group rounded-lg border bg-card px-4 py-3">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-2 rounded-sm text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                        <span className="font-semibold tabular-nums">
+                            {number(stats.total)} étudiant
+                            {stats.total > 1 ? 's' : ''}
+                        </span>
+                        {stats.pending > 0 && (
+                            <span className="text-warning-foreground">
+                                {number(stats.pending)} en attente
+                            </span>
+                        )}
+                        <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            Statistiques
+                            <ChevronRight
+                                className="size-4 transition-transform group-open:rotate-90"
+                                aria-hidden="true"
+                            />
+                        </span>
+                    </summary>
+                    <div className="pt-3">{tiles}</div>
+                </details>
 
                 {!listMode && definition && (
                     <>
@@ -860,6 +1188,7 @@ export default function StudentsIndex({
                                                 ...scope,
                                                 [definition.param]: card.id,
                                             })}
+                                            showOrigins={false}
                                         />
                                     ))}
                                 </div>
@@ -874,13 +1203,13 @@ export default function StudentsIndex({
                             onSubmit={submit}
                             role="search"
                             aria-label="Filtres des étudiants"
-                            className="surface space-y-2 p-3 sm:p-4"
+                            className="surface space-y-3 p-3 sm:p-4"
                         >
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-[minmax(14rem,1.6fr)_repeat(6,minmax(0,1fr))]">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                                 <Field
                                     id="filter-search"
                                     label="Recherche"
-                                    className="sm:col-span-2 2xl:col-span-1"
+                                    className="min-w-0 flex-1"
                                 >
                                     <div className="flex gap-2">
                                         <div className="relative min-w-0 flex-1">
@@ -892,7 +1221,7 @@ export default function StudentsIndex({
                                                 id="filter-search"
                                                 type="search"
                                                 className="bg-background pl-9"
-                                                placeholder="Nom, prénoms, CIN, téléphone, email"
+                                                placeholder="Nom, prénoms, CIN, téléphone, email, code bourse"
                                                 value={search}
                                                 onChange={(event) =>
                                                     setSearch(
@@ -912,106 +1241,166 @@ export default function StudentsIndex({
                                         </Button>
                                     </div>
                                 </Field>
-                                <FilterSelect
-                                    id="filter-year"
-                                    label="Année"
-                                    value={year ? String(year.id) : ALL}
-                                    allLabel="Toutes les années"
-                                    choices={yearChoices}
-                                    onChange={(value) =>
-                                        apply({
-                                            academic_year_id: value ?? ALL,
-                                        })
-                                    }
-                                />
-                                {!fixed && (
+                                <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-end">
+                                    <div className="lg:w-48">
+                                        <FilterSelect
+                                            id="filter-year"
+                                            label="Année"
+                                            value={year ? String(year.id) : ALL}
+                                            allLabel="Toutes les années"
+                                            choices={yearChoices}
+                                            onChange={(value) =>
+                                                apply({
+                                                    academic_year_id:
+                                                        value ?? ALL,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                    {!fixed && (
+                                        <div className="lg:w-64">
+                                            <FilterSelect
+                                                id="filter-establishment"
+                                                label="Établissement"
+                                                value={filters.establishment_id}
+                                                allLabel="Tous"
+                                                choices={options.establishments.map(
+                                                    (item) => ({
+                                                        value: String(item.id),
+                                                        label: item.code
+                                                            ? `${item.code} — ${item.name}`
+                                                            : item.name,
+                                                    }),
+                                                )}
+                                                onChange={(value) =>
+                                                    apply({
+                                                        establishment_id: value,
+                                                        mention_id: undefined,
+                                                        program_id: undefined,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant={moreOpen ? 'secondary' : 'outline'}
+                                    className="bg-background lg:shrink-0"
+                                    aria-expanded={moreOpen}
+                                    aria-controls="more-filters"
+                                    onClick={() => setMoreOpen(!moreOpen)}
+                                >
+                                    <SlidersHorizontal aria-hidden="true" />
+                                    Filtres
+                                    {chips.length > 0 && (
+                                        <span className="rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground tabular-nums">
+                                            {chips.length}
+                                        </span>
+                                    )}
+                                </Button>
+                            </div>
+                            {moreOpen && (
+                                <div
+                                    id="more-filters"
+                                    className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6"
+                                >
                                     <FilterSelect
-                                        id="filter-establishment"
-                                        label="Établissement"
-                                        value={filters.establishment_id}
+                                        id="filter-level"
+                                        label="Niveau"
+                                        value={filters.level_id}
                                         allLabel="Tous"
-                                        choices={options.establishments.map(
-                                            (item) => ({
-                                                value: String(item.id),
-                                                label: item.code
-                                                    ? `${item.code} — ${item.name}`
-                                                    : item.name,
-                                            }),
-                                        )}
+                                        choices={levelChoices}
+                                        onChange={(value) =>
+                                            apply({ level_id: value })
+                                        }
+                                    />
+                                    <FilterSelect
+                                        id="filter-mention"
+                                        label={
+                                            establishment
+                                                ? 'Mention'
+                                                : 'Mention (établissement)'
+                                        }
+                                        value={filters.mention_id}
+                                        allLabel="Toutes"
+                                        choices={mentionChoices}
                                         onChange={(value) =>
                                             apply({
-                                                establishment_id: value,
-                                                mention_id: undefined,
+                                                mention_id: value,
                                                 program_id: undefined,
                                             })
                                         }
                                     />
-                                )}
-                                <FilterSelect
-                                    id="filter-level"
-                                    label="Niveau"
-                                    value={filters.level_id}
-                                    allLabel="Tous"
-                                    choices={options.levels.map((item) => ({
-                                        value: String(item.id),
-                                        label: item.code
-                                            ? `${item.code} — ${item.name}`
-                                            : item.name,
-                                    }))}
-                                    onChange={(value) =>
-                                        apply({ level_id: value })
-                                    }
-                                />
-                                <FilterSelect
-                                    id="filter-mention"
-                                    label={
-                                        establishment
-                                            ? 'Mention'
-                                            : 'Mention (établissement)'
-                                    }
-                                    value={filters.mention_id}
-                                    allLabel="Toutes"
-                                    choices={mentionChoices}
-                                    onChange={(value) =>
-                                        apply({
-                                            mention_id: value,
-                                            program_id: undefined,
-                                        })
-                                    }
-                                />
-                                <FilterSelect
-                                    id="filter-program"
-                                    label={
-                                        establishment
-                                            ? 'Parcours'
-                                            : 'Parcours (établissement)'
-                                    }
-                                    value={filters.program_id}
-                                    allLabel="Tous"
-                                    choices={programChoices}
-                                    onChange={(value) =>
-                                        apply({ program_id: value })
-                                    }
-                                />
-                                <FilterSelect
-                                    id="filter-status"
-                                    label="Statut"
-                                    value={filters.status}
-                                    allLabel="Toutes"
-                                    choices={[
-                                        { value: 'active', label: 'Actives' },
-                                        {
-                                            value: 'inactive',
-                                            label: 'Inactives',
-                                        },
-                                    ]}
-                                    onChange={(value) =>
-                                        apply({ status: value })
-                                    }
-                                />
-                            </div>
-                            {(resettable || error) && (
-                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <FilterSelect
+                                        id="filter-program"
+                                        label={
+                                            establishment
+                                                ? 'Parcours'
+                                                : 'Parcours (établissement)'
+                                        }
+                                        value={filters.program_id}
+                                        allLabel="Tous"
+                                        choices={programChoices}
+                                        onChange={(value) =>
+                                            apply({ program_id: value })
+                                        }
+                                    />
+                                    <FilterSelect
+                                        id="filter-status"
+                                        label="Statut"
+                                        value={filters.status}
+                                        allLabel="Tous"
+                                        choices={STATUS_CHOICES}
+                                        onChange={(value) =>
+                                            apply({ status: value })
+                                        }
+                                    />
+                                    <FilterSelect
+                                        id="filter-holder"
+                                        label="Boursier"
+                                        value={filters.holder}
+                                        allLabel="Tous"
+                                        choices={HOLDER_CHOICES}
+                                        onChange={(value) =>
+                                            apply({ holder: value })
+                                        }
+                                    />
+                                    <FilterSelect
+                                        id="filter-verification"
+                                        label="Vérification"
+                                        value={filters.verification}
+                                        allLabel="Toutes"
+                                        choices={VERIFICATION_CHOICES}
+                                        onChange={(value) =>
+                                            apply({ verification: value })
+                                        }
+                                    />
+                                </div>
+                            )}
+                            {(chips.length > 0 || resettable || error) && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {chips.map((chip) => (
+                                        <button
+                                            key={chip.key}
+                                            type="button"
+                                            onClick={() => apply(chip.clear)}
+                                            className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs text-foreground transition-colors hover:border-destructive/40 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:max-w-60"
+                                            title={`${chip.label} : ${chip.value}`}
+                                            aria-label={`Retirer le filtre ${chip.label} : ${chip.value}`}
+                                        >
+                                            <span className="shrink-0 text-muted-foreground">
+                                                {chip.label} :
+                                            </span>
+                                            <span className="min-w-0 truncate font-medium">
+                                                {chip.value}
+                                            </span>
+                                            <X
+                                                className="size-3.5 shrink-0"
+                                                aria-hidden="true"
+                                            />
+                                        </button>
+                                    ))}
                                     <InputError message={error} />
                                     {resettable && (
                                         <Button
@@ -1026,6 +1415,21 @@ export default function StudentsIndex({
                                             </Link>
                                         </Button>
                                     )}
+                                </div>
+                            )}
+                            {canExport && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        {number(total)} résultat
+                                        {total > 1 ? 's' : ''}
+                                        {filters.source
+                                            ? ` dans la catégorie « ${ORIGINS[filters.source as SituationSource].short} »`
+                                            : ''}
+                                    </p>
+                                    <StudentExportButton
+                                        href={exportUrl}
+                                        hasYear={year !== null}
+                                    />
                                 </div>
                             )}
                         </form>
@@ -1170,6 +1574,31 @@ export default function StudentsIndex({
                                                 Exporter la sélection
                                             </Button>
                                         )}
+                                        {canNotifyStudents && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setNotifying(true)
+                                                }
+                                            >
+                                                <Mail aria-hidden="true" />
+                                                Prévenir par email
+                                            </Button>
+                                        )}
+                                        {canVerify && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-success hover:text-success-foreground"
+                                                onClick={() =>
+                                                    setBulk('verify')
+                                                }
+                                            >
+                                                <BadgeCheck aria-hidden="true" />
+                                                Valider
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -1258,6 +1687,46 @@ export default function StudentsIndex({
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
+                        <Dialog
+                            open={notifying}
+                            onOpenChange={(open) =>
+                                !notifyProcessing && setNotifying(open)
+                            }
+                        >
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        Prévenir {number(selected.length)}{' '}
+                                        étudiant
+                                        {selected.length > 1 ? 's' : ''} par
+                                        email
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        Chaque étudiant reçoit la liste des
+                                        informations vides ou douteuses de sa
+                                        fiche et les corrige depuis le portail.
+                                        Ceux sans email ou sans information à
+                                        signaler sont ignorés et comptés.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <Button
+                                        variant="outline"
+                                        disabled={notifyProcessing}
+                                        onClick={() => setNotifying(false)}
+                                    >
+                                        Annuler
+                                    </Button>
+                                    <Button
+                                        disabled={notifyProcessing}
+                                        onClick={notifySelection}
+                                    >
+                                        {notifyProcessing && <Spinner />}
+                                        Envoyer les emails
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </>
                 )}
             </PageBody>
@@ -1282,12 +1751,16 @@ function StudentRow({
         student?.sex ? SEX_LABELS[student.sex] : null,
         formatBirthDate(student?.birth_date),
     ].filter(Boolean);
-    const mention = record.program
-        ? (record.program.mention?.name ?? 'Sans mention')
-        : null;
-    const path = record.program
-        ? `${mention} › ${record.program.name}`
+    const programCode = record.program
+        ? referenceCode(record.program)
         : 'Sans parcours';
+    const mentionCode = record.program?.mention
+        ? referenceCode(record.program.mention)
+        : 'Sans mention';
+    const path =
+        !record.program || mentionCode === programCode
+            ? programCode
+            : `${mentionCode} › ${programCode}`;
     return (
         <tr className={selected ? 'bg-accent/40' : undefined}>
             <td className="w-10">
@@ -1311,6 +1784,24 @@ function StudentRow({
                     {student?.is_active === false && (
                         <ToneBadge tone="danger">Étudiant désactivé</ToneBadge>
                     )}
+                    {record.is_scholarship_holder && (
+                        <ToneBadge tone="info">Boursier PNES</ToneBadge>
+                    )}
+                    {(record.source === 'preinscription' ||
+                        record.source === 'central') && (
+                        <span title={SOURCE_LABELS[record.source]}>
+                            <ToneBadge tone="neutral">
+                                {ORIGINS[record.source].short}
+                            </ToneBadge>
+                        </span>
+                    )}
+                    {record.verification === 'matched' && (
+                        <span title={VERIFICATION_LABELS[record.verification]}>
+                            <ToneBadge tone="warning">
+                                {VERIFICATION_SHORT[record.verification]}
+                            </ToneBadge>
+                        </span>
+                    )}
                 </div>
             </td>
             <td>
@@ -1329,25 +1820,16 @@ function StudentRow({
                     {record.level?.code ?? record.level?.name}
                 </span>
             </td>
-            <td className="max-w-[20rem]">
+            <td className="w-40 max-w-40">
                 <p
                     className={
                         record.program
-                            ? 'truncate'
-                            : 'truncate text-muted-foreground'
+                            ? 'w-32 truncate font-medium'
+                            : 'w-32 truncate text-muted-foreground'
                     }
                     title={path}
                 >
-                    {record.program ? (
-                        <>
-                            <span className="text-muted-foreground">
-                                {mention} ›
-                            </span>{' '}
-                            {record.program.name}
-                        </>
-                    ) : (
-                        path
-                    )}
+                    {path}
                 </p>
             </td>
             <td>
@@ -1372,7 +1854,7 @@ function StudentRow({
             </td>
             <td>
                 <ToneBadge tone={toneFor(record.status)}>
-                    {record.status === 'active' ? 'Active' : 'Inactive'}
+                    {RECORD_STATUS_LABELS[record.status]}
                 </ToneBadge>
             </td>
             <td>
