@@ -9,6 +9,7 @@ use App\Support\StudentNormalization;
 use Carbon\CarbonInterface;
 use Database\Factories\StudentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,9 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property CarbonInterface|null $cin_issued_at
  * @property StudentSex|null $sex
  */
-#[Fillable(['last_name', 'first_names', 'sex', 'birth_date', 'mother_name', 'cin', 'cin_issued_at', 'cin_issued_place', 'nationality', 'phone', 'email', 'address', 'bac_series', 'bac_year', 'is_active'])]
+#[Fillable(['last_name', 'first_names', 'sex', 'birth_date', 'mother_name', 'cin', 'cin_issued_at', 'cin_issued_place', 'uin', 'scholarship_code', 'bank_account', 'nationality', 'phone', 'email', 'address', 'bac_series', 'bac_year', 'is_active'])]
+// UIN and bank account (PNES) are only given explicitly to the central office, never by default.
+#[Hidden(['uin', 'bank_account'])]
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
@@ -32,7 +35,7 @@ class Student extends Model
 
     protected function casts(): array
     {
-        return ['sex' => StudentSex::class, 'birth_date' => 'date', 'cin_issued_at' => 'date', 'bac_year' => 'integer', 'is_active' => 'boolean'];
+        return ['bank_account' => 'encrypted', 'sex' => StudentSex::class, 'birth_date' => 'date', 'cin_issued_at' => 'date', 'bac_year' => 'integer', 'is_active' => 'boolean'];
     }
 
     public function setAttribute($key, $value): static
@@ -75,10 +78,13 @@ class Student extends Model
      * @param  Builder<Student>  $query
      * @return Builder<Student>
      */
-    public function scopeMatching(Builder $query, string $search): Builder
+    public function scopeMatching(Builder $query, string $search, ?User $actor = null): Builder
     {
-        return $query->where(function ($q) use ($search): void {
-            foreach (['last_name', 'first_names', 'cin', 'phone', 'email'] as $field) {
+        // Also the code bourse, and the UIN for those who may see it.
+        $fields = ['last_name', 'first_names', 'cin', 'phone', 'email', 'scholarship_code', ...($actor?->seesScholarshipRegistry() ? ['uin'] : [])];
+
+        return $query->where(function ($q) use ($search, $fields): void {
+            foreach ($fields as $field) {
                 $term = (string) StudentNormalization::value($field, $search);
                 $pattern = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
                 $pattern = in_array($field, ['last_name', 'first_names'], true) ? '%'.$pattern.'%' : $pattern.'%';
