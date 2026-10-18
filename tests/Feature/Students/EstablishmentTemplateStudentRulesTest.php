@@ -137,19 +137,24 @@ it('accepts a non-standard CIN shared by two identities but not a shared standar
 });
 
 // Scholarship request reference of the annual declaration
-it('rejects a scholarship request reference already given in the same establishment and year', function () {
-    StudentRecord::factory()->create(['academic_year_id' => $this->year->id, 'establishment_id' => $this->establishment->id, 'scholarship_request_reference' => 'DB-2026-001']);
+it('gives the scholarship request reference itself, one sequence per establishment and year, never typed', function () {
+    $this->establishment->update(['code' => 'FST']);
+    $this->year->update(['name' => '2026-2027']);
+    StudentRecord::factory()->create(['academic_year_id' => $this->year->id, 'establishment_id' => $this->establishment->id, 'scholarship_request_reference' => 'FST-2026-00007']);
+    $payload = ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'repeat_code' => 'N', 'scholarship_requested_at' => '2026-10-01', 'scholarship_request_reference' => 'TAPÉ-À-LA-MAIN'];
     $student = Student::factory()->create();
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => AcademicYear::factory()->create()->id, 'establishment_id' => $this->establishment->id]);
-    $payload = ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'repeat_code' => 'N', 'scholarship_requested_at' => '2026-10-01', 'scholarship_request_reference' => ' DB-2026-001 '];
-    $this->actingAs($this->staff)->post('/students/'.$student->uuid.'/records', $payload)->assertSessionHasErrors(['scholarship_request_reference' => 'Cette référence de demande de bourse est déjà attribuée dans l’établissement pour cette année.']);
-    expect($student->studentRecords()->count())->toBe(1);
-    $this->post('/students/'.$student->uuid.'/records', [...$payload, 'scholarship_request_reference' => 'DB-2026-002'])->assertSessionHasNoErrors()->assertRedirect();
+    $this->actingAs($this->staff)->post('/students/'.$student->uuid.'/records', $payload)->assertSessionHasNoErrors()->assertRedirect();
     $record = $student->studentRecords()->where('academic_year_id', $this->year->id)->sole();
-    expect($record->scholarship_request_reference)->toBe('DB-2026-002')->and($record->scholarship_requested_at->format('Y-m-d'))->toBe('2026-10-01')->and($record->repeat_code)->toBe(RepeatCode::New);
-    // Editing the declaration keeps its own reference.
-    $this->put('/student-records/'.$record->uuid, [...$payload, 'scholarship_request_reference' => 'DB-2026-002', 'repeat_code' => 'R'])->assertSessionHasNoErrors();
-    expect($record->fresh()->repeat_code)->toBe(RepeatCode::Repeating);
+    expect($record->scholarship_request_reference)->toBe('FST-2026-00008')->and($record->scholarship_requested_at->format('Y-m-d'))->toBe('2026-10-01')->and($record->repeat_code)->toBe(RepeatCode::New);
+    // Editing the declaration keeps its own reference, whatever is sent.
+    $this->put('/student-records/'.$record->uuid, [...$payload, 'scholarship_request_reference' => 'AUTRE', 'repeat_code' => 'R'])->assertSessionHasNoErrors();
+    expect($record->fresh()->repeat_code)->toBe(RepeatCode::Repeating)->and($record->fresh()->scholarship_request_reference)->toBe('FST-2026-00008');
+    // No deposit date: no reference.
+    $other = Student::factory()->create();
+    StudentRecord::factory()->create(['student_id' => $other->id, 'academic_year_id' => AcademicYear::factory()->create()->id, 'establishment_id' => $this->establishment->id]);
+    $this->post('/students/'.$other->uuid.'/records', [...$payload, 'scholarship_requested_at' => null])->assertSessionHasNoErrors();
+    expect($other->studentRecords()->where('academic_year_id', $this->year->id)->sole()->scholarship_request_reference)->toBeNull();
 });
 
 it('allows the same request reference in another establishment or year and enforces it in SQL', function () {
@@ -159,10 +164,10 @@ it('allows the same request reference in another establishment or year and enfor
     expect(fn () => StudentRecord::factory()->create(['academic_year_id' => $existing->academic_year_id, 'establishment_id' => $existing->establishment_id, 'scholarship_request_reference' => 'DB-1']))->toThrow(QueryException::class);
 });
 
-it('requires the repeat code and a reference when a deposit date is given', function () {
+it('requires the repeat code, not a typed reference, when a deposit date is given', function () {
     $student = Student::factory()->create();
     StudentRecord::factory()->create(['student_id' => $student->id, 'academic_year_id' => AcademicYear::factory()->create()->id, 'establishment_id' => $this->establishment->id]);
     $this->actingAs($this->staff)->post('/students/'.$student->uuid.'/records', ['academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'repeat_code' => 'Q', 'scholarship_requested_at' => '2026-10-01'])
-        ->assertSessionHasErrors(['repeat_code', 'scholarship_request_reference']);
+        ->assertSessionHasErrors(['repeat_code'])->assertSessionDoesntHaveErrors('scholarship_request_reference');
     expect($student->studentRecords()->count())->toBe(1);
 });
