@@ -26,7 +26,7 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
 
     public function chunkSize(): int
     {
-        return (int) config('student_imports.chunk_size');
+        return (int) config('student_imports.read_chunk_size');
     }
 
     public function onRow(Row $row): void
@@ -40,7 +40,7 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
             if ($headers === [] || count(array_filter($headers)) === 0) {
                 throw ValidationException::withMessages(['file' => 'Les en-têtes sont absents.']);
             }
-            $this->import->update(['excel_calendar' => pathinfo($this->import->stored_path, PATHINFO_EXTENSION) === 'csv' ? 1900 : Date::getExcelCalendar(), 'headers' => $headers, 'mapping' => StudentImportColumns::suggest($headers)]);
+            $this->import->update(['excel_calendar' => pathinfo($this->import->stored_path, PATHINFO_EXTENSION) === 'csv' ? 1900 : Date::getExcelCalendar(), 'headers' => $headers, 'mapping' => StudentImportColumns::suggest($headers, $this->import->kind)]);
 
             return;
         }
@@ -58,7 +58,7 @@ class StageStudentSheet implements Import, OnEachRow, WithChunkReading
             throw ValidationException::withMessages(['file' => 'Le fichier dépasse le nombre maximal de lignes.']);
         }
         $this->pending[] = ['student_import_id' => $this->import->id, 'row_number' => $row->getIndex(), 'raw_data' => json_encode($raw, JSON_THROW_ON_ERROR), 'status' => 'rejected', 'created_at' => now(), 'updated_at' => now()];
-        if (count($this->pending) >= $this->chunkSize()) {
+        if (count($this->pending) >= (int) config('student_imports.chunk_size')) {
             $this->flush();
         }
     }
