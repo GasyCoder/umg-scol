@@ -42,15 +42,17 @@ export function ToneBadge({
     );
 }
 
-/** Shared status → tone mapping for every workflow (dossiers, campagnes, corrections, imports, liens). */
+/** Shared status → tone mapping for every workflow (dossiers, corrections, imports, liens). */
 export const statusTones: Record<string, Tone> = {
     // Scholarship applications
     pending: 'warning',
+    // Received file whose situation waits for the establishment's list.
+    awaiting_list: 'neutral',
     in_review: 'info',
     needs_correction: 'warning',
     validated: 'success',
     rejected: 'danger',
-    // Campaigns
+    // Historical campaign statuses (audit compatibility)
     draft: 'neutral',
     scheduled: 'info',
     open: 'success',
