@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Actions\Corrections\CancelStudentCorrection;
 use App\Actions\Corrections\RequestStudentCorrection;
 use App\Enums\StudentCorrectionField;
+use App\Enums\StudentCorrectionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StudentPortal\StoreCorrectionRequest;
 use App\Models\Student;
@@ -27,7 +28,11 @@ class CorrectionController extends Controller
     {
         $correction = $action->handle($request->user(), StudentCorrectionField::from($request->validated('field')), $request->validated('value'), $request->validated('message'));
 
-        return response()->json(['correction' => $this->present($correction), 'message' => 'Votre demande a été transmise. Les informations officielles ne changeront qu’après validation par le personnel.'], 201);
+        $message = $correction->field->appliesDirectly()
+            ? $correction->field->label().' mis à jour.'
+            : 'Votre demande a été transmise. Les informations officielles ne changeront qu’après validation par la scolarité.';
+
+        return response()->json(['correction' => $this->present($correction), 'message' => $message], 201);
     }
 
     public function cancel(Request $request, string $correction, CancelStudentCorrection $action): JsonResponse
@@ -48,7 +53,9 @@ class CorrectionController extends Controller
         return [
             'uuid' => $correction->uuid, 'field' => $correction->field->value, 'field_label' => $correction->field->label(),
             'proposed_value' => $correction->field === StudentCorrectionField::Cin ? str_repeat('•', max(0, mb_strlen($value) - 3)).mb_substr($value, -3) : $value,
-            'status' => $correction->status->value, 'status_label' => $correction->status->label(), 'student_message' => $correction->student_message,
+            // Phone or address saved at once (ADR-089): approved without reviewer.
+            'direct' => $correction->status === StudentCorrectionStatus::Approved && $correction->reviewed_by === null,
+            'status' => $correction->status->value, 'status_label' => $correction->status === StudentCorrectionStatus::Approved && $correction->reviewed_by === null ? 'Enregistrée' : $correction->status->label(), 'student_message' => $correction->student_message,
             'decision_reason' => $correction->rejection_reason, 'created_at' => $correction->created_at->toIso8601String(), 'reviewed_at' => $correction->reviewed_at?->toIso8601String(),
         ];
     }
