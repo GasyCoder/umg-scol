@@ -6,7 +6,7 @@ Centraliser et fiabiliser les informations des étudiants déjà régulièrement
 
 ## Hors périmètre
 
-Inscription/réinscription universitaire, paiement des droits, sélection des étudiants, notes/examens, paiement de la bourse, gestion pédagogique générale.
+Inscription/réinscription universitaire, paiement des droits, sélection des étudiants (seule la liste des admis est reprise), notes/examens, paiement de la bourse, gestion pédagogique générale.
 
 ## Acteurs
 
@@ -33,17 +33,17 @@ Tableau de bord, liste de ses étudiants, ajout/modification, import Excel/CSV, 
 
 Consulter ses informations, confirmer leur exactitude, signaler une correction. Aucune modification directe des données officielles.
 
-Portail prévu : `bourse.umg.test:8000`, réservé aux étudiants, utilisant l'API `/api/student/*` du backend Laravel commun. Création du compte d'accès par email + OTP ou Google OAuth, puis rattachement sécurisé à une fiche `Student` préexistante déclarée par un établissement. La création du compte ne constitue jamais une inscription universitaire ; la vérification de l'email seule ne prouve pas le rattachement à la fiche.
+Portail prévu : `bourse.umg.test:8000`, réservé aux étudiants, utilisant l'API `/api/student/*` du backend Laravel commun. Accès par email officiel déjà présent sur une fiche active, puis OTP (ou Google OAuth soumis à la même restriction), date de naissance et CIN ou renseignement alternatif enregistré. Le rattachement sécurisé à la fiche `Student` est obligatoire avant toute consultation (ADR-086). La création du compte ne constitue jamais une inscription universitaire ; la vérification de l'email seule ne prouve pas le rattachement à la fiche.
 
 Le portail interne `scol.umg.test:8000` utilise Inertia + React + TypeScript et accueille les établissements, la Scolarité Centrale, le superadmin et le developer. Les deux portails, l'authentification étudiante, le rattachement, la demande de correction et la confirmation explicite des informations sont implémentés. La confirmation n'est jamais une condition du traitement papier des bourses.
 
 ## Scolarité Centrale
 
-Recherche globale, consultation tous établissements, réception d'un dossier papier, numéro DDB, vérification, validation, correction, rejet avec motif, historique, statistiques, exports.
+Recherche globale, consultation tous établissements, import de la base PNES des boursiers et des résultats de préinscription des nouveaux bacheliers, saisie d'un étudiant non encore présent dans la liste de son établissement puis validation de sa situation une fois la liste importée, réception d'un dossier papier, numéro DDB, vérification, validation, correction, rejet avec motif, historique, statistiques, exports.
 
 ## Superadmin
 
-Établissements, utilisateurs, rôles/permissions, années universitaires, niveaux, parcours, campagnes, paramètres, audits, statistiques globales.
+Établissements, utilisateurs, rôles/permissions, années universitaires, niveaux, parcours, paramètres, audits, statistiques globales.
 
 ## Développeur
 
@@ -54,16 +54,17 @@ Support/maintenance avec privilèges élevés. Peut être exclu des listes opér
 Champs définis par le fichier modèle des établissements.
 
 Identité : nom, prénoms, sexe, date de naissance, nom et prénoms de la mère, CIN (date et lieu de délivrance), nationalité, année et série du BAC, adresse exacte, téléphone, email (téléphone et email uniques).
-Situation annuelle : année universitaire, établissement, niveau, mention/parcours, code de redoublement (N, R, T+), date de dépôt et référence de la demande de bourse, statut déclaré.
+Base PNES : code bourse (visible avec la fiche), UIN et numéro de compte (réservés à la Scolarité Centrale).
+Situation annuelle : année universitaire, établissement, niveau, mention/parcours, code de redoublement (N, R, T+), date de dépôt et référence de la demande de bourse, statut déclaré, origine (établissement, PNES, Scolarité, préinscription), vérification et statut boursier.
 Référentiels associés : domaine de la mention, type de formation du parcours, institution (publique/privée) de l'établissement, année limite du BAC pour la règle de bourse.
 
 ## Import
 
 Upload → parsing → validation → détection erreurs/doublons → prévisualisation → confirmation → import transactionnel → résumé.
 
-## Campagnes
+## Année des dossiers
 
-Statuts : `draft`, `scheduled`, `open`, `closed`, `archived`.
+La réception utilise l’année universitaire courante active, sans campagne. Un seul dossier actif par étudiant et par année ; le déplacement en corbeille libère cette place.
 
 ## Demandes de bourse
 
@@ -75,4 +76,4 @@ Tracer au minimum connexions, créations, modifications, désactivations, import
 
 ## MVP
 
-Authentification, rôles/permissions, établissements, années, niveaux/parcours, étudiants, `student_records`, imports, recherche, campagnes, traitement des demandes, vérification étudiant, corrections, audit, dashboard, exports.
+Authentification, rôles/permissions, établissements, années, niveaux/parcours, étudiants, `student_records`, imports, recherche, traitement des demandes, vérification étudiant, corrections, audit, dashboard, exports.
