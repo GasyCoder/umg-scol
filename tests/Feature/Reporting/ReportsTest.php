@@ -61,7 +61,11 @@ it('gives global actors global reports, within their module permissions', functi
         expect(collect($props['students'])->pluck('establishment')->unique()->values()->all())->toBe(['Faculté A', 'Institut B'])->and($props['scholarships'])->not->toBeNull();
     }
     $central = reportProps($this, $this->f->central_scholarship_office);
-    expect($central['imports'])->toBeNull()->and($central['students'])->not->toBeNull()->and($central['scholarships'])->not->toBeNull()
+    // The central office has reports.view_own: its national imports are visible,
+    // while the students/imports declared by other accounts are excluded.
+    expect($central['scope']['own'])->toBeTrue()
+        ->and($central['imports'])->toBe([])->and($central['students'])->toBe([])
+        ->and(collect($central['scholarships'])->sum('total'))->toBe(3)
         ->and($central['exports'])->toBe(['students' => true, 'imports' => false, 'scholarships' => true]);
 });
 it('forbids students and enforces each export permission on the server', function () {
