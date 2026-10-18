@@ -8,7 +8,6 @@ use App\Models\Level;
 use App\Models\Mention;
 use App\Models\Program;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentImport;
 use App\Models\StudentImportRow;
@@ -46,13 +45,13 @@ function trashModel(TestCase $test, string $kind, Model $model): void
 {
     $test->delete('/trash/'.$kind.'/'.$model->uuid)->assertSessionHasNoErrors()->assertRedirect();
 }
-it('soft deletes and restores unused references and campaigns', function (string $kind, string $class) {
+it('soft deletes and restores unused references', function (string $kind, string $class) {
     $model = $class::factory()->create();
     trashModel($this, $kind, $model);
     expect($class::query()->whereKey($model->id)->exists())->toBeFalse()->and($class::withTrashed()->find($model->id)->deleted_by)->toBe($this->admin->id);
     $this->post('/trash/'.$kind.'/'.$model->uuid.'/restore')->assertSessionHasNoErrors();
     expect($class::query()->whereKey($model->id)->exists())->toBeTrue();
-})->with([['establishments', Establishment::class], ['academic-years', AcademicYear::class], ['levels', Level::class], ['mentions', Mention::class], ['programs', Program::class], ['campaigns', ScholarshipCampaign::class]]);
+})->with([['establishments', Establishment::class], ['academic-years', AcademicYear::class], ['levels', Level::class], ['mentions', Mention::class], ['programs', Program::class]]);
 it('refuses every direct delete force delete or restore outside the manager', function (string $operation) {
     $model = Level::factory()->create();
     if ($operation === 'restore') {
@@ -223,12 +222,12 @@ it('hides a trashed student from the student API and corrections', function () {
     $this->getJson($base.'/me')->assertForbidden();
     $this->getJson($base.'/corrections')->assertForbidden();
 });
-it('keeps used campaigns and visible paper files protected', function () {
+it('keeps the academic year, student and situation of a paper file protected', function () {
     $student = Student::factory()->create();
     $record = StudentRecord::factory()->create(['student_id' => $student->id]);
-    $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $record->academic_year_id, 'status' => 'open']);
-    $application = app(ReceiveScholarshipApplication::class)->handle($this->admin, $campaign->id, $student->id, null, null);
-    $this->delete('/trash/campaigns/'.$campaign->uuid)->assertSessionHasErrors('trash');
+    $record->academicYear->update(['is_current' => true, 'is_active' => true]);
+    $application = app(ReceiveScholarshipApplication::class)->handle($this->admin, $student->id, null, null);
+    $this->delete('/trash/academic-years/'.$record->academicYear->uuid)->assertSessionHasErrors('trash');
     $this->delete('/trash/students/'.$student->uuid)->assertSessionHasErrors('trash');
     $this->delete('/trash/student-records/'.$record->uuid)->assertSessionHasErrors('trash');
     trashModel($this, 'applications', $application);
@@ -237,8 +236,8 @@ it('keeps used campaigns and visible paper files protected', function () {
 it('rejects purging any paper file already in review', function () {
     $student = Student::factory()->create();
     $record = StudentRecord::factory()->create(['student_id' => $student->id]);
-    $campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $record->academic_year_id, 'status' => 'open']);
-    $application = app(ReceiveScholarshipApplication::class)->handle($this->admin, $campaign->id, $student->id, null, null);
+    $record->academicYear->update(['is_current' => true, 'is_active' => true]);
+    $application = app(ReceiveScholarshipApplication::class)->handle($this->admin, $student->id, null, null);
     $application->update(['status' => 'in_review']);
     trashModel($this, 'applications', $application);
     $this->delete('/trash/applications/'.$application->uuid.'/purge')->assertSessionHasErrors('trash');
