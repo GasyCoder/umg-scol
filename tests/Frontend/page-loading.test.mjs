@@ -45,7 +45,6 @@ const destinations = {
     '/references/establishments/uuid/edit': 'reference-form',
     '/references/programs/import/token': 'import-preview',
     '/scholarships/reception': 'reception',
-    '/scholarships/campaigns': 'list',
     '/scholarships/applications': 'list',
     '/scholarships/applications/uuid': 'scholarship-detail',
     '/users': 'list',
@@ -124,3 +123,6 @@ for (const [name, changes] of Object.entries({
     await test(`${name} does not hide current content`, () =>
         assert.equal(isPageNavigation({ ...visit, ...changes }), false));
 }
+
+await test('removed campaigns have no navigation skeleton', () =>
+    assert.equal(spec('/scholarships/campaigns'), null));
