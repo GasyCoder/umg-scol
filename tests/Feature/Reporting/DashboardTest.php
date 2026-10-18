@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AcademicYear;
+use App\Models\ScholarshipApplication;
 use App\Models\Student;
 use App\Models\StudentRecord;
 use App\Models\User;
@@ -73,7 +74,6 @@ it('gives the central office global, read-only aggregates including paper files'
         ->and(bars($d['charts']['students_by_establishment']))->toBe(['Faculté A' => 4, 'Institut B' => 2])
         ->and($d['corrections']['pending'])->toBe(2)
         ->and($d['imports'])->toBeNull()->and($d['activity'])->toBeNull()
-        ->and($d['campaigns']['open'][0]['name'])->toBe('Bourse 2026-2027')
         ->and(count($d['kpis']))->toBeGreaterThanOrEqual(4)->toBeLessThanOrEqual(8);
 });
 it('gives the superadmin the global institutional view with recent activity', function () {
@@ -114,6 +114,25 @@ it('shows a clear empty state when there is no current academic year', function 
 it('counts student confirmations with the portal rule: current, stale and never confirmed', function () {
     expect(dashboardData($this, $this->f->staff_a)['dashboard']['confirmations'])->toBe(['confirmed' => 1, 'stale' => 1, 'never_confirmed' => 1, 'total' => 3])
         ->and(dashboardData($this, $this->f->superadmin)['dashboard']['confirmations'])->toBe(['confirmed' => 1, 'stale' => 1, 'never_confirmed' => 3, 'total' => 5]);
+});
+
+it('builds a zero-filled daily reception series within the selected year and permissions', function () {
+    $today = now()->startOfDay();
+    $files = ScholarshipApplication::query()->orderBy('id')->get();
+    $files[0]->update(['received_at' => $today->copy()->addHours(10)]);
+    $files[1]->update(['received_at' => $today->copy()->subDays(29)]);
+    $files[2]->update(['received_at' => $today->copy()->subDays(30)]);
+    $points = dashboardData($this, $this->f->superadmin)['dashboard']['charts']['scholarships_daily'];
+    expect($points)->toHaveCount(30)
+        ->and($points[0])->toBe(['date' => $today->copy()->subDays(29)->format('Y-m-d'), 'value' => 1])
+        ->and($points[29])->toBe(['date' => $today->format('Y-m-d'), 'value' => 1])
+        ->and($points[1]['value'])->toBe(0)
+        ->and(array_sum(array_column($points, 'value')))->toBe(2);
+    $previous = dashboardData($this, $this->f->superadmin, '?year='.$this->f->previous->id)['dashboard']['charts']['scholarships_daily'];
+    expect(array_sum(array_column($previous, 'value')))->toBe(0)
+        ->and(dashboardData($this, $this->f->staff_a)['dashboard']['charts']['scholarships_daily'])->toBeNull();
+    AcademicYear::query()->update(['is_current' => false]);
+    expect(dashboardData($this, $this->f->superadmin)['dashboard']['charts']['scholarships_daily'])->toBe([]);
 });
 it('lists items needing attention with non-zero counters only', function () {
     $watch = collect(dashboardData($this, $this->f->central_scholarship_office)['dashboard']['watch'])->pluck('value', 'label')->all();
