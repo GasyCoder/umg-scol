@@ -181,11 +181,6 @@ export function CommandPalette() {
                                 <span className="flex-1 font-medium">
                                     {item.title}
                                 </span>
-                                {!!item.badge && (
-                                    <span className="rounded-full bg-warning-soft px-2 text-xs font-bold text-warning-foreground">
-                                        {item.badge}
-                                    </span>
-                                )}
                                 <span className="text-xs text-muted-foreground">
                                     {item.group}
                                 </span>
