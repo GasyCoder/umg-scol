@@ -29,6 +29,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
 
     Route::get('settings/platform', [PlatformSettingsController::class, 'edit'])->middleware(EnsureEstablishmentContext::class)->name('platform.edit');
+    Route::put('settings/platform/ddb', [PlatformSettingsController::class, 'updateDdb'])->middleware([EnsureEstablishmentContext::class, 'throttle:20,1,platform-settings'])->name('platform.ddb.update');
+    Route::put('settings/platform/student-mails', [PlatformSettingsController::class, 'updateStudentMails'])->middleware([EnsureEstablishmentContext::class, 'throttle:20,1,platform-settings'])->name('platform.student-mails.update');
+    Route::put('settings/platform/labels', [PlatformSettingsController::class, 'updateLabels'])->middleware([EnsureEstablishmentContext::class, 'throttle:20,1,platform-settings'])->name('platform.labels.update');
     Route::put('settings/platform', [PlatformSettingsController::class, 'update'])->middleware([EnsureEstablishmentContext::class, 'throttle:20,1,platform-settings'])->name('platform.update');
 });
 
