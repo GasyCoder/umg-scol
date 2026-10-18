@@ -15,7 +15,8 @@ class ScholarshipApplicationPolicy
 {
     public function access(User $user, string $permission): bool
     {
-        return StudentPortalAccess::internal($user) && $user->hasUsableEstablishment() && $user->can('scholarships.view') && $user->can($permission);
+        // Cached permissions first: the establishment lookup only runs for an account that holds them.
+        return StudentPortalAccess::internal($user) && $user->can('scholarships.view') && $user->can($permission) && $user->hasUsableEstablishment();
     }
 
     public function viewAny(User $user): bool
@@ -31,6 +32,12 @@ class ScholarshipApplicationPolicy
     public function receive(User $user): bool
     {
         return $this->access($user, 'scholarships.receive');
+    }
+
+    /** Sheet of blank DDB labels (scholarships.labels, superadmin only by default). */
+    public function printLabels(User $user): bool
+    {
+        return $this->access($user, 'scholarships.labels');
     }
 
     public function export(User $user): bool
