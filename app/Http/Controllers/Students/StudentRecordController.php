@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Students;
 
 use App\Actions\Students\SaveStudentRecord;
+use App\Actions\Students\VerifyStudentRecord;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Students\SaveStudentRecordRequest;
 use App\Http\Requests\Students\StudentStatusRequest;
@@ -48,6 +49,15 @@ class StudentRecordController extends Controller
     public function status(StudentStatusRequest $request, StudentRecord $student_record): RedirectResponse
     {
         app(SaveStudentRecord::class)->handle($request->user(), $student_record->student, $student_record, $request->validated());
+
+        return to_route('students.show', $student_record->student);
+    }
+
+    /** The central office validates a situation it entered, once found in the establishment's list. */
+    public function verify(Request $request, StudentRecord $student_record, VerifyStudentRecord $action): RedirectResponse
+    {
+        $action->handle($request->user(), $student_record);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Situation validée.']);
 
         return to_route('students.show', $student_record->student);
     }
