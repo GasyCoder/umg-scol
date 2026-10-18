@@ -18,7 +18,7 @@ beforeEach(function () {
 it('creates exactly the five documented roles and the complete permission catalogue', function () {
     expect(Role::query()->pluck('name')->sort()->values()->all())
         ->toBe(['central_scholarship_office', 'developer', 'establishment', 'student', 'superadmin']);
-    expect(Permission::query()->count())->toBe(37);
+    expect(Permission::query()->count())->toBe(46);
 
     foreach (config('access.permissions') as $permission) {
         expect(Permission::findByName($permission, 'web'))->not->toBeNull();
@@ -43,13 +43,14 @@ it('restricts operational roles from global administration', function (string $r
     }
 })->with(['establishment', 'student', 'central_scholarship_office']);
 
-it('gives central office review access without official identity editing', function () {
+it('gives central office review access and identity completion', function () {
     $user = User::factory()->create()->assignRole('central_scholarship_office');
 
     expect($user->can('students.viewAny'))->toBeTrue()
         ->and($user->can('scholarships.validate'))->toBeTrue()
         ->and($user->can('scholarships.reject'))->toBeTrue()
-        ->and($user->can('students.update'))->toBeFalse();
+        ->and($user->can('students.update'))->toBeTrue()
+        ->and($user->can('students.create'))->toBeFalse();
 });
 
 it('gives establishment management access without scholarship decisions', function () {
