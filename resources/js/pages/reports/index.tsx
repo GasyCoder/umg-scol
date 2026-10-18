@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     Building2,
     ChartColumn,
@@ -158,8 +158,15 @@ export default function ReportsIndex({
     scholarships: Row[] | null;
     exports: Record<ReportKey, boolean>;
 }) {
-    const exportHref = (report: ReportKey) =>
-        `/reports/${report}/export${scope.year ? `?year=${scope.year.id}` : ''}`;
+    // The own-activity report chosen by an account that has both kinds keeps its choice.
+    const mine: Record<string, string> =
+        scope.own && scope.canChoose ? { scope: 'mine' } : {};
+    const exportHref = (report: ReportKey) => {
+        const params: Record<string, string> = { ...mine };
+        if (scope.year) params.year = String(scope.year.id);
+        const query = new URLSearchParams(params).toString();
+        return `/reports/${report}/export${query ? `?${query}` : ''}`;
+    };
     const exportable = (Object.keys(reportLabels) as ReportKey[]).filter(
         (report) =>
             exports[report] &&
@@ -244,15 +251,63 @@ export default function ReportsIndex({
             <PageBody>
                 <PageHeader
                     icon={ChartColumn}
-                    title="Rapports"
-                    description="Effectifs agrégés de votre périmètre, sans donnée individuelle."
+                    title={scope.own ? 'Mes activités' : 'Rapports'}
+                    description={
+                        scope.own
+                            ? 'Ce que vous avez fait vous-même : étudiants déclarés, imports lancés, dossiers reçus et corrections traitées.'
+                            : 'Effectifs agrégés de votre périmètre, sans donnée individuelle.'
+                    }
                     meta={<YearLine scope={scope} />}
                     actions={
-                        <YearSelect
-                            years={years}
-                            value={scope.year?.id ?? null}
-                            path="/reports"
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                            {scope.canChoose && (
+                                <nav
+                                    aria-label="Type de rapport"
+                                    className="inline-flex rounded-lg border bg-muted/40 p-1"
+                                >
+                                    {[
+                                        { own: false, label: 'Mon périmètre' },
+                                        { own: true, label: 'Mes activités' },
+                                    ].map((item) => (
+                                        <Link
+                                            key={item.label}
+                                            href={`/reports?${new URLSearchParams(
+                                                {
+                                                    ...(item.own
+                                                        ? { scope: 'mine' }
+                                                        : {}),
+                                                    ...(scope.year
+                                                        ? {
+                                                              year: String(
+                                                                  scope.year.id,
+                                                              ),
+                                                          }
+                                                        : {}),
+                                                },
+                                            ).toString()}`}
+                                            aria-current={
+                                                Boolean(scope.own) === item.own
+                                                    ? 'page'
+                                                    : undefined
+                                            }
+                                            className={
+                                                Boolean(scope.own) === item.own
+                                                    ? 'rounded-md bg-card px-3 py-1.5 text-sm font-semibold text-primary shadow-card'
+                                                    : 'rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground'
+                                            }
+                                        >
+                                            {item.label}
+                                        </Link>
+                                    ))}
+                                </nav>
+                            )}
+                            <YearSelect
+                                years={years}
+                                value={scope.year?.id ?? null}
+                                path="/reports"
+                                params={mine}
+                            />
+                        </div>
                     }
                 />
 
@@ -271,8 +326,10 @@ export default function ReportsIndex({
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     {scope.year
-                                        ? `Année ${scope.year.name}, dans votre périmètre`
-                                        : 'Dans votre périmètre'}
+                                        ? `Année ${scope.year.name}, ${scope.own ? 'vos activités' : 'dans votre périmètre'}`
+                                        : scope.own
+                                          ? 'Vos activités'
+                                          : 'Dans votre périmètre'}
                                 </p>
                             </div>
                         </div>
@@ -324,7 +381,7 @@ export default function ReportsIndex({
                             <Panel
                                 icon={FolderOpen}
                                 title="Dossiers de bourse par statut"
-                                description="Campagnes de l’année"
+                                description="Année universitaire sélectionnée"
                             >
                                 <BarList
                                     label="Dossiers de bourse par statut"
@@ -333,7 +390,7 @@ export default function ReportsIndex({
                                             ? scholarshipStatuses
                                             : []
                                     }
-                                    empty="Aucun dossier pour les campagnes de cette année."
+                                    empty="Aucun dossier pour cette année universitaire."
                                 />
                             </Panel>
                         )}
@@ -398,13 +455,13 @@ export default function ReportsIndex({
                     <Panel
                         icon={FolderOpen}
                         title="Dossiers de bourse"
-                        description="Campagnes de l’année par établissement, niveau et statut"
+                        description="Dossiers de l’année par établissement, niveau et statut"
                     >
                         <ReportTable
-                            caption="Dossiers de bourse par campagne, établissement, niveau et statut"
+                            caption="Dossiers de bourse par année universitaire, établissement, niveau et statut"
                             columns={columns.scholarships}
                             rows={scholarships}
-                            empty="Aucun dossier pour les campagnes de cette année."
+                            empty="Aucun dossier pour cette année universitaire."
                         />
                     </Panel>
                 )}
