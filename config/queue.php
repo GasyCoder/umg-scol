@@ -40,7 +40,8 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            // Above the longest job (student_imports.job_timeout), or a running import would be taken a second time.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 660),
             'after_commit' => false,
         ],
 
@@ -124,6 +125,16 @@ return [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
+    ],
+
+    /*
+    | Workers started automatically (App\Support\Queue\QueueWorkers): a queued job without a live worker
+    | launches one in the background, which stops once the queue is empty. PHP_CLI_BINARY: path of the
+    | command line PHP on the host when "php" is not the right one (o2switch: see deploy/o2switch/README.md).
+    */
+    'auto_worker' => [
+        'enabled' => (bool) env('QUEUE_AUTO_WORKER', true),
+        'php' => env('PHP_CLI_BINARY', ''),
     ],
 
 ];
