@@ -1,13 +1,14 @@
 import { Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
-    Bell,
     BadgeCheck,
+    Bell,
     ChevronRight,
     FilePenLine,
     FileUp,
     FolderClock,
     FolderSearch,
     UserCheck,
+    UserPen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
@@ -41,6 +42,10 @@ const icons: Record<string, { icon: LucideIcon; tone: string }> = {
         icon: BadgeCheck,
         tone: 'bg-success-soft text-success',
     },
+    information_updated: {
+        icon: UserPen,
+        tone: 'bg-info-soft text-info',
+    },
 };
 
 /** "il y a 5 min", "il y a 2 h", or the date. */
@@ -64,7 +69,8 @@ export function NotificationBell() {
     const recent = notifications?.recent ?? [];
     const total = tasks?.total ?? 0;
     const items = tasks?.items ?? [];
-    const badge = unread;
+    // Unread notifications and work waiting: the bell is the only place they are counted.
+    const badge = unread + total;
     usePoll(30000, { only: ['notifications', 'tasks'] });
 
     return (
