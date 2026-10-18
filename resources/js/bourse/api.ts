@@ -6,10 +6,11 @@ export type Session = {
     linked: boolean;
     csrf_token: string;
     google_enabled: boolean;
+    email: string | null;
 };
 export async function api<T>(
     path: string,
-    body?: Record<string, string>,
+    body?: Record<string, string | Record<string, string>>,
 ): Promise<T> {
     const response = await fetch(`/api/student/${path}`, {
         method: body === undefined ? 'GET' : 'POST',
