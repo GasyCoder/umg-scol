@@ -69,3 +69,15 @@ blanche SSH). Les mots de passe de la base et du SMTP restent uniquement dans le
 Les sous-domaines `scol.mahajanga-univ.mg` (`public_html/scolarite`) et `bourse.mahajanga-univ.mg`
 (`public_html/bourse-student`) sont des liens vers `~/umg-scol/public` : une seule application sert
 les deux portails selon le domaine.
+
+## Chargement JavaScript en HTTP/2
+
+Les préchargements JavaScript sont désactivés dans Laravel (`AppServiceProvider`) et dans Vite
+(`build.modulePreload: false`). Sur PowerBoost, les chargements Chromium avec `modulepreload`
+ont reproduit des transferts interrompus, `ERR_HTTP2_PROTOCOL_ERROR` et un tableau de bord vide ;
+le même écran fonctionne avec les imports natifs, en conservant HTTP/2.
+Les scripts, leurs imports, les styles et les polices restent chargés normalement.
+
+Après une modification du build, vérifier dans un navigateur avec un cache vide : ouverture du
+tableau de bord authentifié, navigation Inertia et portail étudiant. Un contrôle HTTP isolé de
+chaque fichier ne suffit pas à reproduire ce problème de chargement.

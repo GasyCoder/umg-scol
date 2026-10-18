@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -44,6 +45,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // PowerBoost can stall HTTP/2 module preloads when Chromium reprioritizes them.
+        // Native module imports load the same dependencies without those speculative requests.
+        Vite::usePreloadTagAttributes(fn (string $src, string $url): array|false => str_ends_with($url, '.js') ? false : []);
         Auth::provider('internal-eloquent', fn ($app, array $config) => new InternalUserProvider($app['hash'], $config['model']));
         Gate::policy(Activity::class, AuditPolicy::class);
         Gate::policy(DatabaseNotification::class, NotificationPolicy::class);

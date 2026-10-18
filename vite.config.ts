@@ -8,6 +8,10 @@ import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 
 export default defineConfig({
+    build: {
+        // Match Laravel's native module loading: avoid HTTP/2 preload reprioritization on PowerBoost.
+        modulePreload: false,
+    },
     plugins: lazyPlugins(() => [
         laravel({
             input: [
