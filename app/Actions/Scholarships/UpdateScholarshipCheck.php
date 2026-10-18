@@ -3,7 +3,6 @@
 namespace App\Actions\Scholarships;
 
 use App\Enums\ScholarshipApplicationStatus;
-use App\Enums\ScholarshipCampaignStatus;
 use App\Enums\ScholarshipCheckStatus;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipApplicationStatusHistory;
@@ -20,8 +19,8 @@ class UpdateScholarshipCheck
     {
         Gate::forUser($actor)->authorize('review', $application);
         DB::transaction(function () use ($actor, $application, $key, $status, $note) {
-            $locked = ScholarshipApplication::query()->with('campaign')->lockForUpdate()->findOrFail($application->id);
-            if ($locked->status->isFinal() || $locked->campaign->status === ScholarshipCampaignStatus::Archived) {
+            $locked = ScholarshipApplication::query()->lockForUpdate()->findOrFail($application->id);
+            if ($locked->status->isFinal()) {
                 throw ValidationException::withMessages(['check' => 'Ce dossier n’est plus modifiable.']);
             }
             $check = $locked->checks()->where('key', $key)->lockForUpdate()->first();
