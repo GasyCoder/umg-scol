@@ -17,6 +17,8 @@ export type Auth = {
     canViewImports: boolean;
     canViewCorrections: boolean;
     canViewReports: boolean;
+    canViewDashboard: boolean;
+    canViewNotifications: boolean;
     canManageUsers: boolean;
     canManageBranding: boolean;
     canManagePermissions: boolean;
@@ -25,8 +27,9 @@ export type Auth = {
     roleLabel?: string | null;
     canViewAudits: boolean;
     scholarships: {
-        campaigns: boolean;
         receive: boolean;
+        /** Sheet of blank DDB labels (scholarships.labels). */
+        labels: boolean;
         applications: boolean;
     };
 };
