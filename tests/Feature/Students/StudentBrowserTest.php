@@ -139,8 +139,8 @@ it('exports exactly the filtered selection, and requires one year', function () 
     $log = Activity::query()->where('event', 'students_exported')->sole();
     expect($log->properties['total_rows'])->toBe(1)->and($log->properties['academic_year_id'])->toBe($this->year->id);
     $this->actingAs($this->admin)->get('/students/export?'.http_build_query(['establishment_id' => $this->a->id, 'mention_id' => $this->info->id, 'program_id' => $this->gl->id]))->assertOk();
-    // Active situations by default (2 of 3 in Génie logiciel L1 + 1 in L2), the inactive one on request.
-    expect(Activity::query()->where('event', 'students_exported')->latest('id')->first()->properties['total_rows'])->toBe(3);
+    // All listed situations by default (3 in Génie logiciel L1 + 1 in L2), or the chosen status.
+    expect(Activity::query()->where('event', 'students_exported')->latest('id')->first()->properties['total_rows'])->toBe(4);
     $this->actingAs($this->admin)->get('/students/export?'.http_build_query(['program_id' => $this->gl->id, 'status' => 'inactive']))->assertOk();
     expect(Activity::query()->where('event', 'students_exported')->latest('id')->first()->properties['total_rows'])->toBe(1);
     $this->actingAs($this->admin)->get('/students/export?'.http_build_query(['academic_year_id' => $this->previous->id, 'search' => 'ANCIEN']))->assertOk();
