@@ -11,6 +11,7 @@ Route::middleware(['auth', 'verified', EnsureEstablishmentContext::class])->pref
     Route::post('/', [StudentImportController::class, 'store'])->name('store');
     Route::get('/{student_import}', [StudentImportController::class, 'show'])->name('show');
     Route::post('/{student_import}/analyze', [StudentImportController::class, 'analyze'])->name('analyze');
+    Route::patch('/{student_import}/rows/{row}', [StudentImportController::class, 'correctRow'])->whereNumber('row')->middleware('throttle:60,1,import-corrections')->name('rows.correct');
     Route::post('/{student_import}/commit', [StudentImportController::class, 'commit'])->name('commit');
     Route::get('/{student_import}/errors', [StudentImportController::class, 'exportErrors'])->name('errors');
 });
