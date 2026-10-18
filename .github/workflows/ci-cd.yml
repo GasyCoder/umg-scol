@@ -115,7 +115,8 @@ jobs:
           RUNNER_IP="$(curl -fsS https://api.ipify.org)"
           echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
           curl -fsS -H "Authorization: cpanel $DEPLOY_USER:$CPANEL_TOKEN" \
-            "https://$CPANEL_HOST:2083/execute/SshWhitelist/add?address=$RUNNER_IP&port=22" > /dev/null
+            "https://$CPANEL_HOST:2083/execute/SshWhitelist/add?address=$RUNNER_IP&port=22" \
+            | jq -e '.status == 1' > /dev/null
 
       - name: Install the deploy key
         env:
@@ -154,5 +155,13 @@ jobs:
         env:
           CPANEL_TOKEN: ${{ secrets.CPANEL_TOKEN }}
         run: |
-          curl -fsS -H "Authorization: cpanel $DEPLOY_USER:$CPANEL_TOKEN" \
-            "https://$CPANEL_HOST:2083/execute/SshWhitelist/remove?address=$RUNNER_IP&port=22&direction=in" > /dev/null || true
+          cleanup_failed=0
+          for direction in in out; do
+            if ! curl -fsS -H "Authorization: cpanel $DEPLOY_USER:$CPANEL_TOKEN" \
+              "https://$CPANEL_HOST:2083/execute/SshWhitelist/remove?address=$RUNNER_IP&port=22&direction=$direction" \
+              | jq -e '.status == 1' > /dev/null; then
+              echo "SSH whitelist cleanup failed for direction=$direction." >&2
+              cleanup_failed=1
+            fi
+          done
+          exit "$cleanup_failed"

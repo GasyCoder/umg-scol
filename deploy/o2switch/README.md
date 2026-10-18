@@ -57,6 +57,10 @@ Chaque push sur `master` lance `.github/workflows/ci-cd.yml` :
     - maintenance, envoi par `rsync` dans `~/umg-scol` (sans `.env`, `storage/`, `tests/`, voir `rsync-exclude.txt`) ;
     - `post-deploy.sh` : migrations, rôles et référentiel, caches, `queue:restart`, remise en ligne.
 
+L'ajout et le retrait de l'autorisation SSH vérifient aussi le statut renvoyé par l'API cPanel.
+Le nettoyage retire les règles entrante et sortante créées pour l'adresse de la machine GitHub ;
+un échec de nettoyage fait échouer le workflow et reste visible dans ses journaux.
+
 Secrets du dépôt GitHub (Settings › Secrets and variables › Actions) : `DEPLOY_HOST`, `DEPLOY_USER`,
 `DEPLOY_PATH`, `DEPLOY_SSH_KEY` (clé privée dédiée, sa clé publique est dans `~/.ssh/authorized_keys`
 du serveur), `DEPLOY_KNOWN_HOSTS`, `CPANEL_HOST` et `CPANEL_TOKEN` (jeton d'API cPanel pour la liste
