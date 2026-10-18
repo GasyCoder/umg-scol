@@ -2,6 +2,7 @@
 
 namespace App\Support\Students;
 
+use App\Enums\SituationSource;
 use App\Models\AcademicYear;
 use App\Models\Establishment;
 use App\Models\Level;
@@ -37,6 +38,14 @@ final class StudentBrowser
 
     public readonly ?string $status;
 
+    /** 'yes' scholarship holders of the year (PNES), 'no' the others. */
+    public readonly ?string $holder;
+
+    public readonly ?string $verification;
+
+    /** Origin of the situation (SituationSource): establishment list, PNES base, pre-registration, central entry. */
+    public readonly ?string $source;
+
     public readonly string $search;
 
     /** The whole list was asked for, instead of the cards. */
@@ -57,6 +66,9 @@ final class StudentBrowser
         $this->mention = isset($filters['mention_id']) ? (string) $filters['mention_id'] : null;
         $this->program = isset($filters['program_id']) ? (string) $filters['program_id'] : null;
         $this->status = isset($filters['status']) ? (string) $filters['status'] : null;
+        $this->holder = isset($filters['holder']) ? (string) $filters['holder'] : null;
+        $this->verification = isset($filters['verification']) ? (string) $filters['verification'] : null;
+        $this->source = isset($filters['source']) ? (string) $filters['source'] : null;
         $this->search = trim((string) ($filters['search'] ?? ''));
     }
 
@@ -64,7 +76,7 @@ final class StudentBrowser
     public function step(): string
     {
         return match (true) {
-            $this->listView || $this->search !== '' || $this->status !== null || $this->year === null => 'list',
+            $this->listView || $this->search !== '' || $this->status !== null || $this->holder !== null || $this->verification !== null || $this->year === null => 'list',
             $this->establishmentId === null => 'establishments',
             $this->levelId === null => 'levels',
             $this->program !== null => 'list',
@@ -78,20 +90,25 @@ final class StudentBrowser
     {
         return StudentRecord::query()->visibleTo($this->user)->where('student_records.academic_year_id', $this->year?->id)
             ->when($this->establishmentId !== null, fn ($q) => $q->where('student_records.establishment_id', $this->establishmentId))
-            ->when($this->levelId !== null, fn ($q) => $q->where('student_records.level_id', $this->levelId));
+            ->when($this->levelId !== null, fn ($q) => $q->where('student_records.level_id', $this->levelId))
+            ->when($this->source !== null, fn ($q) => $q->where('student_records.source', $this->source));
     }
 
     /**
      * Cards of the current step with active/inactive situation counts.
      *
-     * @return array<int,array{id:int|string,label:string,code:string|null,active:int,inactive:int}>
+     * @return array<int,array{id:int|string,label:string,code:string|null,active:int,inactive:int,pending:int,sources:array<string,int>}>
      */
     public function cards(): array
     {
         if ($this->year === null) {
             return [];
         }
-        $counts = "sum(case when student_records.status = 'active' then 1 else 0 end) as active, sum(case when student_records.status = 'active' then 0 else 1 end) as inactive";
+        $counts = "sum(case when student_records.status = 'active' then 1 else 0 end) as active, sum(case when student_records.status = 'inactive' then 1 else 0 end) as inactive, sum(case when student_records.status = 'pending' then 1 else 0 end) as pending";
+        // Active situations of each origin, shown on the card.
+        foreach (SituationSource::cases() as $origin) {
+            $counts .= ", sum(case when student_records.status = 'active' and student_records.source = '{$origin->value}' then 1 else 0 end) as source_{$origin->value}";
+        }
         $query = match ($this->step()) {
             'establishments' => $this->records()->join('establishments', 'establishments.id', '=', 'student_records.establishment_id')->whereNull('establishments.deleted_at')
                 ->groupBy('establishments.id', 'establishments.name', 'establishments.code')->orderBy('establishments.name')
@@ -114,7 +131,8 @@ final class StudentBrowser
 
         return $query->toBase()->get()->map(fn ($row) => [
             'id' => $row->id === null ? self::NONE : (int) $row->id, 'label' => (string) ($row->label ?? $none), 'code' => $row->code,
-            'active' => (int) $row->active, 'inactive' => (int) $row->inactive,
+            'active' => (int) $row->active, 'inactive' => (int) $row->inactive, 'pending' => (int) $row->pending,
+            'sources' => collect(SituationSource::cases())->mapWithKeys(fn (SituationSource $origin) => [$origin->value => (int) $row->{'source_'.$origin->value}])->all(),
         ])->values()->all();
     }
 
@@ -131,7 +149,8 @@ final class StudentBrowser
      */
     public function trail(): array
     {
-        $params = $this->year !== null ? ['academic_year_id' => $this->year->id] : [];
+        // The origin chosen stays while going through the cards.
+        $params = [...($this->year !== null ? ['academic_year_id' => $this->year->id] : []), ...($this->source !== null ? ['source' => $this->source] : [])];
         $trail = [];
         if (! $this->user->hasRole('establishment')) {
             $trail[] = ['label' => 'Établissements', 'params' => $params];
@@ -162,7 +181,7 @@ final class StudentBrowser
      * @param  Builder<StudentRecord>  $query
      * @return Builder<StudentRecord>
      */
-    public function applyToList(Builder $query, bool $withStatus = true): Builder
+    public function applyToList(Builder $query, bool $withStatus = true, bool $withSource = true): Builder
     {
         // Qualified: the list and the export join the students table for their order.
         return $query->when($this->year !== null, fn ($q) => $q->where('student_records.academic_year_id', $this->year?->id))
@@ -173,6 +192,9 @@ final class StudentBrowser
             ->when($this->program === self::NONE, fn ($q) => $q->whereNull('student_records.program_id'))
             ->when($this->program !== null && $this->program !== self::NONE, fn ($q) => $q->where('student_records.program_id', (int) $this->program))
             ->when($withStatus && $this->status !== null, fn ($q) => $q->where('student_records.status', $this->status))
-            ->when($this->search !== '', fn ($q) => $q->whereHas('student', fn ($student) => $student->matching($this->search)));
+            ->when($this->holder !== null, fn ($q) => $q->where('student_records.is_scholarship_holder', $this->holder === 'yes'))
+            ->when($this->verification !== null, fn ($q) => $q->where('student_records.verification', $this->verification))
+            ->when($withSource && $this->source !== null, fn ($q) => $q->where('student_records.source', $this->source))
+            ->when($this->search !== '', fn ($q) => $q->whereHas('student', fn ($student) => $student->matching($this->search, $this->user)));
     }
 }
