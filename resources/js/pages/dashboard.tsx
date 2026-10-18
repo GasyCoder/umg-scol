@@ -1,20 +1,19 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity as ActivityIcon,
     AlertTriangle,
     ArrowRight,
     Building2,
-    CalendarCheck,
-    CalendarRange,
     ChartColumn,
     FileCheck2,
     FilePenLine,
     FileUp,
     FolderClock,
     FolderOpen,
-    GraduationCap,
     Inbox,
     Layers,
+    RefreshCw,
+    TrendingUp,
     Route,
     ServerCog,
     UserCheck,
@@ -23,15 +22,23 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
-import { StudentsIllustration } from '@/components/illustrations';
+import { useState } from 'react';
+import type { ComponentProps } from 'react';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import {
+    DistributionChart,
+    DonutChart,
+    ReceptionTrendChart,
+} from '@/components/reporting/charts';
+import type { DailyPoint } from '@/components/reporting/charts';
 import { ToneBadge, toneFor } from '@/components/tone-badge';
 import type { Tone } from '@/components/tone-badge';
 import {
     applicationStatusLabels,
-    BarList,
     formatNumber,
     KpiCard,
-    Panel,
+    Panel as BasePanel,
     YearLine,
     YearSelect,
 } from '@/components/reporting/shared';
@@ -64,6 +71,7 @@ type DashboardData = {
         students_by_establishment: BarItem[] | null;
         scholarships_by_status: Record<string, number> | null;
         scholarships_by_establishment: BarItem[] | null;
+        scholarships_daily: DailyPoint[] | null;
     };
     confirmations: {
         confirmed: number;
@@ -86,10 +94,6 @@ type DashboardData = {
             declared_rows: number;
             created_at: string;
         }[];
-    } | null;
-    campaigns: {
-        year: { id: number; name: string; status: string }[];
-        open: { id: number; name: string }[];
     } | null;
     technical: {
         failed_jobs: number | null;
@@ -134,6 +138,10 @@ function SeeAll({ href, children }: { href: string; children: string }) {
     );
 }
 
+function Panel(props: ComponentProps<typeof BasePanel>) {
+    return <BasePanel {...props} compact />;
+}
+
 export default function Dashboard({
     dashboard: data,
     years,
@@ -142,6 +150,7 @@ export default function Dashboard({
     years: Year[];
 }) {
     const { auth } = usePage().props;
+    const [refreshing, setRefreshing] = useState(false);
     const { scope, charts } = data;
     const statusItems: BarItem[] | null = charts.scholarships_by_status
         ? Object.entries(charts.scholarships_by_status).map(
@@ -159,94 +168,81 @@ export default function Dashboard({
         month: 'long',
         year: 'numeric',
     }).format(new Date());
-    const hasCharts =
-        charts.students_by_level ||
-        charts.students_by_program ||
-        charts.students_by_establishment ||
-        statusItems ||
-        charts.scholarships_by_establishment;
-
     return (
         <>
             <Head title="Tableau de bord" />
-            <div className="space-y-6 p-4 md:p-6 lg:p-8">
-                <section className="relative overflow-hidden rounded-2xl bg-sidebar p-6 text-white shadow-elevated ring-1 ring-white/10 sm:p-8 dark:bg-linear-to-br dark:from-accent dark:to-sidebar">
-                    <div
-                        className="bg-grid absolute inset-0 text-white opacity-30"
-                        aria-hidden="true"
-                    />
-                    <div
-                        className="absolute -top-24 right-1/4 size-72 rounded-full bg-primary/40 blur-3xl"
-                        aria-hidden="true"
-                    />
-                    <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                        <div className="space-y-3">
-                            <p
-                                className="text-sm font-medium text-white/60 first-letter:uppercase"
+            <div className="space-y-5 p-4 md:p-6">
+                <PageHeader
+                    icon={ChartColumn}
+                    title="Tableau de bord"
+                    description={`Bonjour, ${firstName}. Suivez les étudiants et le traitement des dossiers de bourse.`}
+                    meta={
+                        <p className="text-xs text-muted-foreground">
+                            {scope.global
+                                ? 'Vue globale'
+                                : (scope.establishment ??
+                                  'Votre établissement')}
+                            {auth.roleLabel && ` · ${auth.roleLabel}`}
+                            <span
+                                className="ml-2 hidden sm:inline"
                                 suppressHydrationWarning
                             >
-                                {today}
-                            </p>
-                            <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
-                                Bienvenue, {firstName}
-                            </h1>
-                            <p className="max-w-xl text-sm text-white/70">
-                                Suivi des étudiants déclarés, des demandes
-                                étudiantes et des dossiers papier de bourse
-                                {scope.global
-                                    ? ' pour l’ensemble des établissements.'
-                                    : ` de ${scope.establishment ?? 'votre établissement'}.`}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2 pt-1 text-sm">
-                                {scope.year ? (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 font-medium ring-1 ring-white/15">
-                                        <CalendarCheck
-                                            className="size-4 text-brand-gold"
-                                            aria-hidden="true"
-                                        />
-                                        Année {scope.year.name}
-                                        {!scope.year.is_current &&
-                                            ' (non courante)'}
+                                · {today}
+                            </span>
+                        </p>
+                    }
+                    actions={
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
+                            {scope.global ? (
+                                <div className="min-w-0 flex-1 sm:flex-none">
+                                    <YearSelect
+                                        years={years}
+                                        value={scope.year?.id ?? null}
+                                        path="/dashboard"
+                                    />
+                                </div>
+                            ) : (
+                                scope.year && (
+                                    <span className="rounded-lg border bg-card px-3 py-2 text-sm font-medium">
+                                        {scope.year.name}
                                     </span>
-                                ) : (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-warning px-3 py-1 font-semibold text-sidebar">
-                                        <AlertTriangle
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                        Aucune année courante
-                                    </span>
-                                )}
-                                {auth.roleLabel && (
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 font-medium ring-1 ring-white/15">
-                                        <GraduationCap
-                                            className="size-4 text-brand-gold"
-                                            aria-hidden="true"
-                                        />
-                                        {auth.roleLabel}
-                                    </span>
-                                )}
-                                {scope.global && (
-                                    <div className="w-full sm:w-auto [&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_svg]:text-white/70">
-                                        <YearSelect
-                                            years={years}
-                                            value={scope.year?.id ?? null}
-                                            path="/dashboard"
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                                )
+                            )}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                aria-label="Actualiser le tableau de bord"
+                                title="Actualiser les données"
+                                disabled={refreshing}
+                                onClick={() =>
+                                    router.reload({
+                                        only: ['dashboard'],
+                                        onStart: () => setRefreshing(true),
+                                        onFinish: () => setRefreshing(false),
+                                    })
+                                }
+                            >
+                                <RefreshCw
+                                    className={
+                                        refreshing
+                                            ? 'size-4 animate-spin motion-reduce:animate-none'
+                                            : 'size-4'
+                                    }
+                                    aria-hidden="true"
+                                />
+                            </Button>
                         </div>
-                        <StudentsIllustration className="hidden h-44 w-auto shrink-0 md:block" />
-                    </div>
-                </section>
+                    }
+                />
 
                 {!scope.year && <YearLine scope={scope} />}
 
                 {data.kpis.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                         {data.kpis.map((kpi) => (
                             <KpiCard
+                                compact
                                 key={kpi.key}
                                 label={kpi.label}
                                 value={kpi.value}
@@ -259,28 +255,76 @@ export default function Dashboard({
                     </div>
                 )}
 
-                {hasCharts && (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        {charts.students_by_level && (
+                <div
+                    className={`grid gap-4 lg:grid-cols-2 ${charts.scholarships_daily && statusItems ? '2xl:grid-cols-3' : ''}`}
+                >
+                    {charts.students_by_level && (
+                        <Panel
+                            icon={Layers}
+                            title="Étudiants par niveau"
+                            description="Répartition des situations actives de l’année"
+                        >
+                            <DistributionChart
+                                label="Étudiants par niveau"
+                                items={charts.students_by_level}
+                                empty="Aucune situation active pour cette année."
+                            />
+                        </Panel>
+                    )}
+                    {statusItems ? (
+                        <Panel
+                            icon={FolderOpen}
+                            title="Traitement des dossiers"
+                            description="Répartition par statut · année sélectionnée"
+                        >
+                            <DonutChart
+                                label="Dossiers de bourse par statut"
+                                items={statusItems}
+                                unit="dossiers"
+                                empty="Aucun dossier reçu pour cette année."
+                            />
+                        </Panel>
+                    ) : (
+                        data.confirmations && (
                             <Panel
-                                icon={Layers}
-                                title="Étudiants par niveau"
-                                description="Situations actives de l’année"
+                                icon={UserCheck}
+                                title="Confirmations étudiantes"
+                                description={`${formatNumber(data.confirmations.total)} étudiant(s) avec une situation active`}
                             >
-                                <BarList
-                                    label="Étudiants par niveau"
-                                    items={charts.students_by_level}
-                                    empty="Aucune situation active pour cette année."
-                                />
+                                <ConfirmationChart {...data.confirmations} />
                             </Panel>
-                        )}
+                        )
+                    )}
+                    {charts.scholarships_daily && (
+                        <Panel
+                            icon={TrendingUp}
+                            title="Évolution des réceptions"
+                            description="30 derniers jours · année sélectionnée"
+                            className={
+                                charts.students_by_level && statusItems
+                                    ? 'lg:col-span-2 2xl:col-span-1'
+                                    : undefined
+                            }
+                        >
+                            <ReceptionTrendChart
+                                points={charts.scholarships_daily}
+                            />
+                        </Panel>
+                    )}
+                </div>
+
+                {(charts.students_by_program ||
+                    charts.students_by_establishment ||
+                    charts.scholarships_by_establishment) && (
+                    <div className="grid gap-4 lg:grid-cols-2">
                         {charts.students_by_program && (
                             <Panel
                                 icon={Route}
                                 title="Étudiants par parcours"
                                 description="Situations actives de l’année"
                             >
-                                <BarList
+                                <DistributionChart
+                                    horizontal
                                     label="Étudiants par parcours"
                                     items={charts.students_by_program}
                                     empty="Aucune situation active pour cette année."
@@ -293,43 +337,34 @@ export default function Dashboard({
                                 title="Étudiants par établissement"
                                 description="Situations actives de l’année"
                             >
-                                <BarList
+                                <DistributionChart
+                                    horizontal
                                     label="Étudiants par établissement"
                                     items={charts.students_by_establishment}
                                     empty="Aucune situation active pour cette année."
                                 />
                             </Panel>
                         )}
-                        {statusItems && (
-                            <Panel
-                                icon={FolderOpen}
-                                title="Dossiers de bourse par statut"
-                                description="Campagnes de l’année"
-                            >
-                                <BarList
-                                    label="Dossiers de bourse par statut"
-                                    items={statusItems}
-                                    empty="Aucun dossier."
-                                />
-                            </Panel>
-                        )}
                         {charts.scholarships_by_establishment && (
                             <Panel
                                 icon={Building2}
-                                title="Dossiers de bourse par établissement"
-                                description="Campagnes de l’année"
+                                title="Dossiers par établissement"
+                                description="Dossiers reçus pour l’année sélectionnée"
                             >
-                                <BarList
+                                <DistributionChart
+                                    horizontal
                                     label="Dossiers de bourse par établissement"
                                     items={charts.scholarships_by_establishment}
-                                    empty="Aucun dossier reçu pour les campagnes de cette année."
+                                    empty="Aucun dossier reçu pour cette année universitaire."
                                 />
                             </Panel>
                         )}
                     </div>
                 )}
 
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div
+                    className={`grid gap-4 lg:grid-cols-2 ${data.technical && statusItems && data.confirmations ? '2xl:grid-cols-3' : ''}`}
+                >
                     <Panel
                         icon={AlertTriangle}
                         title="À surveiller"
@@ -377,45 +412,13 @@ export default function Dashboard({
                             </ul>
                         )}
                     </Panel>
-                    {data.confirmations && (
+                    {statusItems && data.confirmations && (
                         <Panel
                             icon={UserCheck}
                             title="Confirmations étudiantes"
                             description={`${formatNumber(data.confirmations.total)} étudiant(s) avec une situation active`}
                         >
-                            <ConfirmationMeter {...data.confirmations} />
-                        </Panel>
-                    )}
-                    {data.campaigns && (
-                        <Panel
-                            icon={CalendarRange}
-                            title="Campagnes de bourse"
-                            description={`${data.campaigns.year.length} campagne(s) pour l’année sélectionnée`}
-                        >
-                            {data.campaigns.open.length === 0 ? (
-                                <EmptyState
-                                    compact
-                                    illustration="scholarship"
-                                    title="Aucune campagne ouverte"
-                                    description="La réception des dossiers papier est fermée."
-                                />
-                            ) : (
-                                <ul className="space-y-2 text-sm">
-                                    {data.campaigns.open.map((campaign) => (
-                                        <li
-                                            key={campaign.id}
-                                            className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2.5"
-                                        >
-                                            <span className="min-w-0 truncate font-medium">
-                                                {campaign.name}
-                                            </span>
-                                            <ToneBadge tone="success">
-                                                Ouverte
-                                            </ToneBadge>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                            <ConfirmationChart {...data.confirmations} />
                         </Panel>
                     )}
                     {data.technical && (
@@ -490,7 +493,7 @@ export default function Dashboard({
                                 description="Les listes d’étudiants importées par les établissements apparaîtront ici."
                             />
                         ) : (
-                            <div className="-mx-5 overflow-x-auto border-t sm:-mx-6">
+                            <div className="-mx-4 overflow-x-auto border-t">
                                 <table className="data-table min-w-[36rem]">
                                     <thead>
                                         <tr>
@@ -615,77 +618,34 @@ export default function Dashboard({
     );
 }
 
-/** Stacked meter of the three confirmation states, each value also written out. */
-function ConfirmationMeter({
+function ConfirmationChart({
     confirmed,
     stale,
     never_confirmed,
     total,
 }: NonNullable<DashboardData['confirmations']>) {
-    if (total === 0)
-        return (
-            <EmptyState
-                compact
-                illustration="students"
-                title="Aucun étudiant déclaré"
-            />
-        );
-    const parts = [
-        {
-            label: 'Confirmées et à jour',
-            value: confirmed,
-            color: 'bg-success',
-        },
-        { label: 'Devenues obsolètes', value: stale, color: 'bg-warning' },
-        {
-            label: 'Jamais confirmées',
-            value: never_confirmed,
-            color: 'bg-muted-foreground/40',
-        },
-    ];
-    const rate = Math.round((confirmed / total) * 100);
     return (
-        <div className="space-y-4">
-            <p className="flex items-baseline gap-2">
-                <span className="font-heading text-3xl font-extrabold text-foreground tabular-nums">
-                    {rate} %
-                </span>
-                <span className="text-sm text-muted-foreground">
-                    confirmées et à jour
-                </span>
-            </p>
-            <div
-                className="flex h-3 overflow-hidden rounded-full bg-muted"
-                aria-hidden="true"
-            >
-                {parts.map((part) => (
-                    <div
-                        key={part.label}
-                        className={part.color}
-                        style={{ width: `${(part.value / total) * 100}%` }}
-                    />
-                ))}
-            </div>
-            <ul className="space-y-2 text-sm">
-                {parts.map((part) => (
-                    <li
-                        key={part.label}
-                        className="flex items-center justify-between gap-3"
-                    >
-                        <span className="flex items-center gap-2">
-                            <span
-                                className={`size-2.5 rounded-full ${part.color}`}
-                                aria-hidden="true"
-                            />
-                            {part.label}
-                        </span>
-                        <span className="font-semibold tabular-nums">
-                            {formatNumber(part.value)}
-                        </span>
-                    </li>
-                ))}
-            </ul>
-        </div>
+        <DonutChart
+            label="État des confirmations étudiantes"
+            items={[
+                { label: 'À jour', value: confirmed, tone: 'success' },
+                { label: 'Obsolètes', value: stale, tone: 'warning' },
+                {
+                    label: 'Jamais confirmées',
+                    value: never_confirmed,
+                    tone: 'neutral',
+                },
+            ]}
+            unit="étudiants"
+            empty="Aucun étudiant avec une situation active pour cette année."
+            summary={{
+                value:
+                    confirmed > 0 && confirmed / total < 0.01
+                        ? '< 1 %'
+                        : `${total > 0 ? Math.round((confirmed / total) * 100) : 0} %`,
+                label: 'confirmées à jour',
+            }}
+        />
     );
 }
 
