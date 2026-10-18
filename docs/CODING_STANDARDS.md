@@ -6,7 +6,7 @@ PSR-12, Pint, types de retour, Enums, Form Requests, Policies, relations Eloquen
 
 ## Naming
 
-Code/DB en anglais, UI en français. Exemples : `Student`, `StudentRecord`, `ScholarshipCampaign`, `ScholarshipApplication`.
+Code/DB en anglais, UI en français. Exemples : `Student`, `StudentRecord`, `ScholarshipApplication`.
 
 ## React/TypeScript
 
