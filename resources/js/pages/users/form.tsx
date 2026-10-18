@@ -6,11 +6,13 @@ import {
     KeyRound,
     Mail,
     Save,
+    Search,
     ShieldCheck,
     UserPlus,
     UserRound,
     UserRoundPen,
 } from 'lucide-react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
     ErrorSummary,
@@ -19,14 +21,16 @@ import {
     FormSection,
 } from '@/components/forms/form-kit';
 import { PageBody, PageHeader } from '@/components/page-header';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { metaFor } from '@/components/users/shared';
 import type { RoleOption, UserSummary } from '@/components/users/shared';
 import { cn } from '@/lib/utils';
@@ -73,6 +77,32 @@ export default function UserForm({
         else form.post('/users');
     };
     const roleChanged = editing && user.role !== form.data.role;
+
+    // Establishment of an establishment account, chosen in a dialog with a search.
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [pending, setPending] = useState('');
+    const [query, setQuery] = useState('');
+    const chosen =
+        establishments.find(
+            (item) => String(item.id) === form.data.establishment_id,
+        ) ?? null;
+    const needle = query.trim().toLowerCase();
+    const visible = needle
+        ? establishments.filter((item) =>
+              `${item.code} ${item.name}`.toLowerCase().includes(needle),
+          )
+        : establishments;
+    const openPicker = () => {
+        setPending(form.data.establishment_id);
+        setQuery('');
+        setPickerOpen(true);
+    };
+    const confirmPicker = (value: string) => {
+        if (!value) return;
+        form.setData('establishment_id', value);
+        form.clearErrors('establishment_id');
+        setPickerOpen(false);
+    };
     const cancel = editing ? `/users/${user.uuid}` : '/users';
 
     return (
@@ -159,7 +189,7 @@ export default function UserForm({
                                 role="radiogroup"
                                 aria-label="Rôle du compte"
                                 aria-invalid={Boolean(form.errors.role)}
-                                className="grid gap-3 sm:grid-cols-2"
+                                className="grid gap-2 md:auto-cols-fr md:grid-flow-col"
                             >
                                 {roles.map((role) => {
                                     const meta = metaFor(role.value);
@@ -172,11 +202,21 @@ export default function UserForm({
                                             type="button"
                                             role="radio"
                                             aria-checked={selected}
-                                            onClick={() =>
-                                                form.setData('role', role.value)
-                                            }
+                                            onClick={() => {
+                                                form.setData(
+                                                    'role',
+                                                    role.value,
+                                                );
+                                                // An establishment account needs its establishment: chosen in a dialog.
+                                                if (
+                                                    role.value ===
+                                                    'establishment'
+                                                )
+                                                    openPicker();
+                                            }}
+                                            title={role.description}
                                             className={cn(
-                                                'relative flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                                'relative flex items-start gap-2.5 rounded-lg border bg-card p-3 text-left transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                                 selected
                                                     ? 'border-primary bg-accent/50 ring-2 ring-primary/20'
                                                     : 'hover:border-primary/40 hover:shadow-card',
@@ -184,21 +224,21 @@ export default function UserForm({
                                         >
                                             <span
                                                 className={cn(
-                                                    'flex size-10 shrink-0 items-center justify-center rounded-xl',
+                                                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
                                                     meta.tile,
                                                 )}
                                                 aria-hidden="true"
                                             >
-                                                <Icon className="size-5" />
+                                                <Icon className="size-4" />
                                             </span>
                                             <span className="min-w-0 flex-1 pr-6">
-                                                <span className="block font-semibold text-foreground">
+                                                <span className="block truncate text-sm font-semibold text-foreground">
                                                     {role.label}
                                                 </span>
-                                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                                <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                                                     {role.description}
                                                 </span>
-                                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground">
+                                                <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                                                     <KeyRound
                                                         className="size-3"
                                                         aria-hidden="true"
@@ -206,10 +246,41 @@ export default function UserForm({
                                                     {role.permissions_count}{' '}
                                                     droits par défaut
                                                 </span>
+                                                {role.value ===
+                                                    'establishment' &&
+                                                    selected && (
+                                                        <span className="mt-1.5 flex items-center gap-1.5 text-xs">
+                                                            <Building2
+                                                                className="size-3.5 shrink-0 text-primary"
+                                                                aria-hidden="true"
+                                                            />
+                                                            {chosen ? (
+                                                                <span className="min-w-0 truncate font-semibold text-foreground">
+                                                                    {
+                                                                        chosen.code
+                                                                    }{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        chosen.name
+                                                                    }
+                                                                </span>
+                                                            ) : (
+                                                                <span className="font-medium text-danger-foreground">
+                                                                    Établissement
+                                                                    à choisir
+                                                                </span>
+                                                            )}
+                                                            <span className="shrink-0 font-medium text-primary underline-offset-2 hover:underline">
+                                                                {chosen
+                                                                    ? 'Changer'
+                                                                    : 'Choisir'}
+                                                            </span>
+                                                        </span>
+                                                    )}
                                             </span>
                                             <span
                                                 className={cn(
-                                                    'absolute top-3 right-3 flex size-5 items-center justify-center rounded-full border transition-colors',
+                                                    'absolute top-2.5 right-2.5 flex size-4 items-center justify-center rounded-full border transition-colors',
                                                     selected
                                                         ? 'border-primary bg-primary text-primary-foreground'
                                                         : 'bg-card',
@@ -217,7 +288,7 @@ export default function UserForm({
                                                 aria-hidden="true"
                                             >
                                                 {selected && (
-                                                    <Check className="size-3" />
+                                                    <Check className="size-2.5" />
                                                 )}
                                             </span>
                                         </button>
@@ -227,6 +298,11 @@ export default function UserForm({
                             {form.errors.role && (
                                 <p className="text-sm font-medium text-danger-foreground">
                                     {form.errors.role}
+                                </p>
+                            )}
+                            {form.errors.establishment_id && (
+                                <p className="text-sm font-medium text-danger-foreground">
+                                    {form.errors.establishment_id}
                                 </p>
                             )}
                             {roleChanged && (
@@ -246,54 +322,107 @@ export default function UserForm({
                             )}
                         </FormSection>
 
-                        {form.data.role === 'establishment' && (
-                            <FormSection
-                                icon={Building2}
-                                title="Établissement"
-                                description="Un compte établissement ne voit et ne traite que les étudiants de son établissement."
-                                columns={1}
-                            >
-                                <FormField
-                                    id="establishment_id"
-                                    label={labels.establishment_id}
-                                    required
-                                    error={form.errors.establishment_id}
-                                >
-                                    <Select
-                                        value={
-                                            form.data.establishment_id ||
-                                            undefined
-                                        }
-                                        onValueChange={(value) =>
-                                            form.setData(
-                                                'establishment_id',
-                                                value,
-                                            )
-                                        }
+                        <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+                            <DialogContent className="gap-0 p-0 sm:max-w-lg">
+                                <DialogHeader className="border-b px-6 py-5">
+                                    <DialogTitle>
+                                        Établissement du compte
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        Le compte ne verra et ne traitera que
+                                        les étudiants de cet établissement.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-3 px-6 py-4">
+                                    <div className="relative">
+                                        <Search
+                                            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                                            aria-hidden="true"
+                                        />
+                                        <Input
+                                            value={query}
+                                            onChange={(event) =>
+                                                setQuery(event.target.value)
+                                            }
+                                            placeholder="Rechercher par code ou nom"
+                                            aria-label="Rechercher un établissement"
+                                            className="pl-9"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div
+                                        role="radiogroup"
+                                        aria-label="Établissements actifs"
+                                        className="max-h-80 divide-y overflow-y-auto rounded-lg border"
                                     >
-                                        <SelectTrigger
-                                            id="establishment_id"
-                                            className="w-full"
-                                            aria-invalid={Boolean(
-                                                form.errors.establishment_id,
-                                            )}
-                                        >
-                                            <SelectValue placeholder="Choisir un établissement actif" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {establishments.map((item) => (
-                                                <SelectItem
-                                                    key={item.id}
-                                                    value={String(item.id)}
-                                                >
-                                                    {item.code} · {item.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormField>
-                            </FormSection>
-                        )}
+                                        {visible.length === 0 ? (
+                                            <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">
+                                                Aucun établissement actif ne
+                                                correspond.
+                                            </p>
+                                        ) : (
+                                            visible.map((item) => {
+                                                const active =
+                                                    pending === String(item.id);
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        type="button"
+                                                        role="radio"
+                                                        aria-checked={active}
+                                                        onClick={() =>
+                                                            setPending(
+                                                                String(item.id),
+                                                            )
+                                                        }
+                                                        onDoubleClick={() =>
+                                                            confirmPicker(
+                                                                String(item.id),
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            'flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors focus-visible:bg-accent focus-visible:outline-none',
+                                                            active
+                                                                ? 'bg-accent'
+                                                                : 'hover:bg-accent/50',
+                                                        )}
+                                                    >
+                                                        <span className="w-20 shrink-0 font-mono text-xs font-semibold text-muted-foreground">
+                                                            {item.code}
+                                                        </span>
+                                                        <span className="min-w-0 flex-1 truncate text-foreground">
+                                                            {item.name}
+                                                        </span>
+                                                        {active && (
+                                                            <Check
+                                                                className="size-4 shrink-0 text-primary"
+                                                                aria-hidden="true"
+                                                            />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                                <DialogFooter className="border-t px-6 py-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setPickerOpen(false)}
+                                    >
+                                        Annuler
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        disabled={!pending}
+                                        onClick={() => confirmPicker(pending)}
+                                    >
+                                        Valider
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
 
                         <FormActions
                             processing={form.processing}
