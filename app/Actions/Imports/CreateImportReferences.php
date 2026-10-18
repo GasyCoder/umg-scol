@@ -19,17 +19,35 @@ use App\Support\StudentImportColumns as Columns;
  */
 class CreateImportReferences
 {
-    /** @return array{levels: list<string>, domains: list<string>, mentions: list<string>, programs: list<string>} */
+    /** @return array{establishments: list<string>, levels: list<string>, domains: list<string>, mentions: list<string>, programs: list<string>} */
     public function handle(StudentImport $import): array
     {
         $wanted = $this->wanted($import);
+        $created = ['establishments' => [], 'levels' => [], 'domains' => [], 'mentions' => [], 'programs' => []];
+        // Establishments named by a global file and missing from the platform, then their mentions and programs.
+        $codes = [];
+        foreach ($wanted['establishments'] as $code => $name) {
+            $existing = Establishment::query()->withTrashed()->where('code', $code)->lockForUpdate()->first();
+            if ($existing === null) {
+                $existing = Establishment::query()->create(['code' => $code, 'name' => $name, 'is_active' => true]);
+                $created['establishments'][] = $code.' — '.$name;
+            }
+            $codes[$code] = $existing->trashed() ? 0 : $existing->id;
+        }
+        foreach (['mentions', 'programs'] as $kind) {
+            foreach ($wanted[$kind] as $key => $item) {
+                if ($item['establishment_id'] === 0 && $item['establishment_code'] !== null) {
+                    $wanted[$kind][$key]['establishment_id'] = $codes[$item['establishment_code']] ?? 0;
+                }
+            }
+            $wanted[$kind] = array_filter($wanted[$kind], fn (array $item) => $item['establishment_id'] !== 0);
+        }
         // Serialises reference creation per establishment (ordered locks): two imports never create the same mention twice.
         $ids = array_values(array_unique([...array_column($wanted['mentions'], 'establishment_id'), ...array_column($wanted['programs'], 'establishment_id')]));
         sort($ids);
         $establishments = Establishment::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
         // A global import names the establishment of each creation.
         $where = fn (int $id) => $import->establishment_id === null ? $establishments[$id]->code.' › ' : '';
-        $created = ['levels' => [], 'domains' => [], 'mentions' => [], 'programs' => []];
 
         foreach ($wanted['levels'] as $code) {
             // A trashed level keeps its code: never recreated, the rows stay unresolved and are skipped.
@@ -74,11 +92,11 @@ class CreateImportReferences
     /**
      * What the valid rows ask for, without duplicates (names compared without case or accents).
      *
-     * @return array{levels: array<string,string>, domains: array<string,string>, mentions: array<string,array{establishment_id:int,name:string,domain_id:int|null,domain_code:string|null}>, programs: array<string,array{establishment_id:int,mention:string|null,name:string,training_type:string|null}>}
+     * @return array{establishments: array<string,string>, levels: array<string,string>, domains: array<string,string>, mentions: array<string,array{establishment_id:int,establishment_code:string|null,name:string,domain_id:int|null,domain_code:string|null}>, programs: array<string,array{establishment_id:int,establishment_code:string|null,mention:string|null,name:string,training_type:string|null}>}
      */
     private function wanted(StudentImport $import): array
     {
-        $wanted = ['levels' => [], 'domains' => [], 'mentions' => [], 'programs' => []];
+        $wanted = ['establishments' => [], 'levels' => [], 'domains' => [], 'mentions' => [], 'programs' => []];
         $import->rows()->where('status', RowStatus::Valid)->chunkById((int) config('student_imports.chunk_size'), function ($rows) use (&$wanted) {
             foreach ($rows as $row) {
                 $data = $row->normalized_data ?? [];
@@ -89,9 +107,15 @@ class CreateImportReferences
                     $wanted['domains'][(string) $data['_new_domain']['code']] ??= (string) $data['_new_domain']['name'];
                 }
                 $establishment = (int) ($data['establishment_id'] ?? 0);
+                $new = is_array($data['_new_establishment'] ?? null) ? (string) $data['_new_establishment']['code'] : null;
+                if ($new !== null) {
+                    $wanted['establishments'][$new] ??= (string) $data['_new_establishment']['name'];
+                }
+                $scope = $new === null ? (string) $establishment : 'new:'.$new;
                 if (filled($data['_new_mention'] ?? null)) {
-                    $wanted['mentions'][$establishment.'|'.Columns::fold((string) $data['_new_mention'])] ??= [
+                    $wanted['mentions'][$scope.'|'.Columns::fold((string) $data['_new_mention'])] ??= [
                         'establishment_id' => $establishment,
+                        'establishment_code' => $new,
                         'name' => (string) $data['_new_mention'],
                         'domain_id' => isset($data['_mention_domain_id']) ? (int) $data['_mention_domain_id'] : null,
                         'domain_code' => is_array($data['_new_domain'] ?? null) ? (string) $data['_new_domain']['code'] : null,
@@ -99,8 +123,9 @@ class CreateImportReferences
                 }
                 if (filled($data['_new_program'] ?? null)) {
                     $mention = filled($data['mention'] ?? null) ? (string) preg_replace('/\s+/u', ' ', trim((string) $data['mention'])) : null;
-                    $wanted['programs'][$establishment.'|'.Columns::fold((string) $mention).'|'.Columns::fold((string) $data['_new_program'])] ??= [
+                    $wanted['programs'][$scope.'|'.Columns::fold((string) $mention).'|'.Columns::fold((string) $data['_new_program'])] ??= [
                         'establishment_id' => $establishment,
+                        'establishment_code' => $new,
                         'mention' => $mention, 'name' => (string) $data['_new_program'], 'training_type' => $data['_training_type'] ?? null,
                     ];
                 }
