@@ -14,6 +14,10 @@ return [
         'complete' => 'Dossier papier complet',
     ],
 
-    // Technical file number: {prefix}{campaign id}-{6-digit sequence per campaign}, e.g. BRS3-000042.
+    // Technical file number, never shown: {prefix}-{academic year}-{6-digit sequence of the year}, e.g. BRS-2026-2027-000042.
     'number_prefix' => 'BRS',
+
+    // DDB label sheet: link of the QR code printed on each label (student portal), and the most sheets printed at once.
+    'label_url' => env('SCHOLARSHIP_LABEL_URL', 'https://bourse.mahajanga-univ.mg'),
+    'label_sheets_max' => 20,
 ];
