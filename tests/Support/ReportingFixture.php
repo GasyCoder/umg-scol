@@ -8,7 +8,6 @@ use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\Program;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
@@ -92,12 +91,11 @@ final class ReportingFixture
         $import($f->m['a'], 'failed', 5, 0, 0, 0, 0);
         $import($f->m['b'], 'completed', 4, 4, 0, 0, 4);
 
-        // Paper files of the current year's campaign: s1 pending (today), s2 rejected, b1 validated.
-        $f->m['campaign'] = ScholarshipCampaign::factory()->create(['academic_year_id' => $f->m['year']->id, 'name' => 'Bourse 2026-2027', 'status' => 'open', 'created_by' => $f->m['superadmin']->id]);
+        // Paper files of the current academic year: s1 pending (today), s2 rejected, b1 validated.
         $sequence = 0;
         $file = function (string $key, string $status, $receivedAt) use ($f, &$sequence) {
             $sequence++;
-            ScholarshipApplication::query()->create(['application_number' => 'BRS-T'.$sequence, 'scholarship_campaign_id' => $f->m['campaign']->id, 'sequence' => $sequence, 'student_id' => $f->m[$key]->id, 'student_record_id' => $f->m[$key.'_record']->id, 'status' => $status, 'received_by' => $f->m['central_scholarship_office']->id, 'received_at' => $receivedAt]);
+            ScholarshipApplication::query()->create(['application_number' => 'BRS-T'.$sequence, 'academic_year_id' => $f->m['year']->id, 'sequence' => $sequence, 'student_id' => $f->m[$key]->id, 'student_record_id' => $f->m[$key.'_record']->id, 'status' => $status, 'received_by' => $f->m['central_scholarship_office']->id, 'received_at' => $receivedAt]);
         };
         $file('s1', 'pending', now());
         $file('s2', 'rejected', now()->subDays(2));
