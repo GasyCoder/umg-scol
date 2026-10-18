@@ -19,7 +19,7 @@ class ApplicationListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'search' => ['nullable', 'string', 'max:100'], 'campaign_id' => ['nullable', 'integer'], 'status' => ['nullable', Rule::enum(ScholarshipApplicationStatus::class)],
+            'search' => ['nullable', 'string', 'max:100'], 'academic_year_id' => ['nullable', 'integer'], 'status' => ['nullable', Rule::in([ScholarshipApplication::AWAITING_LIST, ...array_map(fn ($s) => $s->value, ScholarshipApplicationStatus::cases())])],
             'establishment_id' => ['nullable', 'integer'], 'level_id' => ['nullable', 'integer'],
             'received_from' => ['nullable', 'date_format:Y-m-d'], 'received_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:received_from'],
         ];
