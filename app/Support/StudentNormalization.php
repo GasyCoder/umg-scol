@@ -7,19 +7,24 @@ use Illuminate\Support\Str;
 
 class StudentNormalization
 {
+    /** Spreadsheet placeholders for an empty cell. */
+    private const PLACEHOLDERS = ['n/a', 'na', 'n.a', 'n.a.', '-', '--', '/', 'neant', 'aucun', 'aucune', 'null', 'nil'];
+
     public static function value(string $field, mixed $value): mixed
     {
         if (! is_string($value)) {
             return $value;
         }
         $value = trim($value);
-        if ($value === '') {
+        // "N/A", "néant", "-"… in a spreadsheet mean no value.
+        if ($value === '' || in_array(StudentImportColumns::fold($value), self::PLACEHOLDERS, true)) {
             return null;
         }
 
         return match ($field) {
-            'email' => Str::lower($value),
-            'cin' => preg_replace('/[\s.]+/u', '', $value),
+            // A comma or semicolon typed for the dot of the domain (gmail,com).
+            'email' => Str::lower(str_contains($value, '@') ? Str::before($value, '@').'@'.preg_replace('/[,;]/', '.', Str::after($value, '@')) : $value),
+            'cin', 'uin', 'scholarship_code', 'bank_account' => preg_replace('/[\s.]+/u', '', $value),
             'phone' => self::phone($value),
             'sex' => self::sex($value),
             'nationality' => StudentReferenceLists::canonical(StudentReferenceLists::NATIONALITIES, $value),
