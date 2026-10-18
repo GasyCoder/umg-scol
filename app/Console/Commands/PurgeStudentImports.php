@@ -25,7 +25,7 @@ class PurgeStudentImports extends Command
                         return;
                     }
                     Storage::disk($import->disk)->delete($import->stored_path);
-                    $import->rows()->update(['raw_data' => '[]', 'normalized_data' => null, 'errors' => null, 'warnings' => null]);
+                    $import->rows()->update(['raw_data' => '[]', 'corrections' => null, 'identity_updates' => null, 'normalized_data' => null, 'errors' => null, 'warnings' => null]);
                     $import->update(['purged_at' => now(), 'headers' => [], 'mapping' => [], 'original_filename' => '[fichier purgé]', 'status' => in_array($import->status, [StudentImportStatus::Uploaded, StudentImportStatus::Ready], true) ? StudentImportStatus::Cancelled : $import->status]);
                     $count++;
                 });
