@@ -119,6 +119,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->belongsTo(Establishment::class);
     }
 
+    /** UIN and bank account of the PNES base: the central office and the superadmin only. */
+    public function seesScholarshipRegistry(): bool
+    {
+        return $this->hasAnyRole(['central_scholarship_office', 'superadmin']);
+    }
+
     public function hasUsableEstablishment(): bool
     {
         return ! $this->hasRole('establishment') || (
@@ -135,6 +141,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     protected function casts(): array
     {
         return [
+            'portal_notifications_seen_at' => 'datetime',
             'notification_preferences' => 'array',
             'email_verified_at' => 'datetime',
             'establishment_id' => 'integer',
