@@ -15,7 +15,7 @@ class ReviewCorrectionRequest extends FormRequest
     /** @return array<string,array<mixed>> */
     public function rules(): array
     {
-        return ['decision' => ['required', 'in:approve,reject'], 'rejection_reason' => ['required_if:decision,reject', 'nullable', 'string', 'min:10', 'max:500']];
+        return ['decision' => ['required', 'in:approve,reject'], 'rejection_reason' => ['required_if:decision,reject', 'nullable', 'string', 'min:10', 'max:500'], 'from_student' => ['sometimes', 'boolean']];
     }
 
     /** @return array<string,string> */
