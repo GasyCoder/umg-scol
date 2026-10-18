@@ -194,16 +194,20 @@ it('does not reveal other annual records on a shared student detail', function (
     $this->put('/students/'.$own->student->uuid, ['last_name' => 'Changed'])->assertForbidden();
 });
 
-it('keeps central office read only while allowing global filters and detail', function () {
+it('keeps central office read only on establishment situations while allowing identity completion, pending entries, global filters and detail', function () {
     $a = StudentRecord::factory()->create(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id]);
     StudentRecord::factory()->create(['establishment_id' => $this->b->id]);
-    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', false));
-    $this->get('/students/'.$a->student->uuid)->assertInertia(fn (Assert $page) => $page->where('canUpdate', false)->where('canCreateRecord', false));
+    $this->actingAs($this->central)->get('/students')->assertInertia(fn (Assert $page) => $page->has('records.data', 2)->where('canCreate', true));
+    // Identity completion at the reception counter (students.update); the situations stay the establishment's.
+    $this->get('/students/'.$a->student->uuid)->assertInertia(fn (Assert $page) => $page->where('canUpdate', true)->where('canDeactivate', false)->where('canCreateRecord', true)->where('records.0.canUpdate', false));
     $query = http_build_query(['establishment_id' => $this->a->id, 'academic_year_id' => $this->year->id, 'level_id' => $this->level->id, 'program_id' => $this->program->id, 'status' => 'active']);
     $this->get('/students?'.$query)->assertInertia(fn (Assert $page) => $page->has('records.data', 1));
-    $this->post('/students', $this->data)->assertForbidden();
-    $this->put('/students/'.$a->student->uuid, ['last_name' => 'Hack'])->assertForbidden();
+    // Its own entry stays pending until the establishment list confirms it (StudentSituationOriginTest).
+    $this->post('/students', [...$this->data, 'establishment_id' => $this->b->id, 'program_id' => null])->assertSessionHasNoErrors();
+    expect(StudentRecord::query()->where('establishment_id', $this->b->id)->latest('id')->first()->verification->value)->toBe('pending');
+    $this->put('/students/'.$a->student->uuid, ['last_name' => 'Hack'])->assertSessionHasErrors(['sex', 'birth_date', 'nationality']);
     $this->patch('/student-records/'.$a->uuid.'/status', ['status' => 'inactive'])->assertForbidden();
+    $this->patch('/students/'.$a->student->uuid.'/status', ['is_active' => false])->assertForbidden();
 });
 
 it('allows privileged global creation and retains developer audit identity', function (string $role) {
