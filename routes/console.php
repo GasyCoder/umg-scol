@@ -1,9 +1,11 @@
 <?php
 
 use App\Notifications\StudentActivity;
+use App\Support\Queue\QueueWorkers;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -23,3 +25,12 @@ Artisan::command('notifications:prune-read', function () {
     $this->info($count.' notification(s) lue(s) supprimée(s).');
 })->purpose('Supprimer les notifications étudiantes lues depuis plus de 90 jours');
 Schedule::command('notifications:prune-read')->daily()->withoutOverlapping();
+
+// Safety net of the automatic workers (cron on a shared host): a queue with waiting jobs and no live worker gets one.
+Schedule::call(function () {
+    foreach (['default', (string) config('student_imports.queue')] as $queue) {
+        if (Queue::size($queue) > 0) {
+            QueueWorkers::ensure($queue);
+        }
+    }
+})->everyMinute()->name('queue-workers')->withoutOverlapping();
