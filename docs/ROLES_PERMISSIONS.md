@@ -8,7 +8,7 @@ Accès uniquement à son établissement : étudiants, déclarations annuelles, i
 
 ### central_scholarship_office
 
-Consultation globale, réception/vérification/validation/correction/rejet des dossiers, statistiques et exports.
+Consultation globale, réception/vérification/validation/correction/rejet des dossiers, statistiques et exports. Import de la base PNES des boursiers et des résultats de préinscription, saisie des étudiants en attente de la liste de l'établissement et validation de leur situation. Complète l'identité d'un étudiant (`students.update`, global, audité), notamment depuis la réception ; les situations annuelles des établissements restent en lecture seule et la désactivation d'une fiche ne lui est pas donnée.
 
 ### student
 
@@ -26,24 +26,24 @@ Support technique privilégié ; jamais invisible dans les audits.
 
 Le catalogue et la matrice initiale sont définis dans `config/access.php`, pour le guard `web`.
 
-- Étudiants : `students.view`, `students.viewAny`, `students.create`, `students.update`, `students.deactivate`, `students.export`.
-- Déclarations annuelles : `student_records.view`, `student_records.create`, `student_records.update`.
-- Imports : `imports.view`, `imports.create`, `imports.commit`, `imports.export_errors`.
+- Étudiants : `students.view`, `students.viewAny`, `students.create`, `students.update`, `students.deactivate`, `students.export`, `students.register_pending` (saisie par la Scolarité Centrale, en attente de la liste de l'établissement).
+- Déclarations annuelles : `student_records.view`, `student_records.create`, `student_records.update`, `student_records.verify` (valider une situation trouvée dans la liste de l'établissement).
+- Imports : `imports.view`, `imports.create`, `imports.commit`, `imports.export_errors`, `imports.pnes` (base PNES des boursiers), `imports.preinscription` (résultats de préinscription).
 - Corrections : `corrections.create`, `corrections.view`, `corrections.review`.
-- Bourses : `scholarships.view`, `scholarships.receive`, `scholarships.review`, `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`.
-- Administration : `establishments.manage`, `academic_years.manage`, `levels.manage`, `programs.manage`, `campaigns.manage`, `users.manage`, `roles.manage`, `permissions.manage`, `branding.manage` (identité de la plateforme, ADR-065).
+- Bourses : `scholarships.view`, `scholarships.receive`, `scholarships.review`, `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`, `scholarships.labels` (fiche d’étiquettes DDB vierges ; superadmin seulement par défaut, à attribuer à un autre rôle depuis la matrice des permissions).
+- Administration : `establishments.manage`, `academic_years.manage`, `levels.manage`, `programs.manage`, `users.manage`, `roles.manage`, `permissions.manage`, `branding.manage` (identité de la plateforme, ADR-065).
 - Audit : `audits.view`, `audits.export`.
 - Portail étudiant : `student_links.review` (revue des demandes de rattachement manuel).
 
 ## Matrice initiale
 
-| Rôle                         | Permissions attribuées                                                                                                                                     |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `superadmin`                 | Toutes les permissions du catalogue, explicitement attribuées                                                                                              |
-| `developer`                  | Les mêmes permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                    |
-| `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view`, `student_links.review` et les sept permissions bourses |
-| `establishment`              | Les six permissions étudiants, les trois déclarations annuelles, les quatre imports, `corrections.view`, `corrections.review`, `student_links.review`      |
-| `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                                          |
+| Rôle                         | Permissions attribuées                                                                                                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `superadmin`                 | Toutes les permissions du catalogue, explicitement attribuées                                                                                                                                                                                             |
+| `developer`                  | Les mêmes permissions pour le support privilégié, sans bypass d'autorisation ni d'audit                                                                                                                                                                   |
+| `central_scholarship_office` | `students.view`, `students.viewAny`, `students.export`, `student_records.view`, `corrections.view`, `student_links.review`, les sept permissions bourses, `students.register_pending`, `student_records.verify`, `imports.pnes`, `imports.preinscription` |
+| `establishment`              | Les six permissions étudiants (sans `students.register_pending`), `student_records.view/create/update`, les quatre imports `imports.view/create/commit/export_errors`, `corrections.view`, `corrections.review`, `student_links.review`                   |
+| `student`                    | `students.view`, `student_records.view`, `corrections.create`, `corrections.view`                                                                                                                                                                         |
 
 `students.viewAny` autorise une liste dans le périmètre du rôle : établissement propre pour `establishment`, global pour la Scolarité Centrale. Les permissions de consultation individuelle ne donnent jamais accès aux données d'autrui par elles-mêmes. Les Policies et filtres effectifs seront implémentés avec les modèles métier ; aucune isolation fictive n'est créée dans cette fondation.
 
@@ -66,10 +66,22 @@ Décider exige en plus le droit de modifier l'identité (`StudentPolicy::update`
 
 Matrice existante, sans nouvelle permission :
 
-- `campaigns.manage` (superadmin, developer) : créer, modifier et changer le statut des campagnes. Le CDC confie les campagnes au superadmin ; la Scolarité Centrale ne reçoit pas cette permission.
-- Consultation des campagnes : `campaigns.manage` ou `scholarships.view`, en lecture seule pour la Scolarité Centrale.
+- Campagnes supprimées (ADR-085) : aucune route ni permission `campaigns.*`. La migration retire aussi leurs attributions aux rôles et utilisateurs. Les droits de réception/traitement restent `scholarships.*`.
+- `students.notify` : prévenir un étudiant par email des informations manquantes ou douteuses de sa fiche (`StudentPolicy::notify`, périmètre de consultation de la fiche ; bouton de la fiche et du dossier, actions groupées des listes, case de « Demander une correction »). Accordée au superadmin et au rôle developer ; les autres rôles la reçoivent par la matrice. Migration `2026_10_20_090000_create_student_information_requests` (ADR-088).
+- `scholarships.labels` : imprimer la fiche d’étiquettes DDB vierges (`/scholarships/reception/labels`, `ScholarshipApplicationPolicy::printLabels`, exige aussi `scholarships.view`). Accordée au superadmin (et au rôle technique developer, qui détient tout le catalogue) ; la Scolarité Centrale ne l’a pas par défaut. Migration `2026_10_19_100000_add_ddb_label_permission`.
+- Rôle developer : invisible dans la matrice des permissions et dans la gestion des comptes pour tout compte qui n'est pas developer (superadmin compris), qui ne peut ni le modifier ni l'attribuer ; il reste toujours visible dans les audits.
 - `scholarships.view` : liste et détail des dossiers. Chaque action exige en plus sa permission : `scholarships.receive` (réception), `scholarships.review` (début de vérification, checklist), `scholarships.validate`, `scholarships.request_correction`, `scholarships.reject`, `scholarships.export`.
 - `central_scholarship_office`, `superadmin` et `developer` ont ces permissions, avec un **accès global** : le traitement des dossiers papier est central. `establishment` et `student` n'ont aucune permission bourse et reçoivent 403 sur toutes ces routes. La Policy recontrôle la permission de la transition demandée, quelle que soit l'URL utilisée.
+
+## Boursiers et non-boursiers (ADR-075)
+
+Quatre permissions, attribuées à `central_scholarship_office`, `superadmin` et `developer` ; jamais à `establishment` (les Policies refusent en plus explicitement le rôle établissement, même avec une attribution manuelle) :
+
+- `imports.pnes`, `imports.preinscription` : téléverser, analyser et confirmer le fichier de ce type (`StudentImportPolicy::handleKind`). Un établissement ne traite que les listes de type `establishment`. Sans `imports.view`, la Scolarité Centrale ne voit que les imports des types qu'elle traite, jamais les listes des établissements ; les agrégats d'import du tableau de bord et des rapports exigent `imports.view`.
+- `students.register_pending` : saisir un étudiant (identité + situation `central`/`pending`) ; la Scolarité peut corriger cette situation tant qu'elle n'est pas vérifiée.
+- `student_records.verify` : validation manuelle des anciens cas `matched` (une par une ou en lot). Depuis ADR-076, un rapprochement valide est vérifié automatiquement par la confirmation autorisée de l’import d’établissement (`imports.commit`), dans son périmètre, sans permission supplémentaire.
+
+UIN et numéro de compte : visibles et modifiables uniquement par la Scolarité Centrale et le superadmin (fiche, formulaire, recherche par UIN), jamais envoyés à un établissement ni au portail étudiant ; envoyés par un établissement, ils sont refusés (`prohibited`). Le code bourse est visible avec la fiche, selon `StudentPolicy::view`.
 
 ## Isolation
 
@@ -96,7 +108,7 @@ Aucune nouvelle permission. Le tableau de bord et les rapports réutilisent les 
 | Imports                                     | `imports.view`                 | établissement propre ou global (pas la Scolarité Centrale) |
 | Corrections                                 | `corrections.view`             | scope de revue existant                                    |
 | Rattachements                               | `student_links.review`         | scope de revue existant                                    |
-| Dossiers et campagnes de bourse             | `scholarships.view`            | global (pas les établissements)                            |
+| Dossiers de bourse                          | `scholarships.view`            | global (pas les établissements)                            |
 | Utilisateurs internes                       | `users.manage` + acteur global | global                                                     |
 | Activité récente, page Audit                | `audits.view`                  | global                                                     |
 | Indicateurs techniques                      | rôle `developer`               | compteurs seulement                                        |
