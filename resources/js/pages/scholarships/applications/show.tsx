@@ -27,11 +27,14 @@ import { useState } from 'react';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatDate, StatusBadge } from '@/components/scholarships/shared';
 import type { Option } from '@/components/scholarships/shared';
-import { SEX_LABELS } from '@/components/students/types';
-import type { StudentSex } from '@/components/students/types';
+import { RECORD_STATUS_LABELS, SEX_LABELS } from '@/components/students/types';
+import type { RecordStatus, StudentSex } from '@/components/students/types';
+import { NotifyStudentButton } from '@/components/students/notify-student-dialog';
+import type { StudentNotification } from '@/components/students/notify-student-dialog';
 import { ToneBadge } from '@/components/tone-badge';
 import type { Tone } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -57,13 +60,15 @@ type Check = {
 type Application = {
     id: number;
     uuid: string;
-    application_number: string;
-    ddb_number: string | null;
+    /** The one number of the file: its DDB number. */
+    reference: string;
     status: string;
     status_label: string;
+    /** Status shown in the header: « En attente de la liste » while the situation is not confirmed. */
+    shown_status: { value: string; label: string };
     decision_reason: string | null;
     internal_notes: string | null;
-    campaign: { name: string; academic_year: string; status_label: string };
+    academic_year: string;
     received: { at: string; by: string };
     review_started: Stamp;
     decided: Stamp;
@@ -80,7 +85,9 @@ type Application = {
         establishment: string;
         level: string;
         program: string | null;
-        record_status: string;
+        record_status: RecordStatus;
+        /** 'verified' once the establishment's list confirms the situation. */
+        record_verification: 'verified' | 'pending' | 'matched';
     };
     checks: Check[];
     history: {
@@ -223,16 +230,23 @@ export default function ApplicationShow({
     checkStatuses,
     actions,
     canEditChecks,
+    validationBlockers,
     canViewStudent,
+    notification,
 }: {
     application: Application;
     checkStatuses: Option[];
     actions: string[];
     canEditChecks: boolean;
+    /** Why « Valider » cannot be used yet, empty when it can. */
+    validationBlockers: string[];
     canViewStudent: boolean;
+    /** Email about missing or doubtful information, null without the permission. */
+    notification: StudentNotification | null;
 }) {
     const [target, setTarget] = useState<string | null>(null);
-    const form = useForm({ status: '', reason: '' });
+    // « Demander une correction » emails the student by default when the account may (ADR-088).
+    const form = useForm({ status: '', reason: '', notify_student: true });
     const errors = {
         ...(usePage().props.errors as Record<string, string | undefined>),
         ...(form.errors as Record<string, string | undefined>),
@@ -256,6 +270,8 @@ export default function ApplicationShow({
     const progress = total > 0 ? Math.round((done / total) * 100) : 0;
     const pageError = errors.status ?? errors.check;
     const hasActions = actions.length > 0;
+    // A situation entered by the central office: the file can be instructed, not validated.
+    const unverified = student.record_verification !== 'verified';
     const reasonTone: keyof typeof alertTones =
         application.status === 'rejected'
             ? 'danger'
@@ -265,40 +281,48 @@ export default function ApplicationShow({
     const startAction = (action: string) => {
         form.reset();
         form.clearErrors();
-        form.setData('status', action);
+        form.setData((data) => ({
+            ...data,
+            status: action,
+            notify_student: notification?.has_email === true,
+        }));
         setTarget(action);
     };
 
     return (
         <PageBody>
-            <Head title={`Dossier ${application.application_number}`} />
+            <Head title={`Dossier ${application.reference}`} />
             <PageHeader
                 icon={FileText}
-                title={`Dossier ${application.application_number}`}
-                description={`${fullName}, campagne ${application.campaign.name}`}
+                title={`Dossier N° DDB ${application.reference}`}
+                description={`${fullName} · Bourse nationale ${application.academic_year}`}
                 meta={
                     <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge
-                            status={application.status}
-                            label={application.status_label}
+                            status={application.shown_status.value}
+                            label={application.shown_status.label}
                         />
-                        {application.ddb_number && (
-                            <ToneBadge tone="neutral">
-                                DDB {application.ddb_number}
-                            </ToneBadge>
-                        )}
                         <ToneBadge tone="neutral">
                             Reçu le {formatDate(application.received.at)}
                         </ToneBadge>
                     </div>
                 }
                 actions={
-                    <Button variant="outline" asChild>
-                        <Link href="/scholarships/applications">
-                            <ArrowLeft aria-hidden="true" />
-                            Tous les dossiers
-                        </Link>
-                    </Button>
+                    <>
+                        <Button variant="outline" asChild>
+                            <Link href="/scholarships/applications">
+                                <ArrowLeft aria-hidden="true" />
+                                Tous les dossiers
+                            </Link>
+                        </Button>
+                        {notification && (
+                            <NotifyStudentButton
+                                studentUuid={student.uuid}
+                                notification={notification}
+                                applicationUuid={application.uuid}
+                            />
+                        )}
+                    </>
                 }
             />
 
@@ -366,6 +390,10 @@ export default function ApplicationShow({
                                                     ? 'outline'
                                                     : 'default'
                                             }
+                                            disabled={
+                                                action === 'validated' &&
+                                                validationBlockers.length > 0
+                                            }
                                             onClick={() => startAction(action)}
                                         >
                                             {Icon && (
@@ -376,13 +404,23 @@ export default function ApplicationShow({
                                     );
                                 })}
                             </div>
-                            {actions.includes('validated') && done < total && (
-                                <p className="text-xs text-muted-foreground">
-                                    {total - done} contrôle
-                                    {total - done > 1 ? 's' : ''} encore à
-                                    traiter avant la validation.
-                                </p>
-                            )}
+                            {actions.includes('validated') &&
+                                validationBlockers.length > 0 && (
+                                    <div className="space-y-1 text-xs text-muted-foreground">
+                                        <p className="font-medium text-foreground">
+                                            Pas encore validable :
+                                        </p>
+                                        <ul className="list-disc space-y-0.5 pl-4">
+                                            {validationBlockers.map(
+                                                (reason) => (
+                                                    <li key={reason}>
+                                                        {reason}
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    </div>
+                                )}
                         </div>
                     </section>
                 )}
@@ -511,11 +549,27 @@ export default function ApplicationShow({
                                         }
                                     >
                                         Situation{' '}
-                                        {student.record_status === 'active'
-                                            ? 'active'
-                                            : 'inactive'}
+                                        {RECORD_STATUS_LABELS[
+                                            student.record_status
+                                        ].toLocaleLowerCase('fr')}
                                     </ToneBadge>
+                                    {student.record_verification ===
+                                        'matched' && (
+                                        <ToneBadge tone="warning">
+                                            Situation à valider
+                                        </ToneBadge>
+                                    )}
                                 </div>
+                                {unverified &&
+                                    application.status !== 'validated' &&
+                                    application.status !== 'rejected' && (
+                                        <p className="text-sm text-muted-foreground">
+                                            Le dossier peut être instruit. Sa
+                                            validation reste bloquée tant que la
+                                            situation de l’étudiant n’est pas
+                                            vérifiée.
+                                        </p>
+                                    )}
                             </div>
                         </div>
                         <Rows
@@ -573,15 +627,14 @@ export default function ApplicationShow({
                             columns={1}
                             rows={[
                                 [
-                                    'N° dossier',
-                                    <span className="font-mono">
-                                        {application.application_number}
+                                    'N° DDB',
+                                    <span className="font-mono font-semibold">
+                                        {application.reference}
                                     </span>,
                                 ],
-                                ['N° DDB', application.ddb_number],
                                 [
-                                    'Campagne',
-                                    `${application.campaign.name} (${application.campaign.academic_year}), ${application.campaign.status_label}`,
+                                    'Année universitaire',
+                                    application.academic_year,
                                 ],
                                 ['Statut', application.status_label],
                                 [
@@ -742,6 +795,36 @@ export default function ApplicationShow({
                                 </p>
                             )}
                         </div>
+                    )}
+                    {target === 'needs_correction' && notification && (
+                        <Label
+                            htmlFor="notify-student"
+                            className="flex items-start gap-2.5 font-normal"
+                        >
+                            <Checkbox
+                                id="notify-student"
+                                className="mt-0.5"
+                                disabled={!notification.has_email}
+                                checked={
+                                    notification.has_email &&
+                                    form.data.notify_student
+                                }
+                                onCheckedChange={(checked) =>
+                                    form.setData(
+                                        'notify_student',
+                                        checked === true,
+                                    )
+                                }
+                            />
+                            <span className="text-sm">
+                                Prévenir l’étudiant par email
+                                <span className="block text-xs text-muted-foreground">
+                                    {notification.has_email
+                                        ? 'Il reçoit ce motif et la liste des informations à compléter de sa fiche.'
+                                        : 'Aucun email sur la fiche.'}
+                                </span>
+                            </span>
+                        </Label>
                     )}
                     {errors.status && (
                         <p role="alert" className="text-sm text-destructive">
