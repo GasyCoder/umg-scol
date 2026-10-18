@@ -68,8 +68,6 @@ export function pageSkeletonFor(
     if (/^\/imports\/[^/]+$/.test(path))
         return { layout: 'import-preview', columns: 6 };
     if (path === '/scholarships/reception') return { layout: 'reception' };
-    if (path === '/scholarships/campaigns')
-        return { layout: 'list', columns: 6 };
     if (path === '/scholarships/applications')
         return { layout: 'list', columns: 7 };
     if (/^\/scholarships\/applications\/[^/]+$/.test(path))
