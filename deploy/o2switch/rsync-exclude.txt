@@ -1,0 +1,15 @@
+# Never uploaded by the CI/CD deployment (and so never deleted on the server).
+/.env
+/.env.*
+/.git/
+/.github/
+/.agents/
+/.claude/
+/node_modules/
+/tests/
+/storage/
+/bootstrap/cache/*.php
+/public/hot
+/public/storage
+# Written by cPanel AutoSSL in the document root (certificate renewal).
+/public/.well-known/
