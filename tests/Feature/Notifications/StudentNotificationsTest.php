@@ -44,7 +44,7 @@ beforeEach(function () {
     $this->central = User::factory()->create()->assignRole('central_scholarship_office');
     $this->admin = User::factory()->create()->assignRole('superadmin');
     $this->developer = User::factory()->create()->assignRole('developer');
-    $this->requestCorrection = fn () => app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::Phone, '0381234567', 'Message privé non notifié');
+    $this->requestCorrection = fn () => app(RequestStudentCorrection::class)->handle($this->studentUser, StudentCorrectionField::MotherName, 'RAZAFY Lalao', 'Message privé non notifié');
 });
 
 it('notifies the current establishment central office and superadmin without personal values', function () {
@@ -53,7 +53,7 @@ it('notifies the current establishment central office and superadmin without per
         $notification = $recipient->notifications()->sole();
         expect($notification->data['kind'])->toBe(StudentActivity::CORRECTION_REQUESTED)
             ->and($notification->data['message'])->toContain('RABE Aina')->and($notification->data['subject_uuid'])->toBe($correction->uuid)
-            ->and(json_encode($notification->data))->not->toContain('0341234567', '0381234567', 'Message privé');
+            ->and(json_encode($notification->data))->not->toContain('0341234567', 'RAZAFY Lalao', 'Message privé');
     }
     foreach ([$this->staffB, $this->developer, $this->studentUser] as $excluded) {
         expect($excluded->notifications()->count())->toBe(0);
@@ -183,13 +183,13 @@ it('validates and audits preferences without altering other accounts', function 
     $this->actingAs($this->staffA)->from('/notifications')->put('/notifications/preferences', ['enabled' => [StudentActivity::INFORMATION_CONFIRMED]])->assertRedirect('/notifications');
     expect($this->staffA->fresh()->wantsNotification(StudentActivity::CORRECTION_REQUESTED))->toBeFalse()
         ->and($this->admin->fresh()->notification_preferences)->toBeNull();
-    expect(Activity::query()->where('event', 'notification_preferences_updated')->sole()->properties->get('disabled_types'))->toBe([StudentActivity::CORRECTION_REQUESTED]);
+    expect(Activity::query()->where('event', 'notification_preferences_updated')->sole()->properties->get('disabled_types'))->toBe([StudentActivity::CORRECTION_REQUESTED, StudentActivity::INFORMATION_UPDATED]);
     $this->put('/notifications/preferences', ['enabled' => ['forged']])->assertSessionHasErrors('enabled.0');
     $this->put('/notifications/preferences', ['enabled' => [StudentActivity::INFORMATION_CONFIRMED, StudentActivity::INFORMATION_CONFIRMED]])->assertSessionHasErrors();
     ($this->requestCorrection)();
     expect($this->staffA->notifications()->count())->toBe(0);
     $this->put('/notifications/preferences', ['enabled' => []])->assertSessionHasNoErrors();
-    expect($this->staffA->fresh()->notification_preferences['off'])->toHaveCount(2);
+    expect($this->staffA->fresh()->notification_preferences['off'])->toHaveCount(count(StudentActivity::TYPES));
 });
 
 it('filters and paginates on the server while the bell stays limited to eight rows', function () {
