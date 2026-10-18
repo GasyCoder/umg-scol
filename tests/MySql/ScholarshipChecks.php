@@ -8,7 +8,6 @@ use App\Models\Establishment;
 use App\Models\Level;
 use App\Models\ScholarshipApplication;
 use App\Models\ScholarshipApplicationStatusHistory;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentRecord;
 use App\Models\User;
@@ -17,6 +16,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 // Commits real rows to exercise row locks across two connections: run only on a disposable, migrated database
 // whose name contains "check", e.g. DB_DATABASE=umg_scol_check php tests/MySql/ScholarshipChecks.php
@@ -65,7 +65,8 @@ DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
 
 app(RolesAndPermissionsSeeder::class)->run();
 $central = User::factory()->create()->assignRole('central_scholarship_office');
-$year = AcademicYear::factory()->create(['is_active' => true]);
+AcademicYear::query()->where('is_current', true)->update(['is_current' => false]);
+$year = AcademicYear::factory()->create(['is_active' => true, 'is_current' => true]);
 $establishment = Establishment::factory()->create();
 $level = Level::factory()->create();
 $declared = function () use ($year, $establishment, $level): Student {
@@ -74,25 +75,35 @@ $declared = function () use ($year, $establishment, $level): Student {
 
     return $student;
 };
-$campaign = ScholarshipCampaign::factory()->create(['academic_year_id' => $year->id, 'status' => 'open', 'created_by' => $central->id]);
-$receive = fn (Student $student, ?string $ddb = null) => app(ReceiveScholarshipApplication::class)->handle($central, $campaign->id, $student->id, $ddb, null);
+$receive = fn (Student $student, ?string $ddb = null) => app(ReceiveScholarshipApplication::class)->handle($central, $student->id, $ddb, null);
 
 $first = $receive($declared(), 'DDB 1');
-$row = fn (array $overrides) => [...$first->only(['scholarship_campaign_id', 'student_id', 'student_record_id', 'received_by']), 'uuid' => (string) Str::uuid7(), 'application_number' => 'CHK-'.bin2hex(random_bytes(3)), 'sequence' => random_int(1000, 999999), 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now(), ...$overrides];
-scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row([])), 'unique campaign + student');
+$row = fn (array $overrides) => [...$first->only(['academic_year_id', 'student_id', 'student_record_id', 'received_by']), 'uuid' => (string) Str::uuid7(), 'application_number' => 'CHK-'.bin2hex(random_bytes(3)), 'sequence' => random_int(1000, 999999), 'status' => 'pending', 'received_at' => now(), 'created_at' => now(), 'updated_at' => now(), ...$overrides];
+scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row([])), 'unique academic year + live student');
 $other = $declared();
-scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'ddb_key' => 'DDB1'])), 'unique campaign + DDB key');
-scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'sequence' => $first->sequence])), 'unique campaign + sequence');
+scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'ddb_key' => 'DDB1'])), 'unique academic year + DDB key');
+scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'sequence' => $first->sequence])), 'unique academic year + sequence');
 scholarshipRejected(fn () => DB::table('scholarship_applications')->insert($row(['student_id' => $other->id, 'application_number' => $first->application_number])), 'unique application number');
 $receive($declared());
 $receive($declared());
-scholarshipCheck(ScholarshipApplication::query()->whereNull('ddb_key')->count() === 2, 'several files without DDB in one campaign');
+scholarshipCheck(ScholarshipApplication::query()->where('academic_year_id', $year->id)->whereNotNull('ddb_key')->count() === 3, 'DDB numbers generated per academic year');
+$legacy = $declared();
+DB::table('scholarship_applications')->insert($row(['student_id' => $legacy->id, 'ddb_key' => null]));
+$legacy = $declared();
+DB::table('scholarship_applications')->insert($row(['student_id' => $legacy->id, 'ddb_key' => null]));
+scholarshipCheck(ScholarshipApplication::query()->where('academic_year_id', $year->id)->whereNull('ddb_key')->count() === 2, 'legacy files without DDB remain supported');
+try {
+    $receive(Student::findOrFail($first->student_id));
+    throw new RuntimeException('duplicate reception accepted');
+} catch (ValidationException) {
+    scholarshipCheck($year->fresh()->last_application_sequence === 3, 'duplicate reception consumes no sequence');
+}
 scholarshipRejected(fn () => DB::table('scholarship_application_status_histories')->insert(['scholarship_application_id' => 999999999, 'to_status' => 'pending', 'actor_id' => $central->id, 'created_at' => now()]), 'status history foreign key');
 scholarshipRejected(fn () => DB::table('students')->where('id', $first->student_id)->delete(), 'student deletion restricted by files');
 
 $late = $declared();
-scholarshipWaits('scholarship_campaigns', $campaign->id, fn () => $receive($late), 'reception waits on the campaign row (closing in progress)');
-scholarshipCheck(! ScholarshipApplication::query()->where('student_id', $late->id)->exists() && $campaign->fresh()->last_application_sequence === 3, 'no file nor sequence consumed after lock timeout');
+scholarshipWaits('academic_years', $year->id, fn () => $receive($late), 'reception waits on the academic year row');
+scholarshipCheck(! ScholarshipApplication::query()->where('student_id', $late->id)->exists() && $year->fresh()->last_application_sequence === 3, 'no file nor sequence consumed after lock timeout');
 
 scholarshipWaits('scholarship_applications', $first->id, fn () => app(TransitionScholarshipApplication::class)->handle($central, $first, ScholarshipApplicationStatus::Rejected, 'Décision concurrente.'), 'decision waits on the file row');
 scholarshipCheck($first->fresh()->status === ScholarshipApplicationStatus::Pending && ScholarshipApplicationStatusHistory::query()->where('scholarship_application_id', $first->id)->count() === 1, 'no partial decision after lock timeout');
