@@ -4,7 +4,6 @@ namespace App\Http\Middleware;
 
 use App\Models\Activity;
 use App\Models\ScholarshipApplication;
-use App\Models\ScholarshipCampaign;
 use App\Models\Student;
 use App\Models\StudentCorrectionRequest;
 use App\Models\StudentImport;
@@ -14,6 +13,7 @@ use App\Support\Branding;
 use App\Support\NotificationInbox;
 use App\Support\PendingTasks;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 
@@ -59,8 +59,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'permissions' => $request->user()?->getAllPermissions()->pluck('name')->values()->all() ?? [],
                 'scholarships' => [
-                    'campaigns' => $request->user() !== null && Gate::allows('viewAny', ScholarshipCampaign::class),
                     'receive' => $request->user() !== null && Gate::allows('receive', ScholarshipApplication::class),
+                    'labels' => $request->user() !== null && Gate::allows('printLabels', ScholarshipApplication::class),
                     'applications' => $request->user() !== null && Gate::allows('viewAny', ScholarshipApplication::class),
                 ],
                 'canViewCorrections' => $request->user() !== null && Gate::allows('viewAny', StudentCorrectionRequest::class),
@@ -70,7 +70,9 @@ class HandleInertiaRequests extends Middleware
                 'canManageUsers' => $request->user() !== null && Gate::allows('viewAny', User::class),
                 'canManagePermissions' => $request->user() !== null && Gate::allows('permissions.manage-ui'),
                 'canManageTrash' => $request->user() !== null && Gate::allows('trash.manage-ui'),
-                'canViewReports' => $request->user() !== null && Gate::allows('reports.view'),
+                'canViewReports' => $request->user() !== null && Gate::allows('reports.view-ui'),
+                'canViewDashboard' => $request->user() !== null && Gate::allows('dashboard.view-ui'),
+                'canViewNotifications' => $request->user() !== null && Gate::allows('viewAny', DatabaseNotification::class),
                 'canViewAudits' => $request->user() !== null && Gate::allows('viewAny', Activity::class),
                 'roleLabel' => $request->user() === null ? null : AuditPresenter::role($request->user()),
             ],
