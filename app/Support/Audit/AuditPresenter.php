@@ -32,6 +32,8 @@ final class AuditPresenter
     ];
 
     public const EVENTS = [
+        'identity_verified' => 'Identité étudiante vérifiée',
+        'verified_by_import' => 'Situation vérifiée par import',
         'notification_preferences_updated' => 'Préférences de notification modifiées',
         'created' => 'Création', 'updated' => 'Modification', 'deleted' => 'Suppression', 'login' => 'Connexion', 'logout' => 'Déconnexion',
         'uploaded' => 'Fichier importé', 'analyzed' => 'Import analysé', 'committed' => 'Import confirmé', 'failed' => 'Échec d’import',
@@ -42,7 +44,7 @@ final class AuditPresenter
         'application_validated' => 'Dossier validé', 'application_needs_correction' => 'Correction de dossier demandée', 'application_rejected' => 'Dossier rejeté',
         'applications_exported' => 'Export des dossiers', 'students_exported' => 'Export des étudiants', 'audits_exported' => 'Export de l’audit', 'reports_exported' => 'Export de rapport',
         'role_permissions_updated' => 'Permissions du rôle modifiées', 'user_permissions_updated' => 'Droits du compte modifiés',
-        'user_created' => 'Compte interne créé', 'user_updated' => 'Compte interne modifié', 'user_suspended' => 'Compte suspendu', 'user_reactivated' => 'Compte réactivé', 'user_invitation_sent' => 'Invitation envoyée', 'branding_updated' => 'Identité de la plateforme modifiée', 'trashed' => 'Déplacé dans la corbeille', 'restored' => 'Restauré', 'purged' => 'Purgé définitivement',
+        'user_created' => 'Compte interne créé', 'user_updated' => 'Compte interne modifié', 'user_suspended' => 'Compte suspendu', 'user_reactivated' => 'Compte réactivé', 'user_invitation_sent' => 'Invitation envoyée', 'branding_updated' => 'Identité de la plateforme modifiée', 'ddb_numbering_updated' => 'Numérotation DDB modifiée', 'ddb_labels_updated' => 'Textes des étiquettes DDB modifiés', 'student_mails_updated' => 'Emails aux étudiants modifiés', 'trashed' => 'Déplacé dans la corbeille', 'restored' => 'Restauré', 'purged' => 'Purgé définitivement',
         'references_imported' => 'Import de référentiels', 'references_exported' => 'Export de référentiels',
         'link_requested' => 'Rattachement demandé', 'portal_detached' => 'Compte portail détaché', 'link_approved' => 'Rattachement approuvé', 'link_rejected' => 'Rattachement rejeté', 'automatic_link' => 'Rattachement automatique',
         'account_created' => 'Compte étudiant créé', 'google_associated' => 'Compte Google associé',
