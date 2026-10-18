@@ -26,7 +26,14 @@ function permissionSave(TestCase $test, string $role, array $names): TestRespons
     return $test->put('/permissions/roles/'.$role, ['permissions' => $names, 'version' => PermissionCatalogue::version(roleNames($role))]);
 }
 it('serves a fixed role matrix to authorized personnel', function () {
-    $this->actingAs($this->admin)->get('/permissions')->assertInertia(fn (Assert $page) => $page->component('permissions/index')->has('roles', 5)->has('catalogue', count(config('access.permissions'))));
+    $this->actingAs($this->admin)->get('/permissions')->assertInertia(fn (Assert $page) => $page->component('permissions/index')->has('roles', 4)->has('catalogue', count(config('access.permissions'))));
+});
+it('hides the developer role from everyone but developers, and never lets them change it', function () {
+    $this->actingAs($this->admin)->get('/permissions')->assertInertia(fn (Assert $page) => $page->where('roles', fn ($roles) => ! collect($roles)->contains('name', 'developer')));
+    permissionSave($this, 'developer', [])->assertNotFound();
+    expect(roleNames('developer'))->toBe(collect(config('access.roles.developer'))->sort()->values()->all());
+    $developer = User::factory()->create()->assignRole('developer');
+    $this->actingAs($developer)->get('/permissions')->assertInertia(fn (Assert $page) => $page->has('roles', 5));
 });
 it('denies operational roles and students by default', function (string $role) {
     $user = User::factory()->create()->assignRole($role);
@@ -82,15 +89,15 @@ it('does not allow adding or changing an undocumented role', function () {
     expect(Role::count())->toBe(5);
 });
 it('detects a stale matrix and keeps the newer assignment', function () {
-    $version = PermissionCatalogue::version(roleNames('developer'));
-    Role::findByName('developer')->revokePermissionTo('levels.manage');
-    $this->actingAs($this->admin)->put('/permissions/roles/developer', ['permissions' => config('access.roles.developer'), 'version' => $version])->assertSessionHasErrors('permissions');
-    expect(Role::findByName('developer')->hasPermissionTo('levels.manage'))->toBeFalse();
+    $version = PermissionCatalogue::version(roleNames('central_scholarship_office'));
+    Role::findByName('central_scholarship_office')->revokePermissionTo('scholarships.export');
+    $this->actingAs($this->admin)->put('/permissions/roles/central_scholarship_office', ['permissions' => config('access.roles.central_scholarship_office'), 'version' => $version])->assertSessionHasErrors('permissions');
+    expect(Role::findByName('central_scholarship_office')->hasPermissionTo('scholarships.export'))->toBeFalse();
 });
 it('audits grants and revocations with the acting account', function () {
     $this->actingAs($this->admin);
-    permissionSave($this, 'developer', array_values(array_diff(roleNames('developer'), ['levels.manage'])))->assertSessionHasNoErrors();
+    permissionSave($this, 'central_scholarship_office', array_values(array_diff(roleNames('central_scholarship_office'), ['scholarships.export'])))->assertSessionHasNoErrors();
     $log = Activity::where('event', 'role_permissions_updated')->sole();
-    expect($log->causer_id)->toBe($this->admin->id)->and($log->properties['revoked_permissions'])->toBe(['levels.manage'])->and($log->properties['role_name'])->toBe('developer');
+    expect($log->causer_id)->toBe($this->admin->id)->and($log->properties['revoked_permissions'])->toBe(['scholarships.export'])->and($log->properties['role_name'])->toBe('central_scholarship_office');
     expect(Activity::where('event', 'permissions.detached')->where('causer_id', $this->admin->id)->exists())->toBeTrue();
 });
