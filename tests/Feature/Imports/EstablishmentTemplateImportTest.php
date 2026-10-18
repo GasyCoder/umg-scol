@@ -207,7 +207,7 @@ it('creates the missing mention and program in the import establishment, with th
         templateRow(['NOM' => 'RAVELO', 'CIN' => 413012049890, 'NUMERO TELEPHONE' => 327407098, 'ADRESSE MAIL' => 'ravelo@example.test', 'REFERENCE DEMANDE DE BOURSE' => 'DB-0003', 'Parcours' => 'Linguistique']),
     ]);
     expect($import->valid_rows)->toBe(3)
-        ->and($import->reference_changes)->toBe(['levels' => [], 'domains' => [], 'mentions' => ['Droit'], 'programs' => ['Droit › Tronc Commun', 'droit › Droit Privé', 'Lettres modernes › Linguistique'], 'created' => false]);
+        ->and($import->reference_changes)->toBe(['establishments' => [], 'levels' => [], 'domains' => [], 'mentions' => ['Droit'], 'programs' => ['Droit › Tronc Commun', 'droit › Droit Privé', 'Lettres modernes › Linguistique'], 'created' => false]);
     $this->get('/imports/'.$import->uuid)->assertInertia(fn (Assert $page) => $page->where('rows.data.0.notices', [
         'Nouvelle mention « Droit » : elle sera créée dans l’établissement.', 'Nouveau parcours « Tronc Commun » : il sera créé dans l’établissement.',
     ]));
