@@ -20,9 +20,11 @@ import {
     UserCheck,
     UserRound,
     XCircle,
+    PencilLine,
+    RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import InputError from '@/components/input-error';
@@ -49,7 +51,9 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { IconAction } from '@/components/icon-action';
 import { ImportStatusBadge, ImportStepper, RowStatusBadge } from './import-ui';
+import { RowCorrectionDialog } from './row-correction';
 import { rowStatusOrder, statuses } from './types';
 import type {
     ImportItem,
@@ -215,6 +219,72 @@ const causeHint = (code: string): string | null =>
             'Corrigez le type de formation dans le fichier ou celui du parcours dans les référentiels.',
     })[code] ?? null;
 
+/** Bar and counter of the rows already processed by a running analysis or confirmation. */
+function ImportProgressBar({
+    progress,
+    verb,
+}: {
+    progress: {
+        phase: 'waiting' | 'prepare' | 'rows';
+        done: number;
+        total: number;
+        percent: number;
+        /** Seconds since the last update. */
+        idle: number;
+    } | null;
+    verb: string;
+}) {
+    const percent = progress?.phase === 'rows' ? progress.percent : 0;
+    // Queued but never picked up: the background worker is not running.
+    // A worker starts by itself within seconds, or through the scheduler (cron) within a minute.
+    const stalled = progress?.phase === 'waiting' && progress.idle >= 90;
+    const text =
+        progress === null || progress.phase === 'waiting'
+            ? 'En attente de démarrage du traitement…'
+            : progress.phase === 'prepare'
+              ? 'Préparation (vérification des doublons et des référentiels)…'
+              : `${formatNumber(progress.done)} sur ${formatNumber(progress.total)} ligne(s) ${verb}`;
+    return (
+        <div className="mt-2 space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+                <span>{text}</span>
+                <span className="font-semibold tabular-nums">{percent} %</span>
+            </div>
+            <div
+                className="h-2 overflow-hidden rounded-full bg-card/70"
+                role="progressbar"
+                aria-valuenow={percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Progression du traitement"
+            >
+                <div
+                    className="h-2 rounded-full bg-info transition-[width] duration-500 motion-reduce:transition-none"
+                    style={{ width: `${percent}%` }}
+                />
+            </div>
+            {stalled ? (
+                <p
+                    role="alert"
+                    className="text-xs font-semibold text-warning-foreground"
+                >
+                    Le traitement n’a pas démarré depuis{' '}
+                    {formatNumber(progress?.idle ?? 0)} s : le service de
+                    traitement en arrière-plan (file d’attente) ne semble pas
+                    actif (tâche planifiée « schedule:run » absente ?). Prévenez
+                    l’administrateur ; l’analyse démarrera dès qu’il sera
+                    relancé.
+                </p>
+            ) : (
+                <p className="text-xs opacity-80">
+                    La page se met à jour toute seule ; vous pouvez la quitter
+                    et revenir plus tard.
+                </p>
+            )}
+        </div>
+    );
+}
+
 export default function ImportShow({
     import: item,
     rows,
@@ -224,6 +294,7 @@ export default function ImportShow({
     canAnalyze,
     canCommit,
     canExport,
+    progress = null,
 }: {
     import: ImportItem;
     rows: Page<ImportRow>;
@@ -234,6 +305,15 @@ export default function ImportShow({
     canAnalyze: boolean;
     canCommit: boolean;
     canExport: boolean;
+    /** Running analysis or confirmation (ImportProgress.php); null otherwise. */
+    progress?: {
+        phase: 'waiting' | 'prepare' | 'rows';
+        done: number;
+        total: number;
+        percent: number;
+        /** Seconds since the last update. */
+        idle: number;
+    } | null;
 }) {
     const mapping = useForm<{ mapping: Record<string, number> }>({
         mapping: item.mapping ?? {},
@@ -241,9 +321,27 @@ export default function ImportShow({
     const commit = useForm({});
     const [confirm, setConfirm] = useState(false);
     const [editMapping, setEditMapping] = useState(false);
+    const [correcting, setCorrecting] = useState<ImportRow | null>(null);
+    const correctable = rows.data.some((row) => row.values);
+    const reanalyze = () =>
+        router.post(
+            `/imports/${item.uuid}/analyze`,
+            { mapping: item.mapping },
+            { preserveScroll: true },
+        );
     const analyzing =
         item.status === 'uploaded' || (item.status === 'ready' && editMapping);
     const showMapping = analyzing && canAnalyze;
+    const working = item.status === 'analyzing' || item.status === 'committing';
+    // A large file is analyzed or confirmed in the queue: follow it until it finishes.
+    useEffect(() => {
+        if (!working) return;
+        const timer = window.setInterval(
+            () => router.reload({ only: ['import', 'rows', 'progress'] }),
+            2000,
+        );
+        return () => window.clearInterval(timer);
+    }, [working]);
     const analyze = (event: FormEvent) => {
         event.preventDefault();
         mapping.post(`/imports/${item.uuid}/analyze`, {
@@ -258,7 +356,8 @@ export default function ImportShow({
         );
     const commitError = (commit.errors as Record<string, string>).import;
     const referenceCount = item.reference_changes
-        ? (item.reference_changes.levels?.length ?? 0) +
+        ? (item.reference_changes.establishments?.length ?? 0) +
+          (item.reference_changes.levels?.length ?? 0) +
           item.reference_changes.domains.length +
           item.reference_changes.mentions.length +
           item.reference_changes.programs.length
@@ -344,7 +443,11 @@ export default function ImportShow({
                 <Banner
                     tone="danger"
                     icon={XCircle}
-                    title="Échec de l’import"
+                    title={
+                        item.status === 'failed'
+                            ? 'Échec de l’import'
+                            : 'Traitement interrompu'
+                    }
                     role="alert"
                 >
                     {item.failure_reason}
@@ -581,6 +684,16 @@ export default function ImportShow({
                                                 Corriger les colonnes
                                             </Button>
                                         )}
+                                        {canAnalyze && (
+                                            <Button
+                                                variant="outline"
+                                                className="bg-card"
+                                                onClick={reanalyze}
+                                            >
+                                                <RefreshCw aria-hidden="true" />
+                                                Relancer l’analyse
+                                            </Button>
+                                        )}
                                         {canCommit && (
                                             <Button
                                                 disabled={
@@ -611,8 +724,14 @@ export default function ImportShow({
                             role="status"
                             title={statuses[item.status]}
                         >
-                            Traitement en cours : actualisez la page dans
-                            quelques instants pour voir le résultat.
+                            <ImportProgressBar
+                                progress={progress}
+                                verb={
+                                    item.status === 'analyzing'
+                                        ? 'analysée(s)'
+                                        : 'importée(s)'
+                                }
+                            />
                         </Banner>
                     )}
                     {item.status === 'cancelled' && (
@@ -641,11 +760,21 @@ export default function ImportShow({
                                     Import terminé
                                 </h2>
                             </div>
-                            <dl className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                            <dl className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-5">
                                 {[
                                     ['identités créées', item.created_rows],
                                     ['identités complétées', item.updated_rows],
                                     ['situations créées', item.declared_rows],
+                                    ...(item.matched_rows > 0
+                                        ? [
+                                              [
+                                                  item.kind === 'pnes'
+                                                      ? 'situations marquées boursier'
+                                                      : 'saisies Scolarité retrouvées',
+                                                  item.matched_rows,
+                                              ],
+                                          ]
+                                        : []),
                                     ['lignes ignorées', item.skipped_rows],
                                 ].map(([label, value]) => (
                                     <div
@@ -661,6 +790,14 @@ export default function ImportShow({
                                     </div>
                                 ))}
                             </dl>
+                            {item.skipped_rows > 0 && canCommit && (
+                                <p className="mt-3 text-sm text-success-foreground">
+                                    {formatNumber(item.skipped_rows)} ligne(s)
+                                    non importée(s) : ouvrez le crayon d’une
+                                    ligne pour la corriger et l’importer, sans
+                                    refaire l’import.
+                                </p>
+                            )}
                         </section>
                     )}
                     <InputError message={commitError} />
@@ -680,32 +817,31 @@ export default function ImportShow({
                                     aria-pressed={active}
                                     onClick={() => applyFilter(key)}
                                     className={cn(
-                                        'surface group flex flex-col gap-2 p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:hover:translate-y-0',
+                                        'surface group flex items-center gap-3 px-3.5 py-2.5 text-left transition-shadow hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                         key === 'all' &&
                                             'col-span-2 sm:col-span-1',
                                         active &&
                                             'border-primary ring-2 ring-primary/30',
                                     )}
                                 >
-                                    <span className="flex items-center justify-between gap-2">
-                                        <span className="text-sm font-medium text-muted-foreground">
+                                    <span
+                                        className={cn(
+                                            'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                                            toneIcons[tile.tone],
+                                        )}
+                                        aria-hidden="true"
+                                    >
+                                        <tile.icon className="size-4" />
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-xs font-medium text-muted-foreground">
                                             {tile.label}
                                         </span>
-                                        <span
-                                            className={cn(
-                                                'flex size-9 shrink-0 items-center justify-center rounded-lg',
-                                                toneIcons[tile.tone],
-                                            )}
-                                            aria-hidden="true"
-                                        >
-                                            <tile.icon className="size-[18px]" />
+                                        <span className="block font-heading text-lg leading-tight font-bold text-foreground tabular-nums">
+                                            {item.status === 'analyzing'
+                                                ? '—'
+                                                : formatNumber(counts[key])}
                                         </span>
-                                    </span>
-                                    <span className="font-heading text-2xl font-extrabold tracking-tight text-foreground tabular-nums">
-                                        {formatNumber(counts[key])}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {active ? 'Filtre actif' : 'Afficher'}
                                     </span>
                                 </button>
                             );
@@ -736,6 +872,11 @@ export default function ImportShow({
                                 {(
                                     [
                                         [
+                                            'Établissements',
+                                            item.reference_changes
+                                                .establishments ?? [],
+                                        ],
+                                        [
                                             'Niveaux',
                                             item.reference_changes.levels ?? [],
                                         ],
@@ -763,9 +904,13 @@ export default function ImportShow({
                                         </p>
                                     ))}
                                 <p className="text-xs opacity-80">
-                                    Ils sont rattachés à cet établissement
-                                    uniquement et restent modifiables dans
-                                    Référentiels → Mentions et Parcours.
+                                    Les mentions et parcours sont rattachés à
+                                    leur établissement uniquement ; tout reste
+                                    modifiable dans les référentiels
+                                    {(item.reference_changes.establishments
+                                        ?.length ?? 0) > 0 &&
+                                        ' (complétez le type et l’adresse des établissements créés)'}
+                                    .
                                 </p>
                             </div>
                         </section>
@@ -875,7 +1020,12 @@ export default function ImportShow({
                                 )}
                             </div>
                         </header>
-                        {rows.data.length === 0 ? (
+                        {item.status === 'analyzing' ? (
+                            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+                                Les lignes et leurs observations s’afficheront à
+                                la fin de l’analyse.
+                            </p>
+                        ) : rows.data.length === 0 ? (
                             <EmptyState
                                 compact
                                 illustration="search"
@@ -910,6 +1060,13 @@ export default function ImportShow({
                                             </th>
                                             <th scope="col">Statut</th>
                                             <th scope="col">Observations</th>
+                                            {correctable && (
+                                                <th scope="col">
+                                                    <span className="sr-only">
+                                                        Actions
+                                                    </span>
+                                                </th>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1048,7 +1205,6 @@ export default function ImportShow({
                                                                                 notice
                                                                             }
                                                                             tone="info"
-                                                                            label="Référentiel"
                                                                             message={
                                                                                 notice
                                                                             }
@@ -1070,6 +1226,23 @@ export default function ImportShow({
                                                             </span>
                                                         )}
                                                     </td>
+                                                    {correctable && (
+                                                        <td className="text-right">
+                                                            {row.values && (
+                                                                <IconAction
+                                                                    icon={
+                                                                        PencilLine
+                                                                    }
+                                                                    label={`Corriger la ligne ${row.row_number}`}
+                                                                    onClick={() =>
+                                                                        setCorrecting(
+                                                                            row,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            )}
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}
@@ -1079,6 +1252,15 @@ export default function ImportShow({
                         )}
                     </section>
                     <Pagination links={rows.links} />
+                    {correcting && (
+                        <RowCorrectionDialog
+                            importUuid={item.uuid}
+                            row={correcting}
+                            columns={columns}
+                            completed={item.status === 'completed'}
+                            onClose={() => setCorrecting(null)}
+                        />
+                    )}
                 </>
             )}
 
