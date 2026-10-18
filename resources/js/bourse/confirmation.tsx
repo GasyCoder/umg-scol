@@ -1,8 +1,9 @@
-import { AlertCircle, BadgeCheck, CalendarCheck, Info } from 'lucide-react';
+import { AlertCircle, BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
 import { ToneBadge } from '@/components/tone-badge';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardHeader } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { api } from './api';
+import { SectionTitle } from './section-title';
 
 export type ConfirmationState = {
     status: 'never_confirmed' | 'confirmed' | 'stale';
@@ -83,51 +85,22 @@ export function ConfirmationSection({
     const confirmed = state.status === 'confirmed';
 
     return (
-        <section
+        <Card
             id="verification"
             aria-labelledby="verification-title"
-            className="surface scroll-mt-24 overflow-hidden"
+            className="scroll-mt-24 gap-0 overflow-hidden py-0"
         >
-            <header
-                className={
-                    compact
-                        ? 'flex flex-col gap-2 border-b bg-muted/30 px-5 py-4'
-                        : 'flex flex-wrap items-start gap-x-4 gap-y-3 border-b bg-muted/30 px-5 py-4 sm:px-6'
-                }
-            >
-                {!compact && (
-                    <span
-                        className={
-                            confirmed
-                                ? 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-foreground'
-                                : 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary'
-                        }
-                        aria-hidden="true"
-                    >
-                        <BadgeCheck className="size-5" />
-                    </span>
-                )}
-                <div className="min-w-0 flex-1">
-                    <h2
-                        id="verification-title"
-                        className="font-heading text-base font-bold text-foreground"
-                    >
-                        Vérification de mes informations
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                        Confirmez que les informations affichées sont exactes.
-                    </p>
+            <CardHeader className="flex-row items-start justify-between gap-3 border-b px-5 py-4 sm:px-6">
+                <div className="min-w-0 space-y-1">
+                    <SectionTitle icon={BadgeCheck} id="verification-title">
+                        Vérification
+                    </SectionTitle>
+                    {state.academic_year && (
+                        <CardDescription>{state.academic_year}</CardDescription>
+                    )}
                 </div>
-                <div
-                    className={
-                        compact
-                            ? ''
-                            : 'order-last basis-full pl-14 sm:order-none sm:basis-auto sm:pl-0'
-                    }
-                >
-                    <ConfirmationBadge status={state.status} />
-                </div>
-            </header>
+                <ConfirmationBadge status={state.status} />
+            </CardHeader>
 
             <div
                 className={
@@ -136,74 +109,35 @@ export function ConfirmationSection({
                         : 'space-y-4 px-5 py-5 sm:px-6'
                 }
             >
-                {confirmed && state.confirmed_at && (
-                    <p className="flex items-start gap-3 rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-foreground">
-                        <CalendarCheck
-                            className="mt-0.5 size-4 shrink-0"
-                            aria-hidden="true"
-                        />
-                        <span>
-                            Informations confirmées le{' '}
-                            {formatDateTime(state.confirmed_at)}
-                            {state.academic_year &&
-                                ` pour l’année ${state.academic_year}`}
-                            .
-                        </span>
-                    </p>
-                )}
-                {state.status === 'stale' && (
-                    <p className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-foreground">
-                        <AlertCircle
-                            className="mt-0.5 size-4 shrink-0"
-                            aria-hidden="true"
-                        />
-                        <span>
-                            Vos informations ont changé depuis votre dernière
-                            confirmation
-                            {state.confirmed_at &&
-                                ` (le ${formatDateTime(state.confirmed_at)})`}
-                            . Vérifiez-les à nouveau.
-                        </span>
-                    </p>
-                )}
-                {state.status === 'never_confirmed' && (
+                {/* One short sentence per state, then the button when it can be used. */}
+                {confirmed ? (
                     <p className="text-sm text-foreground">
-                        {compact
-                            ? 'Relisez vos informations, puis confirmez qu’elles sont correctes.'
-                            : 'Après vérification des informations ci-dessus, confirmez qu’elles sont correctes.'}
+                        Confirmée
+                        {state.confirmed_at &&
+                            ` le ${formatDateTime(state.confirmed_at)}`}
+                        .
                     </p>
-                )}
-
-                <p className="flex items-start gap-3 rounded-lg bg-muted px-4 py-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-                    <Info
-                        className="mt-0.5 size-4 shrink-0"
-                        aria-hidden="true"
-                    />
-                    <span>
-                        Cette confirmation indique seulement que vous avez
-                        vérifié les informations affichées. Elle ne constitue ni
-                        une inscription, ni une validation de dossier de bourse.
-                        Les données CIN, non affichées, ne sont pas concernées.
-                    </span>
-                </p>
-
-                {pending ? (
-                    <p className="flex items-start gap-3 rounded-lg border border-info/30 bg-info-soft px-4 py-3 text-sm text-info-foreground">
-                        <Info
-                            className="mt-0.5 size-4 shrink-0"
-                            aria-hidden="true"
-                        />
-                        <span>
-                            Vous avez une demande de correction en attente. Vous
-                            pourrez confirmer vos informations après son
-                            traitement ou son annulation.{' '}
-                            <a
-                                href="#mes-demandes"
-                                className="rounded-sm font-semibold underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                            >
-                                Voir mes demandes
-                            </a>
-                        </span>
+                ) : pending ? (
+                    <p className="text-sm text-muted-foreground">
+                        Une demande est en attente.{' '}
+                        <a
+                            href="/demandes"
+                            className="rounded-sm font-medium text-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            Voir
+                        </a>
+                    </p>
+                ) : state.can_confirm ? (
+                    <p className="flex items-start gap-2 text-sm text-foreground">
+                        {state.status === 'stale' && (
+                            <AlertCircle
+                                className="mt-0.5 size-4 shrink-0 text-warning"
+                                aria-hidden="true"
+                            />
+                        )}
+                        {state.status === 'stale'
+                            ? 'Votre fiche a changé. Est-elle toujours exacte ?'
+                            : 'Votre fiche est-elle exacte ?'}
                     </p>
                 ) : (
                     state.message && (
@@ -213,18 +147,17 @@ export function ConfirmationSection({
                     )
                 )}
 
-                {!confirmed && (
+                {!confirmed && !pending && state.can_confirm && (
                     <Button
                         className={
                             compact
-                                ? 'h-auto min-h-11 w-full py-2.5 font-semibold whitespace-normal'
-                                : 'h-auto min-h-11 w-full py-2.5 font-semibold whitespace-normal sm:w-auto'
+                                ? 'h-11 w-full text-base'
+                                : 'h-11 w-full text-base sm:w-auto'
                         }
-                        disabled={!state.can_confirm || !state.version || busy}
+                        disabled={!state.version || busy}
                         onClick={() => setOpen(true)}
                     >
-                        <BadgeCheck aria-hidden="true" />
-                        Je confirme
+                        Oui, je confirme
                     </Button>
                 )}
             </div>
@@ -237,21 +170,17 @@ export function ConfirmationSection({
             >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <span
-                            className="mx-auto mb-2 flex size-11 items-center justify-center rounded-xl bg-accent text-primary sm:mx-0"
-                            aria-hidden="true"
-                        >
-                            <BadgeCheck className="size-5" />
-                        </span>
                         <DialogTitle>Confirmer mes informations</DialogTitle>
                         <DialogDescription>
-                            Je confirme avoir vérifié les informations
-                            affichées.
+                            Je confirme que les informations affichées sont
+                            exactes.
                         </DialogDescription>
                     </DialogHeader>
-                    <p className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
-                        Si une information est inexacte, annulez et utilisez
-                        plutôt « Signaler une erreur ».
+                    {/* The fine print lives here, at the moment of deciding, not on the card. */}
+                    <p className="text-sm text-muted-foreground">
+                        Une erreur ? Annulez et touchez le crayon à côté de
+                        l’information. Cette confirmation ne vaut ni inscription
+                        ni dossier de bourse.
                     </p>
                     <DialogFooter className="gap-2">
                         <Button
@@ -271,6 +200,6 @@ export function ConfirmationSection({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </section>
+        </Card>
     );
 }
