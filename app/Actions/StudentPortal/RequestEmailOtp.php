@@ -5,15 +5,21 @@ namespace App\Actions\StudentPortal;
 use App\Mail\StudentOtpMail;
 use App\Models\EmailOtpChallenge;
 use App\Support\PortalEmailLock;
+use App\Support\StudentPortalIdentity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class RequestEmailOtp
 {
     public function handle(string $email, string $binding): string
     {
+        $email = Str::lower(trim($email));
+        if (StudentPortalIdentity::find($email) === null) {
+            throw ValidationException::withMessages(['email' => 'Cette adresse ne permet pas d’accéder au portail étudiant. Utilisez l’adresse déclarée à votre établissement ou contactez sa scolarité.']);
+        }
         $mailer = (string) config('mail.default');
         $transport = config('mail.mailers.'.$mailer.'.transport');
         // Never send a secret through the log mailer or a failover containing it.
