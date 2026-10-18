@@ -25,7 +25,10 @@ BASH);
     $workflow = Yaml::parseFile(dirname(__DIR__, 2).'/.github/workflows/ci-cd.yml');
     $this->whitelistSteps = array_column($workflow['jobs']['deploy']['steps'], null, 'name');
     $this->runWhitelistStep = function (string $name, array $environment = []): Process {
-        $process = new Process(['bash', '-e', '-o', 'pipefail', '-c', $this->whitelistSteps[$name]['run']], null, array_merge([
+        // GitHub enables pipefail only when the workflow explicitly selects Bash.
+        $shell = $this->whitelistSteps[$name]['shell'] ?? null;
+        $command = $shell === 'bash' ? ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c'] : ['bash', '-e', '-c'];
+        $process = new Process([...$command, $this->whitelistSteps[$name]['run']], null, array_merge([
             'PATH' => $this->whitelistDirectory.PATH_SEPARATOR.getenv('PATH'),
             'DEPLOY_USER' => 'test-user',
             'CPANEL_TOKEN' => 'test-token',
