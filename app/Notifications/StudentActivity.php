@@ -15,10 +15,14 @@ class StudentActivity extends Notification
 
     public const INFORMATION_CONFIRMED = 'information_confirmed';
 
+    /** Sex, nationality or address changed by the student without validation (ADR-089). */
+    public const INFORMATION_UPDATED = 'information_updated';
+
     /** Label of each type, also used by the preferences. */
     public const TYPES = [
         self::CORRECTION_REQUESTED => 'Demande de correction d’un étudiant',
         self::INFORMATION_CONFIRMED => 'Informations confirmées par un étudiant',
+        self::INFORMATION_UPDATED => 'Fiche modifiée par un étudiant',
     ];
 
     public function __construct(
