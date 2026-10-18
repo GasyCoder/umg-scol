@@ -1,15 +1,18 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
     ArrowRight,
     BookOpenCheck,
+    Check,
+    CircleAlert,
     ClipboardCheck,
     GraduationCap,
+    History,
     IdCard,
-    Info,
     Pencil,
     Phone,
+    RotateCcw,
     Save,
     UserPlus,
     UserRound,
@@ -17,12 +20,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, HTMLInputTypeAttribute } from 'react';
-import {
-    ErrorSummary,
-    FormField,
-    FormSection,
-} from '@/components/forms/form-kit';
-import { Stepper } from '@/components/forms/stepper';
+import { ErrorSummary, FormField } from '@/components/forms/form-kit';
 import type { Step, StepState } from '@/components/forms/stepper';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { formatDay } from '@/components/references/reference-meta';
@@ -39,8 +37,15 @@ import type {
     SelectChoice,
     Student,
 } from '@/components/students/types';
-import { Badge } from '@/components/ui/badge';
+import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -50,6 +55,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 
 type FieldKey = Exclude<keyof Student, 'id' | 'uuid' | 'is_active'>;
 type Field = {
@@ -76,6 +82,19 @@ type Errors = Record<string, string>;
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentYear = new Date().getFullYear();
+/** Optional identity fields counted as « vides » on the review (PNES identifiers excluded: holders only). */
+const REVIEW_OPTIONAL = [
+    'first_names',
+    'mother_name',
+    'cin',
+    'cin_issued_at',
+    'cin_issued_place',
+    'phone',
+    'email',
+    'address',
+    'bac_year',
+    'bac_series',
+];
 const RECORD_KEYS = [
     'establishment_id',
     'academic_year_id',
@@ -140,7 +159,7 @@ const identityStep: FormStep = {
 const cinStep: FormStep = {
     id: 'cin',
     title: 'Pièce d’identité',
-    description: 'CIN et délivrance',
+    description: 'CIN, code bourse',
     icon: IdCard,
     keys: [],
     fields: [
@@ -159,8 +178,29 @@ const cinStep: FormStep = {
             max: 255,
             placeholder: 'Ex. : Mahajanga',
         },
+        {
+            key: 'scholarship_code',
+            label: 'Code bourse',
+            max: 30,
+            hint: 'Code de la base PNES, pour un étudiant boursier.',
+        },
     ],
 };
+/** PNES identifiers entered by the central office only (never shown to establishments). */
+const pnesFields: Field[] = [
+    {
+        key: 'uin',
+        label: 'UIN',
+        max: 30,
+        hint: 'Identifiant PNES. Visible par la Scolarité Centrale uniquement.',
+    },
+    {
+        key: 'bank_account',
+        label: 'Numéro de compte',
+        max: 34,
+        hint: 'Compte bancaire du boursier. Visible par la Scolarité Centrale uniquement.',
+    },
+];
 const contactStep: FormStep = {
     id: 'contact',
     title: 'Coordonnées',
@@ -236,13 +276,23 @@ const reviewStep: FormStep = {
     keys: [],
 };
 
-const identitySteps = [identityStep, cinStep, contactStep, bacStep];
-for (const step of identitySteps)
-    step.keys = (step.fields ?? []).map((field) => field.key);
+/** Identity steps; the central office also enters the PNES identifiers. */
+const identityStepsFor = (pnes: boolean): FormStep[] =>
+    [
+        identityStep,
+        pnes
+            ? { ...cinStep, fields: [...(cinStep.fields ?? []), ...pnesFields] }
+            : cinStep,
+        contactStep,
+        bacStep,
+    ].map((step) => ({
+        ...step,
+        keys: (step.fields ?? []).map((field) => field.key),
+    }));
 
 const labels: Record<string, string> = {
     ...Object.fromEntries(
-        identitySteps.flatMap((step) =>
+        identityStepsFor(true).flatMap((step) =>
             (step.fields ?? []).map((field) => [field.key, field.label]),
         ),
     ),
@@ -281,6 +331,24 @@ function validateStep(step: FormStep, data: Data): Errors {
         )
             errors.cin_issued_at =
                 'La délivrance de la CIN ne peut pas précéder la naissance.';
+        // Spaces and dots are removed by the server, as for the CIN.
+        const compact = (key: string) =>
+            (data[key] ?? '').replace(/[\s.]+/g, '');
+        if (
+            compact('scholarship_code') &&
+            !/^[0-9A-Za-z-]+$/.test(compact('scholarship_code'))
+        )
+            errors.scholarship_code =
+                'Le code bourse ne doit contenir que des chiffres, des lettres et des tirets.';
+        if (compact('uin') && !/^[0-9A-Za-z]+$/.test(compact('uin')))
+            errors.uin =
+                'L’UIN ne doit contenir que des chiffres et des lettres.';
+        if (
+            compact('bank_account') &&
+            !/^[0-9A-Za-z]+$/.test(compact('bank_account'))
+        )
+            errors.bank_account =
+                'Le numéro de compte ne doit contenir que des chiffres et des lettres.';
     }
     if (step.id === 'contact') {
         if (data.phone && !/^\+?[0-9\s().-]+$/.test(data.phone))
@@ -301,12 +369,6 @@ function validateStep(step: FormStep, data: Data): Errors {
             'level_id',
             'repeat_code',
         ].forEach(required);
-        if (
-            data.scholarship_requested_at &&
-            !data.scholarship_request_reference.trim()
-        )
-            errors.scholarship_request_reference =
-                'La référence de la demande est obligatoire lorsque la date de dépôt est renseignée.';
         if (
             data.scholarship_requested_at &&
             data.scholarship_requested_at > today()
@@ -332,14 +394,118 @@ const optionName = (options: Option[], id: string) => {
         : '';
 };
 
+/**
+ * Draft of a creation, kept in this browser tab only (sessionStorage, per account): a reload
+ * loses nothing, closing the tab, saving or cancelling forgets it. Nothing reaches the server
+ * before « Enregistrer ». Storage may be unavailable (private mode): the form still works.
+ */
+type Draft = {
+    data: Data;
+    current: number;
+    reached: number;
+    savedAt: string;
+    /** Reception search the creation started from (null for a plain creation). */
+    origin: string | null;
+};
+const readDraft = (key: string | null): Draft | null => {
+    if (!key) return null;
+    try {
+        const raw = window.sessionStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as Draft) : null;
+    } catch {
+        return null;
+    }
+};
+const writeDraft = (key: string, draft: Draft | null) => {
+    try {
+        if (draft) window.sessionStorage.setItem(key, JSON.stringify(draft));
+        else window.sessionStorage.removeItem(key);
+    } catch {
+        // Storage full or blocked: the draft is simply not kept.
+    }
+};
+
+/** « ! » button of the header: the draft was restored after a reload; opens the notice and « Recommencer ». */
+function RestoredNotice({
+    savedAt,
+    onRestart,
+}: {
+    savedAt: string;
+    onRestart: () => void;
+}) {
+    const time = new Date(savedAt).toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="relative rounded-full text-info"
+                    aria-label={`Saisie restaurée (${time}) : afficher le détail`}
+                >
+                    <CircleAlert aria-hidden="true" />
+                    <span
+                        className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-info ring-2 ring-card"
+                        aria-hidden="true"
+                    />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 p-0">
+                <div className="space-y-1.5 px-4 py-3 text-sm">
+                    <p className="flex items-center gap-2 font-semibold text-foreground">
+                        <History
+                            className="size-4 text-info"
+                            aria-hidden="true"
+                        />
+                        Saisie restaurée
+                    </p>
+                    <p className="text-muted-foreground">
+                        Les informations entrées avant l’actualisation ({time})
+                        sont conservées. Rien n’est enregistré avant «
+                        Enregistrer ».
+                    </p>
+                </div>
+                <DropdownMenuSeparator className="my-0" />
+                <DropdownMenuItem
+                    onSelect={onRestart}
+                    className="cursor-pointer rounded-none px-4 py-2.5 font-medium text-danger-foreground focus:text-danger-foreground"
+                >
+                    <RotateCcw aria-hidden="true" />
+                    Recommencer
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/** Creation opened from a reception search without result. */
+type ReceptionContext = {
+    search: string;
+    back_url: string;
+};
+
 export default function StudentForm({
     student,
     options,
+    prefill = {},
+    reception = null,
 }: {
     student: Student | null;
     options: Options;
+    /** Field guessed from the reception search (name, email, phone or CIN). */
+    prefill?: Record<string, string>;
+    reception?: ReceptionContext | null;
 }) {
     const editing = student !== null;
+    // UIN and bank account: central office only; editing, the server sends them only to it.
+    const pnes = student
+        ? student.uin !== undefined
+        : options.fixedEstablishmentId === null;
+    const [identitySteps] = useState(() => identityStepsFor(pnes));
     const steps = editing
         ? [...identitySteps, reviewStep]
         : [...identitySteps, recordStep, reviewStep];
@@ -368,13 +534,90 @@ export default function StudentForm({
                 scholarship_requested_at: '',
                 scholarship_request_reference: '',
             });
+        if (!student)
+            for (const [key, value] of Object.entries(prefill))
+                if (key in values) values[key] = value;
         return values;
     });
-    const form = useForm<Data>(initial);
+    const { auth } = usePage().props;
+    const draftKey = editing
+        ? null
+        : `umg:student-create:${auth.user?.id ?? 'guest'}`;
+    // A creation in progress before a reload comes back as it was (fields, step).
+    const [restored, setRestored] = useState<Draft | null>(() => {
+        const draft = readDraft(draftKey);
+        // Started for another reception search: that other student is not mixed in.
+        return draft &&
+            typeof draft.data === 'object' &&
+            (draft.origin ?? null) === (reception?.search ?? null)
+            ? draft
+            : null;
+    });
+    const form = useForm<Data>(
+        restored
+            ? Object.fromEntries(
+                  Object.entries(initial).map(([key, value]) => [
+                      key,
+                      typeof restored.data[key] === 'string'
+                          ? restored.data[key]
+                          : value,
+                  ]),
+              )
+            : initial,
+    );
     const errors = form.errors as Errors;
-    const [current, setCurrent] = useState(0);
+    const lastStep = steps.length - 1;
+    const [current, setCurrent] = useState(() => {
+        // Editing from a block of the student page (?step=contact…): open that step.
+        if (editing && typeof window !== 'undefined') {
+            const asked = new URLSearchParams(window.location.search).get(
+                'step',
+            );
+            const index = steps.findIndex((item) => item.id === asked);
+            if (index >= 0) return index;
+        }
+        return Math.min(restored?.current ?? 0, lastStep);
+    });
     // Furthest step reached: creating, later steps open only once the previous ones are valid.
-    const [reached, setReached] = useState(editing ? steps.length - 1 : 0);
+    const [reached, setReached] = useState(() =>
+        editing ? lastStep : Math.min(restored?.reached ?? 0, lastStep),
+    );
+    // Saved or cancelled: the draft is forgotten and never written again.
+    const finished = useRef(false);
+    const forgetDraft = () => {
+        finished.current = true;
+        if (draftKey) writeDraft(draftKey, null);
+    };
+    useEffect(() => {
+        if (!draftKey || finished.current) return;
+        const timer = window.setTimeout(() => {
+            if (finished.current) return;
+            const touched = Object.keys(form.data).some(
+                (key) => form.data[key] !== initial[key],
+            );
+            writeDraft(
+                draftKey,
+                touched
+                    ? {
+                          data: form.data,
+                          current,
+                          reached,
+                          savedAt: new Date().toISOString(),
+                          origin: reception?.search ?? null,
+                      }
+                    : null,
+            );
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [draftKey, form.data, current, reached, initial]);
+    const restart = () => {
+        if (draftKey) writeDraft(draftKey, null);
+        form.setData(initial);
+        form.clearErrors();
+        setCurrent(0);
+        setReached(0);
+        setRestored(null);
+    };
     const panel = useRef<HTMLDivElement>(null);
     const firstRender = useRef(true);
 
@@ -424,13 +667,23 @@ export default function StudentForm({
             }
         const visit = {
             preserveScroll: true,
+            onSuccess: forgetDraft,
             onError: (serverErrors: Errors) => {
                 const index = stepWithError(Object.keys(serverErrors));
                 if (index >= 0) setCurrent(index);
             },
         };
         if (student) form.put(`/students/${student.uuid}`, visit);
-        else form.post('/students', visit);
+        else {
+            // From the reception, the server comes back to the counter on the new student's file.
+            if (reception)
+                form.transform((data) => ({
+                    ...data,
+                    from_reception: true,
+                    reception_search: reception.search,
+                }));
+            form.post('/students', visit);
+        }
     };
     /** Enter key: creating, goes to the next step; editing, saves from any step. */
     const submit = (event: FormEvent) => {
@@ -441,13 +694,6 @@ export default function StudentForm({
 
     const step = steps[current];
     const last = current === steps.length - 1;
-    const otherStepsWithErrors = steps
-        .map((_, index) => index)
-        .filter(
-            (index) =>
-                index !== current &&
-                steps[index].keys.some((key) => errors[key]),
-        );
     const fullName = student
         ? `${student.last_name} ${student.first_names ?? ''}`.trim()
         : '';
@@ -575,6 +821,45 @@ export default function StudentForm({
         }
     };
 
+    /** What a step already holds, shown under its title in the step list. */
+    const summaryOf = (item: FormStep): string => {
+        const join = (...values: string[]) =>
+            values.filter((value) => value !== '').join(' · ');
+        switch (item.id) {
+            case 'identity':
+                return join(
+                    `${form.data.last_name} ${form.data.first_names}`.trim(),
+                    display('sex'),
+                    display('birth_date'),
+                );
+            case 'cin':
+                return join(display('cin'), display('scholarship_code'));
+            case 'contact':
+                return join(display('phone'), display('email'));
+            case 'bac':
+                return join(display('bac_series'), display('bac_year'));
+            case 'record':
+                return join(
+                    form.data.level_id
+                        ? (options.levels.find(
+                              (level) =>
+                                  String(level.id) === form.data.level_id,
+                          )?.code ?? '')
+                        : '',
+                    form.data.establishment_id
+                        ? (options.establishments.find(
+                              (item) =>
+                                  String(item.id) ===
+                                  form.data.establishment_id,
+                          )?.code ?? '')
+                        : '',
+                );
+            default:
+                return '';
+        }
+    };
+
+    /** One block of the review: label / value rows, « Modifier » opens the step. */
     const reviewSection = (item: FormStep, index: number) => {
         const keys =
             item.id === 'record'
@@ -583,64 +868,59 @@ export default function StudentForm({
         return (
             <section
                 key={item.id}
-                className="rounded-xl border bg-card"
                 aria-labelledby={`review-${item.id}`}
+                className="overflow-hidden rounded-lg border bg-card"
             >
-                <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                <div className="flex items-center justify-between gap-3 border-b bg-muted/40 py-1.5 pr-1.5 pl-4">
                     <h3
                         id={`review-${item.id}`}
-                        className="flex items-center gap-2 text-sm font-bold text-foreground"
+                        className="text-sm font-semibold text-foreground"
                     >
-                        <item.icon
-                            className="size-4 text-primary"
-                            aria-hidden="true"
-                        />
                         {item.title}
                     </h3>
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="text-primary hover:text-primary"
                         onClick={() => setCurrent(index)}
                     >
                         <Pencil aria-hidden="true" />
                         Modifier
                         <span className="sr-only"> : {item.title}</span>
                     </Button>
-                </header>
-                <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
+                </div>
+                <dl className="divide-y">
                     {keys.map((key) => {
                         const value = display(key);
                         const changed =
                             editing && form.data[key] !== initial[key];
                         return (
-                            <div key={key} className="min-w-0">
-                                <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <div
+                                key={key}
+                                className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-3 px-4 py-2 text-sm sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]"
+                            >
+                                <dt className="text-muted-foreground">
                                     {labels[key]}
-                                    {changed && (
-                                        <Badge
-                                            variant="outline"
-                                            className="border-info/40 bg-info-soft px-1.5 py-0 text-[10px] text-info-foreground"
-                                        >
-                                            Modifié
-                                        </Badge>
-                                    )}
                                 </dt>
                                 <dd
-                                    className={
+                                    className={cn(
+                                        'flex flex-wrap items-center gap-2 break-words',
                                         value
-                                            ? 'mt-0.5 text-sm font-medium break-words text-foreground'
-                                            : 'mt-0.5 text-sm text-muted-foreground italic'
-                                    }
+                                            ? 'font-medium text-foreground'
+                                            : 'text-muted-foreground',
+                                    )}
                                 >
                                     {value || 'Non renseigné'}
                                     {key === 'cin' && cinIsNonStandard && (
-                                        <Badge
-                                            variant="outline"
-                                            className="ml-2 border-warning/40 bg-warning-soft text-warning-foreground"
-                                        >
-                                            CIN non standard
-                                        </Badge>
+                                        <ToneBadge tone="warning">
+                                            Non standard
+                                        </ToneBadge>
+                                    )}
+                                    {changed && (
+                                        <ToneBadge tone="info">
+                                            Modifié
+                                        </ToneBadge>
                                     )}
                                 </dd>
                             </div>
@@ -650,6 +930,76 @@ export default function StudentForm({
             </section>
         );
     };
+
+    /** Top of the review: who is being added, and what is still empty. */
+    const reviewOverview = () => {
+        const optionalEmpty = REVIEW_OPTIONAL.filter(
+            (key) => key in form.data && !form.data[key],
+        );
+        const born = form.data.birth_date
+            ? `${form.data.sex === 'F' ? 'née' : form.data.sex === 'M' ? 'né' : 'né(e)'} le ${display('birth_date')}`
+            : '';
+        const identity = [display('sex'), born, display('nationality')].filter(
+            Boolean,
+        );
+        const situation = editing
+            ? []
+            : [
+                  options.levels.find(
+                      (level) => String(level.id) === form.data.level_id,
+                  )?.name ?? '',
+                  options.establishments.find(
+                      (item) => String(item.id) === form.data.establishment_id,
+                  )?.name ?? '',
+                  options.academicYears.find(
+                      (year) => String(year.id) === form.data.academic_year_id,
+                  )?.name ?? '',
+              ].filter(Boolean);
+        return (
+            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                    <p className="text-lg leading-tight font-semibold text-foreground">
+                        {`${form.data.last_name} ${form.data.first_names}`.trim() ||
+                            '—'}
+                    </p>
+                    {identity.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                            {identity.join(' · ')}
+                        </p>
+                    )}
+                    {situation.length > 0 && (
+                        <p className="text-sm text-foreground">
+                            {situation.join(' · ')}
+                        </p>
+                    )}
+                </div>
+                {optionalEmpty.length > 0 ? (
+                    <span
+                        className="shrink-0"
+                        title={optionalEmpty
+                            .map((key) => labels[key])
+                            .join(', ')}
+                    >
+                        <ToneBadge tone="neutral">
+                            {optionalEmpty.length} information
+                            {optionalEmpty.length > 1 && 's'} facultative
+                            {optionalEmpty.length > 1 && 's'} vide
+                            {optionalEmpty.length > 1 && 's'}
+                        </ToneBadge>
+                    </span>
+                ) : (
+                    <ToneBadge tone="success" className="shrink-0">
+                        Fiche complète
+                    </ToneBadge>
+                )}
+            </div>
+        );
+    };
+
+    const cancelHref = student
+        ? `/students/${student.uuid}`
+        : (reception?.back_url ?? '/students');
+    const progress = Math.round(((current + 1) / steps.length) * 100);
 
     return (
         <>
@@ -667,130 +1017,221 @@ export default function StudentForm({
                     description={
                         editing
                             ? 'Les modifications sont tracées dans l’audit. La situation de l’année se modifie depuis la fiche.'
-                            : 'Déclarez, étape par étape, un étudiant déjà régulièrement inscrit dans votre établissement.'
+                            : options.fixedEstablishmentId === null
+                              ? 'Un étudiant déjà inscrit dans son établissement : l’inscription se fait hors plateforme.'
+                              : 'Un étudiant déjà inscrit dans votre établissement : l’inscription se fait hors plateforme.'
                     }
-                />
-                <Stepper
-                    steps={steps}
-                    current={current}
-                    stateOf={stateOf}
-                    subtitleOf={(index) =>
-                        editing && index !== current && stepChanged(index)
-                            ? 'Modifiée'
-                            : undefined
+                    meta={
+                        reception && (
+                            <ToneBadge tone="info">
+                                Depuis la réception
+                                {reception.search &&
+                                    ` · « ${reception.search} »`}
+                            </ToneBadge>
+                        )
                     }
-                    canOpen={(index) => index <= reached || index < current}
-                    onOpen={open}
-                />
-                <form onSubmit={submit} className="space-y-6" noValidate>
-                    <ErrorSummary
-                        errors={Object.fromEntries(
-                            step.keys.map((key) => [key, errors[key]]),
-                        )}
-                        labels={labels}
-                    />
-                    {otherStepsWithErrors.length > 0 && (
-                        <div
-                            role="alert"
-                            className="flex flex-wrap items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft p-3 text-sm text-danger-foreground"
-                        >
-                            <AlertTriangle
-                                className="size-4 shrink-0"
-                                aria-hidden="true"
-                            />
-                            <span>D’autres étapes sont à corriger :</span>
-                            {otherStepsWithErrors.map((index) => (
-                                <Button
-                                    key={steps[index].id}
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setCurrent(index)}
-                                >
-                                    {steps[index].title}
-                                </Button>
-                            ))}
-                        </div>
-                    )}
-                    <div
-                        ref={panel}
-                        tabIndex={-1}
-                        aria-label={`Étape ${current + 1} sur ${steps.length} : ${step.title}`}
-                        className="scroll-mt-24 space-y-4 outline-none"
-                    >
-                        {step.fields && (
-                            <FormSection
-                                icon={step.icon}
-                                title={step.title}
-                                description={stepDescriptions[step.id]}
-                            >
-                                {step.fields.map(renderField)}
-                            </FormSection>
-                        )}
-                        {step.id === 'cin' && cinIsNonStandard && (
-                            <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft p-3 text-sm text-warning-foreground">
-                                <AlertTriangle
-                                    className="mt-0.5 size-4 shrink-0"
-                                    aria-hidden="true"
+                    actions={
+                        <>
+                            {restored && (
+                                <RestoredNotice
+                                    savedAt={restored.savedAt}
+                                    onRestart={restart}
                                 />
-                                Ce numéro ne comporte pas 12 chiffres : il sera
-                                accepté mais signalé « CIN non standard » et ne
-                                servira pas à identifier l’étudiant.
-                            </p>
-                        )}
-                        {step.id === 'record' && (
-                            <RecordFields
-                                options={options}
-                                data={form.data}
-                                errors={form.errors}
-                                setData={(key, value) => {
-                                    form.setData(key, value);
-                                    form.clearErrors(key);
-                                }}
-                            />
-                        )}
-                        {step.id === 'review' && (
-                            <FormSection
-                                icon={ClipboardCheck}
-                                title="Récapitulatif"
-                                description={
-                                    editing
-                                        ? 'Vérifiez les informations ; les champs modifiés sont signalés.'
-                                        : 'Vérifiez les informations avant d’ajouter l’étudiant.'
-                                }
-                                columns={1}
-                            >
-                                {steps
-                                    .slice(0, -1)
-                                    .map((item, index) =>
-                                        reviewSection(item, index),
-                                    )}
-                                {!editing && (
-                                    <p className="flex items-start gap-2 rounded-xl border border-info/30 bg-info-soft p-3 text-sm text-info-foreground">
-                                        <Info
-                                            className="mt-0.5 size-4 shrink-0"
-                                            aria-hidden="true"
-                                        />
-                                        L’inscription se fait dans
-                                        l’établissement, hors plateforme : cette
-                                        fiche déclare un étudiant déjà
-                                        régulièrement inscrit.
-                                    </p>
-                                )}
-                            </FormSection>
-                        )}
-                    </div>
+                            )}
+                            {reception && (
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={reception.back_url}
+                                        onClick={forgetDraft}
+                                    >
+                                        <ArrowLeft aria-hidden="true" />
+                                        Retour à la recherche
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
+                    }
+                />
 
-                    <div className="sticky bottom-0 z-20 pt-2 pb-3 md:pb-4">
-                        <div className="flex flex-col gap-3 rounded-xl border bg-card/85 px-4 py-3 shadow-elevated backdrop-blur-md supports-[backdrop-filter]:bg-card/75 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                            <div className="flex items-center gap-2">
+                <div className="grid items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]">
+                    {/* Steps: vertical list on large screens, with what each step already holds. */}
+                    <nav
+                        aria-label="Étapes"
+                        className="hidden lg:sticky lg:top-6 lg:block"
+                    >
+                        <ol className="space-y-1">
+                            {steps.map((item, index) => {
+                                const state = stateOf(index);
+                                const openable =
+                                    editing ||
+                                    index <= reached ||
+                                    index < current;
+                                const summary = summaryOf(item);
+                                return (
+                                    <li key={item.id}>
+                                        <button
+                                            type="button"
+                                            disabled={!openable}
+                                            aria-current={
+                                                state === 'current'
+                                                    ? 'step'
+                                                    : undefined
+                                            }
+                                            onClick={() => open(index)}
+                                            className={cn(
+                                                'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed',
+                                                state === 'current'
+                                                    ? 'bg-card shadow-card ring-1 ring-border'
+                                                    : 'hover:bg-card/70 disabled:hover:bg-transparent',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums',
+                                                    state === 'current' &&
+                                                        'border-primary bg-primary text-primary-foreground',
+                                                    state === 'done' &&
+                                                        'border-success/40 bg-success-soft text-success-foreground',
+                                                    state === 'error' &&
+                                                        'border-danger/40 bg-danger-soft text-danger-foreground',
+                                                    state === 'upcoming' &&
+                                                        'bg-card text-muted-foreground',
+                                                )}
+                                                aria-hidden="true"
+                                            >
+                                                {state === 'done' ? (
+                                                    <Check className="size-3.5" />
+                                                ) : state === 'error' ? (
+                                                    '!'
+                                                ) : (
+                                                    index + 1
+                                                )}
+                                            </span>
+                                            <span className="min-w-0 flex-1">
+                                                <span
+                                                    className={cn(
+                                                        'block text-sm',
+                                                        state === 'current'
+                                                            ? 'font-semibold text-foreground'
+                                                            : state === 'error'
+                                                              ? 'font-medium text-danger-foreground'
+                                                              : openable
+                                                                ? 'font-medium text-foreground'
+                                                                : 'text-muted-foreground',
+                                                    )}
+                                                >
+                                                    {item.title}
+                                                </span>
+                                                <span className="block truncate text-xs text-muted-foreground">
+                                                    {state === 'error'
+                                                        ? 'À corriger'
+                                                        : summary ||
+                                                          item.description}
+                                                </span>
+                                            </span>
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    </nav>
+
+                    <form
+                        onSubmit={submit}
+                        noValidate
+                        className="surface min-w-0 overflow-clip"
+                    >
+                        {/* Small screens: where the agent stands, instead of the list. */}
+                        <div className="border-b px-5 pt-4 pb-3 lg:hidden">
+                            <p className="text-xs text-muted-foreground">
+                                Étape {current + 1} sur {steps.length}
+                            </p>
+                            <div
+                                className="mt-2 h-1 overflow-hidden rounded-full bg-muted"
+                                aria-hidden="true"
+                            >
+                                <div
+                                    className="h-full rounded-full bg-primary transition-[width]"
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        <div
+                            ref={panel}
+                            tabIndex={-1}
+                            aria-label={`Étape ${current + 1} sur ${steps.length} : ${step.title}`}
+                            className="scroll-mt-24 space-y-6 p-5 outline-none sm:p-6"
+                        >
+                            <header>
+                                <h2 className="text-lg font-semibold text-foreground">
+                                    {step.title}
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {step.id === 'review' && editing
+                                        ? 'Vérifiez les informations ; les champs modifiés sont signalés.'
+                                        : stepDescriptions[step.id]}
+                                </p>
+                            </header>
+
+                            <ErrorSummary
+                                errors={Object.fromEntries(
+                                    step.keys.map((key) => [key, errors[key]]),
+                                )}
+                                labels={labels}
+                            />
+
+                            {step.fields && (
+                                <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+                                    {step.fields.map(renderField)}
+                                </div>
+                            )}
+                            {step.id === 'cin' && cinIsNonStandard && (
+                                <p className="-mt-2 flex items-start gap-2 text-sm text-warning-foreground">
+                                    <AlertTriangle
+                                        className="mt-0.5 size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    Ce numéro n’a pas 12 chiffres : il sera
+                                    accepté mais signalé « CIN non standard » et
+                                    ne servira pas à identifier l’étudiant.
+                                </p>
+                            )}
+                            {step.id === 'record' && (
+                                <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+                                    <RecordFields
+                                        bare
+                                        options={options}
+                                        data={form.data}
+                                        errors={form.errors}
+                                        setData={(key, value) => {
+                                            form.setData(key, value);
+                                            form.clearErrors(key);
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            {step.id === 'review' && (
+                                <div className="space-y-4">
+                                    {reviewOverview()}
+                                    <div className="grid items-start gap-4 xl:grid-cols-2">
+                                        {steps
+                                            .slice(0, -1)
+                                            .map((item, index) =>
+                                                reviewSection(item, index),
+                                            )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions stay in reach at the bottom of the screen. */}
+                        <div className="sticky bottom-0 z-20 flex flex-col-reverse gap-3 border-t bg-card/95 px-5 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <div className="flex items-center gap-3">
                                 <Button variant="ghost" asChild>
                                     <Link
-                                        href={
-                                            student
-                                                ? `/students/${student.uuid}`
-                                                : '/students'
-                                        }
+                                        href={cancelHref}
+                                        onClick={forgetDraft}
                                     >
                                         Annuler
                                     </Link>
@@ -799,20 +1240,21 @@ export default function StudentForm({
                                     {editing
                                         ? changedKeys.length === 0
                                             ? 'Aucune modification pour l’instant.'
-                                            : `${changedKeys.length} champ${changedKeys.length > 1 ? 's' : ''} modifié${changedKeys.length > 1 ? 's' : ''} ; enregistrez depuis n’importe quelle étape.`
-                                        : 'Les champs marqués * sont obligatoires.'}
+                                            : `${changedKeys.length} champ${changedKeys.length > 1 ? 's' : ''} modifié${changedKeys.length > 1 ? 's' : ''}.`
+                                        : '* champ obligatoire'}
                                 </p>
                             </div>
                             <div className="flex gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setCurrent(current - 1)}
-                                    disabled={current === 0}
-                                >
-                                    <ArrowLeft aria-hidden="true" />
-                                    Précédent
-                                </Button>
+                                {current > 0 && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setCurrent(current - 1)}
+                                    >
+                                        <ArrowLeft aria-hidden="true" />
+                                        Précédent
+                                    </Button>
+                                )}
                                 {!last && (
                                     <Button
                                         type={editing ? 'button' : 'submit'}
@@ -834,11 +1276,6 @@ export default function StudentForm({
                                 {(editing || last) && (
                                     <Button
                                         type="submit"
-                                        className={
-                                            editing
-                                                ? 'bg-success text-primary-foreground hover:bg-success/90 focus-visible:ring-success/40'
-                                                : undefined
-                                        }
                                         disabled={
                                             form.processing ||
                                             (editing &&
@@ -855,14 +1292,14 @@ export default function StudentForm({
                                         {form.processing
                                             ? 'Enregistrement…'
                                             : editing
-                                              ? 'Mettre à jour'
+                                              ? 'Enregistrer les modifications'
                                               : 'Ajouter l’étudiant'}
                                     </Button>
                                 )}
                             </div>
                         </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </PageBody>
         </>
     );
@@ -870,9 +1307,11 @@ export default function StudentForm({
 
 const stepDescriptions: Record<string, string> = {
     identity: 'Telle qu’elle figure sur les pièces officielles de l’étudiant.',
-    cin: 'Données sensibles : visibles uniquement par le personnel autorisé.',
+    cin: 'Données sensibles, visibles seulement par le personnel autorisé.',
     contact: 'Pour joindre l’étudiant au sujet de son dossier.',
-    bac: 'Informations du diplôme d’accès à l’université.',
+    bac: 'Le diplôme qui lui a ouvert l’accès à l’université.',
+    record: 'Où et à quel niveau l’étudiant est inscrit cette année. Il reste « en attente » tant que la liste de l’établissement ne l’a pas confirmé.',
+    review: 'Relisez avant d’ajouter l’étudiant ; « Modifier » rouvre l’étape.',
 };
 
 StudentForm.layout = {
