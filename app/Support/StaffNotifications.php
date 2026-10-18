@@ -31,7 +31,8 @@ final class StaffNotifications
             })
             ->with(['roles.permissions', 'permissions', 'deniedPermissions'])
             ->chunkById(200, function ($users) use ($student, $kind, $message, $subjectUuid, $permission) {
-                $recipients = $users->filter(fn (User $user) => $user->can($permission) && $user->wantsNotification($kind));
+                // An account without notifications.view receives none.
+                $recipients = $users->filter(fn (User $user) => $user->can('notifications.view') && $user->can($permission) && $user->wantsNotification($kind));
                 Notification::send($recipients, new StudentActivity($kind, $message, $student->uuid, $subjectUuid));
             });
     }
