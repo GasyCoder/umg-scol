@@ -27,7 +27,7 @@ class AuthenticationController extends Controller
             abort_unless(StudentPortalAccess::student($user) && $user->hasVerifiedEmail() && $request->session()->get('student_portal') === true, 403);
         }
 
-        return response()->json(['authenticated' => $user !== null, 'linked' => $user?->student_id !== null, 'csrf_token' => csrf_token(), 'google_enabled' => $this->googleEnabled()]);
+        return response()->json(['authenticated' => $user !== null, 'linked' => $user?->student_id !== null && $request->session()->get('student_identity_verified') === $user->student_id, 'csrf_token' => csrf_token(), 'google_enabled' => $this->googleEnabled(), 'email' => $user?->email]);
     }
 
     public function requestOtp(RequestOtpRequest $request, RequestEmailOtp $action): JsonResponse
@@ -37,7 +37,7 @@ class AuthenticationController extends Controller
         }
         $id = $action->handle($request->validated('email'), $request->session()->get('otp_binding'));
 
-        return response()->json(['challenge_id' => $id, 'message' => 'Si la demande peut être traitée, un code a été envoyé.']);
+        return response()->json(['challenge_id' => $id, 'message' => 'Un code de vérification a été envoyé à votre adresse email.']);
     }
 
     public function verifyOtp(VerifyOtpRequest $request, VerifyEmailOtp $action): JsonResponse
@@ -58,6 +58,7 @@ class AuthenticationController extends Controller
         Auth::guard('student')->login($user);
         $request->session()->regenerate();
         $request->session()->forget('otp_binding');
+        $request->session()->forget(['student_identity_verified', 'student_birth_verified']);
         $request->session()->put('student_portal', true);
         StudentPortalAccess::audit($user, $event);
     }
