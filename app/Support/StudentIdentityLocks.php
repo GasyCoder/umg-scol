@@ -6,7 +6,8 @@ use Illuminate\Support\Facades\DB;
 
 class StudentIdentityLocks
 {
-    public const UNIQUE_FIELDS = ['cin', 'phone', 'email'];
+    // UIN and code bourse (PNES) identify one student too.
+    public const UNIQUE_FIELDS = ['cin', 'phone', 'email', 'uin', 'scholarship_code'];
 
     /**
      * @param  array<string,mixed>  $data
