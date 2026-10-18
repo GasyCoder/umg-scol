@@ -47,6 +47,16 @@ enum StudentCorrectionField: string
         };
     }
 
+    /**
+     * Fields the student changes directly, without validation (ADR-089): sex, nationality and address.
+     * Nationality decides the scholarship eligibility: the staff is told of each change (StudentActivity).
+     * Names, birth date, mother, CIN, phone, contact email and BAC always wait for the staff's decision.
+     */
+    public function appliesDirectly(): bool
+    {
+        return in_array($this, [self::Sex, self::Nationality, self::Address], true);
+    }
+
     /** CIN data is never returned to the student portal, so its values stay hidden there. */
     public function hiddenFromStudent(): bool
     {
