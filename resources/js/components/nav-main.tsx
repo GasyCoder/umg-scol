@@ -3,22 +3,46 @@ import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
-    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { useCurrentUrl } from '@/hooks/use-current-url';
 import { toUrl } from '@/lib/utils';
 import type { NavItem } from '@/types';
 
-/** Menu group on the navy sidebar: small caps heading, icon entries, active bar and pending counters. */
-export function NavMain({ items, label }: { items: NavItem[]; label: string }) {
-    const { currentUrl } = useCurrentUrl();
-    // An entry stays active on its sub-pages (/students/… keeps "Étudiants" lit).
-    const isActive = (href: NavItem['href']) => {
-        const path = toUrl(href).split('?')[0];
-        return currentUrl === path || currentUrl.startsWith(`${path}/`);
-    };
+const pathOf = (href: NavItem['href']) => toUrl(href).split('?')[0];
+
+/**
+ * The one menu entry lit for the current page: the entry stays active on its sub-pages
+ * (/students/… keeps "Étudiants" lit), and the most specific entry wins when two match
+ * (/scholarships/reception/labels lights "Étiquettes DDB", not "Réception des dossiers").
+ */
+export function activeHrefOf(
+    items: NavItem[],
+    currentUrl: string,
+): string | null {
+    let best: string | null = null;
+    for (const item of items) {
+        const path = pathOf(item.href);
+        const matches =
+            currentUrl === path || currentUrl.startsWith(`${path}/`);
+        if (matches && (best === null || path.length > best.length))
+            best = path;
+    }
+    return best;
+}
+
+/** Menu group on the navy sidebar: small caps heading, icon entries and active bar. */
+export function NavMain({
+    items,
+    label,
+    activeHref,
+}: {
+    items: NavItem[];
+    label: string;
+    /** Path of the entry lit across the whole menu (activeHrefOf). */
+    activeHref: string | null;
+}) {
+    const isActive = (href: NavItem['href']) => pathOf(href) === activeHref;
 
     return (
         <SidebarGroup className="px-3 py-0 pt-5 first:pt-3">
@@ -33,11 +57,7 @@ export function NavMain({ items, label }: { items: NavItem[]; label: string }) {
                             <SidebarMenuButton
                                 asChild
                                 isActive={active}
-                                tooltip={{
-                                    children: item.badge
-                                        ? `${item.title} (${item.badge})`
-                                        : item.title,
-                                }}
+                                tooltip={{ children: item.title }}
                                 className="relative h-10 gap-3 rounded-lg px-3 font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-brand-gold [&>svg]:size-[18px] [&>svg]:text-sidebar-muted hover:[&>svg]:text-sidebar-accent-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground"
                             >
                                 <Link
@@ -49,14 +69,6 @@ export function NavMain({ items, label }: { items: NavItem[]; label: string }) {
                                     <span>{item.title}</span>
                                 </Link>
                             </SidebarMenuButton>
-                            {!!item.badge && (
-                                <SidebarMenuBadge
-                                    className="right-2 h-5 min-w-5 rounded-full bg-brand-gold px-1.5 text-[11px] font-bold text-sidebar tabular-nums peer-hover/menu-button:text-sidebar peer-data-[active=true]/menu-button:text-sidebar peer-data-[size=default]/menu-button:top-2.5"
-                                    aria-label={`${item.badge} à traiter`}
-                                >
-                                    {item.badge > 99 ? '99+' : item.badge}
-                                </SidebarMenuBadge>
-                            )}
                         </SidebarMenuItem>
                     );
                 })}
