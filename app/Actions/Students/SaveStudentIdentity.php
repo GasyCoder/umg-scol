@@ -12,18 +12,21 @@ use Illuminate\Validation\ValidationException;
 
 class SaveStudentIdentity
 {
-    /** @param array<string,mixed> $data */
-    public function handle(User $actor, ?Student $student, array $data): Student
+    /**
+     * @param  array<string,mixed>  $data
+     * @param  string  $ability  Policy ability checked on an existing student (updateAtReception from the reception counter).
+     */
+    public function handle(User $actor, ?Student $student, array $data, string $ability = 'update'): Student
     {
-        return Cache::lock('students:manual-identity-write', 60)->block(10, fn (): Student => $this->persist($actor, $student, $data));
+        return Cache::lock('students:manual-identity-write', 60)->block(10, fn (): Student => $this->persist($actor, $student, $data, $ability));
     }
 
     /** @param array<string,mixed> $data */
-    public function persist(User $actor, ?Student $student, array $data): Student
+    public function persist(User $actor, ?Student $student, array $data, string $ability = 'update'): Student
     {
-        return DB::transaction(function () use ($actor, $student, $data): Student {
+        return DB::transaction(function () use ($actor, $student, $data, $ability): Student {
             $target = $student === null ? new Student : Student::query()->lockForUpdate()->findOrFail($student->id);
-            Gate::forUser($actor)->authorize($student === null ? 'create' : 'update', $student === null ? Student::class : $target);
+            Gate::forUser($actor)->authorize($student === null ? 'create' : $ability, $student === null ? Student::class : $target);
             $target->fill($data);
             StudentIdentityLocks::acquire(StudentIdentityLocks::keys($target->attributesToArray()));
             foreach (StudentIdentityLocks::uniqueValues($target->attributesToArray()) as $field => $value) {
