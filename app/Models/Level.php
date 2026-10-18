@@ -26,7 +26,7 @@ class Level extends Model
     }
 
     /** LMD levels every establishment uses: an import may create them when missing. code => [name, order] */
-    public const STANDARD = ['L1' => ['Licence 1', 1], 'L2' => ['Licence 2', 2], 'L3' => ['Licence 3', 3], 'M1' => ['Master 1', 4], 'M2' => ['Master 2', 5]];
+    public const STANDARD = ['L1' => ['Licence 1', 1], 'L2' => ['Licence 2', 2], 'L3' => ['Licence 3', 3], 'M1' => ['Master 1', 4], 'M2' => ['Master 2', 5], 'D1' => ['Doctorat 1', 6], 'D2' => ['Doctorat 2', 7], 'D3' => ['Doctorat 3', 8]];
 
     /** Standard code named by a file value ("L3", "l3", "Licence 3", "Master 1"), null otherwise. */
     public static function standardCode(mixed $value): ?string
