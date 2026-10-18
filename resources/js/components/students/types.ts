@@ -12,6 +12,11 @@ export type Student = {
     cin: string | null;
     cin_issued_at: string | null;
     cin_issued_place: string | null;
+    /** Code bourse of the PNES base, shown everywhere. */
+    scholarship_code: string | null;
+    /** UIN and bank account: only sent to the central office (absent otherwise). */
+    uin?: string | null;
+    bank_account?: string | null;
     nationality: string | null;
     phone: string | null;
     email: string | null;
@@ -53,7 +58,12 @@ export type AnnualRecord = {
     repeat_code: RepeatCode | null;
     scholarship_requested_at: string | null;
     scholarship_request_reference: string | null;
-    status: 'active' | 'inactive';
+    status: RecordStatus;
+    source: SituationSource;
+    verification: SituationVerification;
+    /** Scholarship holder of the year (PNES base). */
+    is_scholarship_holder: boolean;
+    preinscription_reference?: string | null;
     declared_at: string;
     student?: Pick<
         Student,
@@ -74,6 +84,40 @@ export type AnnualRecord = {
     /** Deactivated together with the identity; restored when the identity is reactivated. */
     inactive_with_identity?: boolean;
     canUpdate?: boolean;
+    canVerify?: boolean;
+};
+
+/** Where the situation of the year comes from (mirrors App\Enums\SituationSource). */
+export type SituationSource =
+    | 'establishment'
+    | 'pnes'
+    | 'central'
+    | 'preinscription';
+/** Status of a situation (mirrors App\Enums\StudentRecordStatus). */
+export type RecordStatus = 'active' | 'inactive' | 'pending';
+export const RECORD_STATUS_LABELS: Record<RecordStatus, string> = {
+    active: 'Active',
+    inactive: 'Inactive',
+    pending: 'En attente',
+};
+export const SOURCE_LABELS: Record<SituationSource, string> = {
+    establishment: 'Liste de l’établissement',
+    pnes: 'Base PNES (boursiers)',
+    central: 'Saisie de la Scolarité',
+    preinscription: 'Préinscription (nouveau bachelier)',
+};
+/** Proof of the enrolment of the year (mirrors App\Enums\SituationVerification). */
+export type SituationVerification = 'verified' | 'pending' | 'matched';
+export const VERIFICATION_LABELS: Record<SituationVerification, string> = {
+    verified: 'Vérifiée',
+    pending: 'Pas encore dans la liste de l’établissement',
+    matched: 'Trouvée dans la liste — à valider',
+};
+/** Short wording for badges in lists. */
+export const VERIFICATION_SHORT: Record<SituationVerification, string> = {
+    verified: 'Vérifiée',
+    pending: 'En attente',
+    matched: 'À valider',
 };
 
 /** Closed lists of the official establishment template (mirrors App\Support\StudentReferenceLists). */
