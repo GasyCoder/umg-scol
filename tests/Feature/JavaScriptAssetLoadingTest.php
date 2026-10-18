@@ -46,3 +46,32 @@ it('does not reintroduce JavaScript preloads through the HTTP Link header', func
     expect($links)->toContain('app-test.css', 'shared-test.css')
         ->not->toContain('app-test.js', 'shared-test.js', 'modulepreload');
 });
+
+it('keeps initial portal loading within five JavaScript files', function (array $entries) {
+    $buildPath = $this->originalPublicPath.'/build/';
+    if (! File::exists($buildPath.'manifest.json')) {
+        $this->markTestSkipped('Run npm run build to check the production module graph.');
+    }
+    $manifest = json_decode(File::get($buildPath.'manifest.json'), true, flags: JSON_THROW_ON_ERROR);
+    $visited = [];
+    $visit = function (string $entry) use (&$visit, &$visited, $manifest, $buildPath): void {
+        if (isset($visited[$entry])) {
+            return;
+        }
+        expect($manifest)->toHaveKey($entry);
+        $visited[$entry] = true;
+        expect(File::exists($buildPath.$manifest[$entry]['file']))->toBeTrue();
+        foreach ($manifest[$entry]['imports'] ?? [] as $dependency) {
+            $visit($dependency);
+        }
+    };
+    foreach ($entries as $entry) {
+        $visit($entry);
+    }
+
+    expect(count($visited))->toBeLessThanOrEqual(5);
+})->with([
+    'dashboard' => [['resources/js/app.tsx', 'resources/js/pages/dashboard.tsx']],
+    'login' => [['resources/js/app.tsx', 'resources/js/pages/auth/login.tsx']],
+    'student portal' => [['resources/js/bourse/app.tsx']],
+]);

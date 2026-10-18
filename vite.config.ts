@@ -11,6 +11,13 @@ export default defineConfig({
     build: {
         // Match Laravel's native module loading: avoid HTTP/2 preload reprioritization on PowerBoost.
         modulePreload: false,
+        rolldownOptions: {
+            output: {
+                codeSplitting: {
+                    groups: [{ name: 'shared', minShareCount: 2 }],
+                },
+            },
+        },
     },
     plugins: lazyPlugins(() => [
         laravel({

@@ -78,6 +78,11 @@ ont reproduit des transferts interrompus, `ERR_HTTP2_PROTOCOL_ERROR` et un table
 le même écran fonctionne avec les imports natifs, en conservant HTTP/2.
 Les scripts, leurs imports, les styles et les polices restent chargés normalement.
 
+Le build regroupe les modules partagés entre plusieurs entrées dans un fichier commun,
+au lieu de multiplier les petits fichiers d'icônes et de composants. Les pages restent chargées
+à la demande. Les tests Pest contrôlent le graphe du build : chaque portail initial charge
+au maximum cinq fichiers JavaScript, imports compris.
+
 Après une modification du build, vérifier dans un navigateur avec un cache vide : ouverture du
 tableau de bord authentifié, navigation Inertia et portail étudiant. Un contrôle HTTP isolé de
 chaque fichier ne suffit pas à reproduire ce problème de chargement.
