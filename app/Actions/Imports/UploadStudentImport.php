@@ -2,6 +2,7 @@
 
 namespace App\Actions\Imports;
 
+use App\Enums\ImportKind;
 use App\Imports\StageStudentSheet;
 use App\Imports\StageStudentWorkbook;
 use App\Models\StudentImport;
@@ -18,9 +19,11 @@ use Throwable;
 
 class UploadStudentImport
 {
-    public function handle(User $actor, UploadedFile $file, ?int $establishment, int $year): StudentImport
+    public function handle(User $actor, UploadedFile $file, ?int $establishment, int $year, ImportKind $kind = ImportKind::Establishment): StudentImport
     {
-        Gate::forUser($actor)->authorize('create', StudentImport::class);
+        Gate::forUser($actor)->authorize('handleKind', [StudentImport::class, $kind]);
+        // The national files (PNES, pre-registration) always name the establishment on each row.
+        abort_if($kind !== ImportKind::Establishment && $establishment !== null, 422);
         abort_if($actor->hasRole('establishment') && ($establishment === null || $actor->establishment_id !== $establishment), 403);
         try {
             app(StudentImportFileGuard::class)->validate($file);
@@ -35,8 +38,8 @@ class UploadStudentImport
             throw ValidationException::withMessages(['file' => 'Le stockage du fichier a échoué.']);
         }
         try {
-            return DB::transaction(function () use ($actor, $file, $establishment, $year, $path) {
-                $import = StudentImport::query()->create(['establishment_id' => $establishment, 'academic_year_id' => $year, 'user_id' => $actor->id, 'original_filename' => mb_substr(basename($file->getClientOriginalName()), 0, 255), 'stored_path' => $path, 'disk' => 'student_imports']);
+            return DB::transaction(function () use ($actor, $file, $establishment, $year, $path, $kind) {
+                $import = StudentImport::query()->create(['kind' => $kind, 'establishment_id' => $establishment, 'academic_year_id' => $year, 'user_id' => $actor->id, 'original_filename' => mb_substr(basename($file->getClientOriginalName()), 0, 255), 'stored_path' => $path, 'disk' => 'student_imports']);
                 $sheet = new StageStudentSheet($import);
                 Excel::import(new StageStudentWorkbook($sheet), $path, 'student_imports', strtolower($file->getClientOriginalExtension()) === 'csv' ? \Maatwebsite\Excel\Excel::CSV : \Maatwebsite\Excel\Excel::XLSX);
                 $sheet->flush();
