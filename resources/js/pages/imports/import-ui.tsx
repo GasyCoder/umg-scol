@@ -76,10 +76,12 @@ export function ImportStepper({
     failed?: boolean;
     className?: string;
 }) {
-    const step = importSteps[current];
     return (
-        <div className={cn('surface px-4 py-4 sm:px-6', className)}>
-            <ol aria-label="Étapes de l’import" className="flex items-start">
+        <div className={cn('surface px-4 py-2.5 sm:px-5', className)}>
+            <ol
+                aria-label="Étapes de l’import"
+                className="flex items-center gap-2"
+            >
                 {importSteps.map((item, index) => {
                     const done =
                         index < current || (index === current && finished);
@@ -88,14 +90,17 @@ export function ImportStepper({
                     return (
                         <li
                             key={item.title}
-                            className="relative flex min-w-0 flex-1 flex-col items-center gap-2 text-center"
+                            className={cn(
+                                'flex min-w-0 items-center gap-2',
+                                index > 0 && 'flex-1',
+                            )}
                             aria-current={active ? 'step' : undefined}
                         >
                             {index > 0 && (
                                 <span
                                     aria-hidden="true"
                                     className={cn(
-                                        'absolute top-[1.125rem] right-1/2 -left-1/2 h-0.5 -translate-y-1/2 rounded-full',
+                                        'h-px min-w-3 flex-1',
                                         index <= current
                                             ? 'bg-primary'
                                             : 'bg-border',
@@ -105,63 +110,49 @@ export function ImportStepper({
                             <span
                                 aria-hidden="true"
                                 className={cn(
-                                    'relative z-10 flex size-9 items-center justify-center rounded-full text-sm font-bold transition-colors',
+                                    'flex size-7 shrink-0 items-center justify-center rounded-full transition-colors',
                                     done &&
                                         'bg-primary text-primary-foreground',
                                     active &&
                                         (failed
-                                            ? 'bg-danger-soft text-danger ring-2 ring-danger ring-offset-2 ring-offset-card'
-                                            : 'bg-card text-primary ring-2 ring-primary ring-offset-2 ring-offset-card'),
+                                            ? 'bg-danger-soft text-danger ring-2 ring-danger'
+                                            : 'bg-card text-primary ring-2 ring-primary'),
                                     !done &&
                                         !active &&
                                         'bg-muted text-muted-foreground',
                                 )}
                             >
                                 {done ? (
-                                    <Check className="size-4" />
+                                    <Check className="size-3.5" />
                                 ) : active && failed ? (
-                                    <X className="size-4" />
+                                    <X className="size-3.5" />
                                 ) : (
-                                    <Icon className="size-4" />
+                                    <Icon className="size-3.5" />
                                 )}
                             </span>
-                            <span className="min-w-0 max-sm:sr-only">
-                                <span
-                                    className={cn(
-                                        'block truncate text-xs font-semibold',
-                                        active || done
-                                            ? 'text-foreground'
-                                            : 'text-muted-foreground',
-                                    )}
-                                >
-                                    <span className="sr-only">
-                                        Étape {index + 1} :{' '}
-                                    </span>
-                                    {item.title}
-                                    {done && (
-                                        <span className="sr-only">
-                                            {' '}
-                                            (terminée)
-                                        </span>
-                                    )}
+                            <span
+                                className={cn(
+                                    'truncate text-xs font-semibold',
+                                    active || done
+                                        ? 'text-foreground'
+                                        : 'text-muted-foreground',
+                                    // On a phone only the current step is named.
+                                    !active && 'max-md:sr-only',
+                                )}
+                                title={item.hint}
+                            >
+                                <span className="sr-only">
+                                    Étape {index + 1} :{' '}
                                 </span>
-                                <span className="hidden truncate text-[11px] text-muted-foreground lg:block">
-                                    {item.hint}
-                                </span>
+                                {item.title}
+                                {done && (
+                                    <span className="sr-only"> (terminée)</span>
+                                )}
                             </span>
                         </li>
                     );
                 })}
             </ol>
-            <p
-                className="mt-3 text-center text-sm text-muted-foreground sm:hidden"
-                aria-hidden="true"
-            >
-                Étape {current + 1} sur {importSteps.length} ·{' '}
-                <span className="font-semibold text-foreground">
-                    {step?.title}
-                </span>
-            </p>
         </div>
     );
 }
