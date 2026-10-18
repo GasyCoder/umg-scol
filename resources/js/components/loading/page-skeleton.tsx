@@ -206,33 +206,38 @@ function Content({ spec }: { spec: PageSkeletonSpec }) {
         case 'dashboard':
             return (
                 <>
-                    <div className="surface flex items-center justify-between gap-8 p-6 sm:p-8">
-                        <div className="w-full max-w-lg space-y-4">
-                            <Line className="h-8 w-3/4" />
-                            <Line className="w-full" />
-                            <Line className="h-8 w-40" />
-                        </div>
-                        <Line className="hidden h-36 w-52 md:block" />
-                    </div>
-                    <Counters />
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        {[0, 1, 2, 3].map((index) => (
-                            <div key={index} className="surface space-y-5 p-5">
-                                <Line className="h-5 w-40" />
-                                {[0, 1, 2, 3].map((_, row) => (
-                                    <div key={row} className="space-y-2">
-                                        <Line className="h-3 w-24" />
-                                        <Line
-                                            className={
-                                                row % 2 === 0
-                                                    ? 'h-5 w-3/5'
-                                                    : 'h-5 w-4/5'
-                                            }
-                                        />
+                    <Header compact />
+                    <Counters count={8} />
+                    <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                        {[0, 1, 2].map((index) => (
+                            <div key={index} className="surface space-y-4 p-4">
+                                <Line className="h-4 w-40" />
+                                <Line className="h-3 w-48" />
+                                {index === 1 ? (
+                                    <div className="flex h-60 items-center justify-center">
+                                        <Skeleton className="size-40 rounded-full [mask-image:radial-gradient(transparent_48%,black_49%)]" />
                                     </div>
-                                ))}
+                                ) : (
+                                    <div className="flex h-60 items-end justify-around gap-3 border-b border-l px-5 pt-4">
+                                        {[40, 75, 55, 90, 65, 45].map(
+                                            (height, i) => (
+                                                <Skeleton
+                                                    key={i}
+                                                    className="w-7 rounded-b-none"
+                                                    style={{
+                                                        height: `${height}%`,
+                                                    }}
+                                                />
+                                            ),
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
+                    </div>
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <Panel fields={4} />
+                        <Panel fields={4} />
                     </div>
                 </>
             );
