@@ -27,12 +27,16 @@ export type ImportItem = {
     updated_rows: number;
     declared_rows: number;
     skipped_rows: number;
+    /** Situations found again (central entries) or marked as PNES scholarship holders. */
+    matched_rows: number;
+    kind: ImportKind;
     created_at: string;
     failure_reason: string | null;
     headers: string[];
     mapping: Record<string, number>;
     /** Referentials created in the establishment: planned at analysis, actual once created is true. */
     reference_changes: {
+        establishments?: string[];
         levels?: string[];
         domains: string[];
         mentions: string[];
@@ -67,6 +71,16 @@ export type ImportRow = {
     matched_student_id: number | null;
     resolution: string | null;
     data: Record<string, string | null>;
+    /** Values offered for correction (rows not importable, import ready); null otherwise. */
+    values?: Record<string, string> | null;
+    /** Fields already corrected in the preview. */
+    corrected?: string[];
+    /** Value of the existing student record for each field differing from it. */
+    official?: Record<string, string> | null;
+    /** Fields of the existing record chosen to be replaced with the file value. */
+    identity_updates?: string[];
+    /** The actor may correct the existing record (StudentPolicy::update). */
+    identity_editable?: boolean;
 };
 export const statuses: Record<ImportStatus | RowStatus, string> = {
     uploaded: 'Fichier reçu',
@@ -95,3 +109,16 @@ export const rowStatusOrder: RowStatus[] = [
     'rejected',
     'duplicate',
 ];
+
+/** File the platform imports: the establishment list, the PNES base or the pre-registration results. */
+export type ImportKind = 'establishment' | 'pnes' | 'preinscription';
+
+/** Expected column of an import file, shown before upload. */
+export type ImportColumn = { label: string; required: boolean };
+
+/** Kind of file the actor may import, with its expected columns. */
+export type ImportKindOption = {
+    value: ImportKind;
+    label: string;
+    columns: ImportColumn[];
+};
