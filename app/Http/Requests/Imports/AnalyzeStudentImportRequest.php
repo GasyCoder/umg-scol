@@ -22,8 +22,8 @@ class AnalyzeStudentImportRequest extends FormRequest
         $import = $this->route('student_import');
 
         $column = ['required', 'integer', 'min:0', 'max:'.(count($import->headers) - 1)];
-        $rules = ['mapping' => ['required', 'array:'.implode(',', array_keys(StudentImportColumns::labels()))], 'mapping.*' => [...$column, 'distinct']];
-        foreach (StudentImportColumns::required() as $field) {
+        $rules = ['mapping' => ['required', 'array:'.implode(',', array_keys(StudentImportColumns::labels($import->kind)))], 'mapping.*' => [...$column, 'distinct']];
+        foreach (StudentImportColumns::required($import->kind) as $field) {
             $rules['mapping.'.$field] = $column;
         }
 
@@ -49,8 +49,10 @@ class AnalyzeStudentImportRequest extends FormRequest
     public function messages(): array
     {
         $messages = ['distinct' => 'Une colonne ne peut être utilisée deux fois.', 'max' => 'La colonne sélectionnée est invalide.'];
-        foreach (StudentImportColumns::required() as $field) {
-            $messages['mapping.'.$field.'.required'] = 'Associez la colonne '.StudentImportColumns::labels()[$field].'.';
+        /** @var StudentImport $import */
+        $import = $this->route('student_import');
+        foreach (StudentImportColumns::required($import->kind) as $field) {
+            $messages['mapping.'.$field.'.required'] = 'Associez la colonne '.StudentImportColumns::labels($import->kind)[$field].'.';
         }
 
         return $messages;
