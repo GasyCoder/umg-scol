@@ -1,7 +1,6 @@
 <?php
 
-use App\Actions\Scholarships\SaveScholarshipCampaign;
-use App\Models\AcademicYear;
+use App\Actions\Platform\SaveDdbNumbering;
 use App\Models\Activity;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -95,10 +94,9 @@ it('renders an empty administrative list explicitly', function () {
     $this->actingAs($this->admin)->get('/audits/'.$line->uuid)->assertInertia(fn (Assert $page) => $page->where('activity.metadata', [['key' => 'filters', 'value' => 'aucun']]));
 });
 it('never hides the developer: actions appear and filter like any other actor', function () {
-    $year = AcademicYear::factory()->create(['is_current' => true]);
-    app(SaveScholarshipCampaign::class)->handle($this->developer, null, ['academic_year_id' => $year->id, 'name' => 'Campagne dev', 'starts_at' => null, 'ends_at' => null, 'notes' => null]);
+    app(SaveDdbNumbering::class)->handle($this->developer, 'DEV-{NUM}', 5);
     $rows = auditRows($this, $this->admin, '?actor='.$this->developer->id);
-    expect($rows['data'])->not->toBeEmpty()->and($rows['data'][0])->toMatchArray(['actor' => 'Dev Support', 'role' => 'Développeur', 'event' => 'campaign_created']);
+    expect($rows['data'])->not->toBeEmpty()->and($rows['data'][0])->toMatchArray(['actor' => 'Dev Support', 'role' => 'Développeur', 'event' => 'ddb_numbering_updated']);
     $this->actingAs($this->admin)->get('/audits')->assertInertia(fn (Assert $page) => $page->where('options.actors', fn ($actors) => collect($actors)->pluck('name')->contains('Dev Support')));
     // The developer's own consultation of the audit is itself traced when it exports.
     $this->actingAs($this->developer)->get('/audits/export')->assertOk()->streamedContent();
