@@ -103,6 +103,8 @@ jobs:
           php artisan key:generate --ansi
           npm ci --no-audit --no-fund
           npm run build
+          # PowerBoost does not compress on the fly: ship gzip copies served by public/.htaccess.
+          find public/build/assets -type f \( -name '*.js' -o -name '*.css' \) -exec gzip -9 -k -n {} +
           composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
           rm .env
 

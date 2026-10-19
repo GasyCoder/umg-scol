@@ -13,6 +13,11 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Serve the gzip copies of Vite assets made by the CI build (PowerBoost does not compress).
+    RewriteCond %{HTTP:Accept-Encoding} gzip
+    RewriteCond %{REQUEST_FILENAME}.gz -f
+    RewriteRule ^(build/assets/.+\.(?:js|css))$ $1.gz [L]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
@@ -24,14 +29,21 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# Compress text responses (PowerBoost serves them uncompressed otherwise).
-<IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
-</IfModule>
-
-# Vite assets carry a content hash in their name: cache them for a year.
 <IfModule mod_headers.c>
-    <FilesMatch "-[A-Za-z0-9_-]{8}\.(js|css|woff2?)$">
+    <FilesMatch "\.js\.gz$">
+        ForceType text/javascript
+        Header set Content-Encoding gzip
+    </FilesMatch>
+    <FilesMatch "\.css\.gz$">
+        ForceType text/css
+        Header set Content-Encoding gzip
+    </FilesMatch>
+    <FilesMatch "\.(js|css)(\.gz)?$">
+        Header append Vary Accept-Encoding
+    </FilesMatch>
+
+    # Vite assets carry a content hash in their name: cache them for a year.
+    <FilesMatch "-[A-Za-z0-9_-]{8}\.(js|css|woff2?)(\.gz)?$">
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
 </IfModule>

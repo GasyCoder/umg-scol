@@ -80,9 +80,11 @@ it('keeps initial portal loading within five JavaScript files', function (array 
     'student portal' => [['resources/js/bourse/app.tsx']],
 ]);
 
-it('compresses responses and caches hashed assets on Apache', function () {
+it('serves gzip copies of the assets and caches them for a year on Apache', function () {
     $htaccess = File::get($this->originalPublicPath.'/.htaccess');
+    $workflow = File::get(base_path('.github/workflows/ci-cd.yml'));
 
-    expect($htaccess)->toContain('AddOutputFilterByType DEFLATE', 'application/javascript', 'text/css', 'text/html')
+    expect($workflow)->toContain("find public/build/assets -type f \\( -name '*.js' -o -name '*.css' \\) -exec gzip -9 -k -n {} +");
+    expect($htaccess)->toContain('RewriteRule ^(build/assets/.+\\.(?:js|css))$ $1.gz [L]', 'Header set Content-Encoding gzip', 'ForceType text/javascript', 'ForceType text/css')
         ->toContain('max-age=31536000, immutable');
 });
