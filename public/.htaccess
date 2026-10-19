@@ -14,6 +14,7 @@
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
     # Serve the gzip copies of Vite assets made by the CI build (PowerBoost does not compress).
+    RewriteRule ^build/assets/ - [E=UMG_DIAG:ae=%{HTTP:Accept-Encoding}|f=%{REQUEST_FILENAME}]
     RewriteCond %{HTTP:Accept-Encoding} gzip
     RewriteCond %{REQUEST_FILENAME}.gz -f
     RewriteRule ^(build/assets/.+\.(?:js|css))$ $1.gz [L]
@@ -38,6 +39,7 @@
         ForceType text/css
         Header set Content-Encoding gzip
     </FilesMatch>
+    Header set X-Umg-Diag "%{UMG_DIAG}e|r=%{REDIRECT_UMG_DIAG}e"
     <FilesMatch "\.(js|css)(\.gz)?$">
         Header append Vary Accept-Encoding
     </FilesMatch>
