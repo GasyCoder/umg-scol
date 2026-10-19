@@ -79,3 +79,10 @@ it('keeps initial portal loading within five JavaScript files', function (array 
     'login' => [['resources/js/app.tsx', 'resources/js/pages/auth/login.tsx']],
     'student portal' => [['resources/js/bourse/app.tsx']],
 ]);
+
+it('compresses responses and caches hashed assets on Apache', function () {
+    $htaccess = File::get($this->originalPublicPath.'/.htaccess');
+
+    expect($htaccess)->toContain('AddOutputFilterByType DEFLATE', 'application/javascript', 'text/css', 'text/html')
+        ->toContain('max-age=31536000, immutable');
+});
