@@ -683,15 +683,18 @@ function Portal() {
                         href="/"
                         className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                        <BrandMark
-                            logoUrl={branding.logo_url}
-                            className={cn(
-                                'size-9 ring-0',
-                                branding.logo_url
-                                    ? 'bg-transparent p-0'
-                                    : 'bg-sidebar',
-                            )}
-                        />
+                        {branding.logo_url ? (
+                            <img
+                                src={branding.logo_url}
+                                alt=""
+                                className="h-9 w-auto max-w-28 shrink-0 object-contain"
+                            />
+                        ) : (
+                            <BrandMark
+                                logoUrl={null}
+                                className="size-9 bg-sidebar ring-0"
+                            />
+                        )}
                         <span className="min-w-0 leading-tight">
                             <span className="block font-heading text-[15px] font-bold tracking-tight text-foreground">
                                 {branding.bourse_name}
