@@ -4,6 +4,7 @@ use App\Actions\Imports\AnalyzeStudentImport;
 use App\Actions\Imports\CommitStudentImport;
 use App\Enums\StudentImportRowStatus as RowStatus;
 use App\Enums\StudentImportStatus as ImportStatus;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\AcademicYear;
 use App\Models\Activity;
 use App\Models\Establishment;
@@ -45,6 +46,32 @@ beforeEach(function () {
     $this->admin = User::factory()->create()->assignRole('superadmin');
     $this->actingAs($this->actor);
     $this->data = ['last_name' => 'Nom', 'first_names' => 'Prénom', 'sex' => 'M', 'birth_date' => '2001-01-01', 'nationality' => 'Malagasy', 'repeat_code' => 'N', 'level' => 'L1', 'program' => 'INFO'];
+});
+
+it('never stores an import polling response in place of its HTML page', function () {
+    $import = uploadStudentCsv($this, [$this->data]);
+    $url = '/imports/'.$import->uuid;
+    $this->get($url)->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
+        ->assertHeader('Cache-Control', 'no-store, private');
+
+    $this->get($url, [
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(request()) ?? '',
+        'X-Inertia-Partial-Component' => 'imports/show',
+        'X-Inertia-Partial-Data' => 'import,rows,progress',
+    ])->assertOk()->assertHeader('X-Inertia', 'true')->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('component', 'imports/show')->assertJsonPath('props.import.uuid', $import->uuid)
+        ->assertJsonMissingPath('props.auth');
+
+    $this->get($url)->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
+        ->assertHeader('Cache-Control', 'no-store, private')->assertSee('data-page="app"', false);
+
+    $this->get($url, ['X-Inertia' => 'true', 'X-Inertia-Version' => 'outdated-build'])
+        ->assertStatus(409)->assertHeader('X-Inertia-Location')
+        ->assertHeader('Cache-Control', 'no-store, private');
+
+    $this->actingAs(User::factory()->create(['establishment_id' => $this->b->id])->assignRole('establishment'))
+        ->get($url)->assertForbidden();
 });
 
 /** @param list<array<string,mixed>> $rows */

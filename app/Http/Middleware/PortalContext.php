@@ -22,9 +22,9 @@ class PortalContext
         app('session')->driver()->setName(config('session.cookie'));
         try {
             $response = $next($request);
-            if ($portal === 'bourse') {
-                $response->headers->set('Cache-Control', 'private, no-store');
-            }
+            // PowerBoost drops Vary: X-Inertia on HTML. Never store a dynamic response under a
+            // page URL: a polling JSON response could otherwise replace its HTML.
+            $response->headers->set('Cache-Control', 'private, no-store');
 
             return $response;
         } finally {

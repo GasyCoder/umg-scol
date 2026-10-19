@@ -78,7 +78,8 @@ function googleStudent(string $email = 'google@example.test', string $id = '1234
 it('serves each portal only on its own configured domain', function () {
     $this->get('http://'.config('portals.scol_domain').'/')->assertRedirect('/dashboard');
     $this->get('http://'.config('portals.scol_domain').'/dashboard')->assertRedirect('/login');
-    $this->get($this->base.'/')->assertOk()->assertSee('bourse-root');
+    $this->get($this->base.'/')->assertOk()->assertSee('bourse-root')->assertHeader('Cache-Control', 'no-store, private');
+    $this->getJson($this->base.'/api/student/session')->assertOk()->assertHeader('Cache-Control', 'no-store, private');
     $this->get($this->base.'/dashboard')->assertNotFound();
     $this->get($this->base.'/login')->assertNotFound();
     $this->get('/api/student/session')->assertNotFound();

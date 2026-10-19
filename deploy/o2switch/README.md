@@ -89,6 +89,13 @@ chaque fichier ne suffit pas à reproduire ce problème de chargement.
 
 ## Modifications depuis le portail interne
 
+PowerBoost retire aussi `Vary: X-Inertia` des réponses HTML. `PortalContext` impose
+`Cache-Control: private, no-store` sur les deux portails : le navigateur et les caches
+intermédiaires ne doivent pas conserver le JSON d'un rafraîchissement partiel à la place
+du document HTML de la même URL. Les fichiers statiques Vite gardent leur cache long.
+Vérifier l'ouverture directe d'un import, un rafraîchissement partiel, puis le rechargement
+du document : ce dernier doit toujours rendre l'interface HTML.
+
 PowerBoost a aussi interrompu une requête native `PATCH` en HTTP/2 lors du choix de l'année
 courante. Le client HTTP Inertia transporte les méthodes `PATCH`, `PUT` et `DELETE` en `POST`
 avec l'en-tête Laravel `X-HTTP-Method-Override`. Le serveur retrouve la méthode initiale :
