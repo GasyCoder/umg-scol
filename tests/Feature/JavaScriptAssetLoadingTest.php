@@ -70,6 +70,10 @@ it('keeps initial portal loading within five JavaScript files', function (array 
     }
 
     expect(count($visited))->toBeLessThanOrEqual(5);
+    // Recharts is only fetched on demand by the charts, never on the critical path.
+    foreach (array_keys($visited) as $chunk) {
+        expect($manifest[$chunk]['file'])->not->toContain('chart-renderers');
+    }
 })->with([
     'dashboard' => [['resources/js/app.tsx', 'resources/js/pages/dashboard.tsx']],
     'login' => [['resources/js/app.tsx', 'resources/js/pages/auth/login.tsx']],

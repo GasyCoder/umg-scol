@@ -14,6 +14,7 @@ export default defineConfig({
         rolldownOptions: {
             output: {
                 codeSplitting: {
+                    // Few initial files (no modulepreload on PowerBoost); Recharts stays in its lazy chunk.
                     groups: [{ name: 'shared', minShareCount: 2 }],
                 },
             },
@@ -30,9 +31,11 @@ export default defineConfig({
             fonts: [
                 bunny('Public Sans', {
                     weights: [400, 500, 600, 700],
+                    preload: [{ weight: 400 }],
                 }),
                 bunny('Plus Jakarta Sans', {
                     weights: [500, 600, 700, 800],
+                    preload: [{ weight: 700 }],
                 }),
             ],
         }),
